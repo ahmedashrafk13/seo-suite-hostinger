@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+    <div class="card">
+      <div class="card-body">
+        <h3 class="mt-0">Account</h3>
+        <p><strong>Name:</strong> <%= user.name || '—' %></p>
+        <p><strong>Email:</strong> <%= user.email %></p>
+        <p><strong>Member since:</strong> <%= user.created_at %></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h3 class="mt-0">Google Connection</h3>
+        <% if (connection) { %>
+          <p>Connected as <strong><%= connection.connected_email || 'unknown' %></strong>.</p>
+          <form method="POST" action="/settings/disconnect">
+            <button class="btn danger" type="submit">Disconnect Google Account</button>
+          </form>
+        <% } else { %>
+          <p class="muted">Not connected.</p>
+          <a class="btn" href="/connect">Go to Connect Accounts</a>
+        <% } %>
+      </div>
+    </div>
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

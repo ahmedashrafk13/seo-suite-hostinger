@@ -1,0 +1,23 @@
+  <div class="topbar">
+    <h1><%= typeof pageTitle !== 'undefined' && pageTitle ? pageTitle : title %></h1>
+    <div class="user-chip">
+      <span><%= currentUser ? (currentUser.name || currentUser.email) : '' %></span>
+      <form method="POST" action="/logout" style="display:inline">
+        <button type="submit" class="btn ghost sm">Log out</button>
+      </form>
+    </div>
+  </div>
+  <div class="content<%= typeof narrow !== 'undefined' && narrow ? ' narrow' : '' %>">
+
+  <% if (typeof flash !== 'undefined' && flash) { %>
+    <div class="notice success">
+      <span class="notice-icon">&#10003;</span>
+      <div class="notice-body"><%= flash %></div>
+    </div>
+  <% } %>
+  <% if (typeof flashError !== 'undefined' && flashError) { %>
+    <div class="notice error">
+      <span class="notice-icon">&#9888;</span>
+      <div class="notice-body"><%= flashError %></div>
+    </div>
+  <% } %>

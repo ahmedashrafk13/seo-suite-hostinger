@@ -1,0 +1,123 @@
+<%
+/* Interactive area/line trend chart (ApexCharts) with a Day/Week/Month
+   grouping toggle. Same call signature as before: label (string), points
+   (array of {date, value} where date is an ISO YYYY-MM-DD string), color
+   (hex), fmt (optional formatter name: 'int'|'pct'|'pos'), invert (bool,
+   lower=better). */
+const _pts = (typeof points !== 'undefined' ? points : []).filter((p) => p && p.value != null);
+const _label = typeof label !== 'undefined' ? label : '';
+const _color = typeof color !== 'undefined' ? color : '#2563eb';
+const _fmt = typeof fmt !== 'undefined' ? fmt : 'int';
+const _invert = typeof invert !== 'undefined' ? invert : false;
+function _fmtV(v) {
+  if (_fmt === 'pct') return `${(v * 100).toFixed(2)}%`;
+  if (_fmt === 'pos') return v.toFixed(1);
+  return Math.round(v).toLocaleString('en-US');
+}
+const _uid = `tc${Math.random().toString(36).slice(2, 9)}`;
+// Weekly/monthly grouping only makes sense with enough history to bucket.
+const _canGroup = _pts.length >= 10;
+%>
+<div class="trendchart">
+  <div class="trendchart-head">
+    <span class="trendchart-label"><%= _label %></span>
+    <% if (_pts.length) { %>
+      <span class="trendchart-last"><%= _fmtV(_pts[_pts.length - 1].value) %></span>
+    <% } %>
+    <% if (_canGroup) { %>
+      <div class="chart-granularity" id="<%= _uid %>-gran" role="group" aria-label="Group by">
+        <button type="button" class="active" data-mode="day">D</button>
+        <button type="button" data-mode="week">W</button>
+        <button type="button" data-mode="month">M</button>
+      </div>
+    <% } %>
+  </div>
+  <% if (_pts.length < 2) { %>
+    <div class="empty" style="padding:18px 0;font-size:12.5px">Not enough data yet</div>
+  <% } else { %>
+  <div id="<%= _uid %>" class="trendchart-mount"></div>
+  <% if (_invert) { %><div class="trendchart-foot"><span class="meta">lower is better</span></div><% } %>
+  <script>
+    (function () {
+      var dailyDates = <%- JSON.stringify(_pts.map((p) => p.date)) %>;
+      var dailyValues = <%- JSON.stringify(_pts.map((p) => Number(p.value) || 0)) %>;
+      var color = <%- JSON.stringify(_color) %>;
+      var fmt = <%- JSON.stringify(_fmt) %>;
+      function fmtV(v) {
+        if (fmt === 'pct') return (v * 100).toFixed(2) + '%';
+        if (fmt === 'pos') return Number(v).toFixed(1);
+        return Math.round(v).toLocaleString('en-US');
+      }
+      // Sums for volume metrics (clicks/impressions), averages for rate/
+      // position metrics — a client-side re-bucket needs no extra server call.
+      function bucketize(mode) {
+        if (mode === 'day') return { labels: dailyDates, values: dailyValues };
+        var buckets = {}, order = [];
+        dailyDates.forEach(function (iso, i) {
+          var d = new Date(iso + 'T00:00:00Z');
+          var key, label;
+          if (mode === 'week') {
+            var dow = d.getUTCDay();
+            var diff = dow === 0 ? 6 : dow - 1;
+            var monday = new Date(d);
+            monday.setUTCDate(d.getUTCDate() - diff);
+            key = monday.toISOString().slice(0, 10);
+            label = monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+          } else {
+            key = iso.slice(0, 7);
+            label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+          }
+          if (!buckets[key]) { buckets[key] = { label: label, vals: [] }; order.push(key); }
+          buckets[key].vals.push(dailyValues[i]);
+        });
+        var isRate = fmt === 'pct' || fmt === 'pos';
+        return {
+          labels: order.map(function (k) { return buckets[k].label; }),
+          values: order.map(function (k) {
+            var arr = buckets[k].vals;
+            var sum = arr.reduce(function (a, b) { return a + b; }, 0);
+            return isRate ? sum / arr.length : sum;
+          }),
+        };
+      }
+      function render() {
+        if (!window.ApexCharts) { setTimeout(render, 60); return; }
+        var chart = new ApexCharts(document.querySelector('#<%= _uid %>'), {
+          chart: {
+            type: 'area', height: 160, toolbar: { show: false }, sparkline: { enabled: false },
+            fontFamily: 'inherit', animations: { easing: 'easeinout', speed: 400 },
+          },
+          series: [{ name: <%- JSON.stringify(_label) %>, data: dailyValues }],
+          xaxis: {
+            categories: dailyDates, labels: { style: { fontSize: '11px', colors: '#94a3b8' }, rotate: 0 },
+            axisBorder: { show: false }, axisTicks: { show: false }, tooltip: { enabled: false },
+          },
+          yaxis: { labels: { style: { fontSize: '11px', colors: '#94a3b8' }, formatter: fmtV } },
+          grid: { borderColor: 'var(--border, #e5e9f0)', strokeDashArray: 3, padding: { left: 8, right: 8 } },
+          stroke: { curve: 'smooth', width: 2.5 },
+          colors: [color],
+          fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.32, opacityTo: 0.02, stops: [0, 95] } },
+          markers: { size: 0, hover: { size: 5 } },
+          dataLabels: { enabled: false },
+          tooltip: { theme: 'light', y: { formatter: fmtV } },
+        });
+        chart.render();
+
+        var granEl = document.getElementById('<%= _uid %>-gran');
+        if (granEl) {
+          granEl.addEventListener('click', function (e) {
+            var btn = e.target.closest('button[data-mode]');
+            if (!btn) return;
+            Array.prototype.forEach.call(granEl.querySelectorAll('button'), function (b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            var b = bucketize(btn.getAttribute('data-mode'));
+            chart.updateOptions({ xaxis: { categories: b.labels } }, false, false);
+            chart.updateSeries([{ name: <%- JSON.stringify(_label) %>, data: b.values }]);
+          });
+        }
+      }
+      render();
+    })();
+  </script>
+  <% } %>
+</div>

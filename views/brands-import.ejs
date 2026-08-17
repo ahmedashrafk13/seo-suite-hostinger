@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<div class="toolbar">
+  <a class="btn ghost sm" href="/brands">&larr; Brands</a>
+</div>
+
+<% if (errors.length) { %>
+  <div class="notice error">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body"><%= errors.join(' · ') %></div>
+  </div>
+<% } %>
+
+<%
+var newOnes = proposals.filter(function(p){ return !p.existing; });
+var already = proposals.filter(function(p){ return p.existing; });
+%>
+
+<div class="card">
+  <div class="card-head">
+    <h2>Sites on your Google account</h2>
+    <span class="sub"><%= proposals.length %> Search Console propert<%= proposals.length === 1 ? 'y' : 'ies' %> found</span>
+  </div>
+  <div class="card-body">
+    <p class="hint" style="margin-top:0">
+      Every verified Search Console property is listed below, paired with the GA4 property whose name matches its
+      domain. Check the ones to add — each becomes a client site with its own dashboard, alerts, tasks and reports.
+      Anything already added is shown at the bottom and cannot be duplicated.
+    </p>
+  </div>
+</div>
+
+<% if (!newOnes.length) { %>
+  <div class="card">
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon">&#10003;</div>
+        <h3>Every property is already added</h3>
+        <p>All <%= proposals.length %> Search Console propert<%= proposals.length === 1 ? 'y is' : 'ies are' %>
+          set up as sites in the suite.</p>
+        <a class="btn sm" href="/brands">Back to brands</a>
+      </div>
+    </div>
+  </div>
+<% } else { %>
+  <form method="POST" action="/brands/import">
+    <div class="card">
+      <div class="card-head">
+        <h3>Ready to add</h3>
+        <span class="sub"><%= newOnes.length %> not in the suite yet</span>
+      </div>
+      <div class="card-body">
+        <% newOnes.forEach(function(p){ %>
+          <div class="import-row">
+            <label class="check import-pick">
+              <input type="checkbox" name="host" value="<%= p.host %>" checked>
+              <span class="sr-only">Add <%= p.host %></span>
+            </label>
+            <div class="import-main">
+              <div class="form-row" style="margin-bottom:8px">
+                <div style="flex:2 1 220px">
+                  <label for="n-<%= p.host %>">Site name</label>
+                  <input type="text" id="n-<%= p.host %>" name="name_<%= p.host %>" value="<%= p.suggestedName %>" required>
+                </div>
+                <div style="flex:3 1 280px">
+                  <label for="u-<%= p.host %>">Website URL</label>
+                  <input type="text" id="u-<%= p.host %>" name="url_<%= p.host %>" value="<%= p.siteUrl %>" required>
+                </div>
+              </div>
+              <div class="form-row" style="margin-bottom:0">
+                <div style="flex:3 1 280px">
+                  <label for="g-<%= p.host %>">Search Console property</label>
+                  <select id="g-<%= p.host %>" name="gsc_<%= p.host %>">
+                    <option value="<%= p.gscProperty %>"><%= p.gscProperty %></option>
+                    <% p.alternateProperties.forEach(function(alt){ %>
+                      <option value="<%= alt %>"><%= alt %></option>
+                    <% }) %>
+                  </select>
+                  <div class="hint"><%= p.permissionLevel %></div>
+                </div>
+                <div style="flex:3 1 280px">
+                  <label for="a-<%= p.host %>">GA4 property</label>
+                  <select id="a-<%= p.host %>" name="ga4_<%= p.host %>"
+                          onchange="document.getElementById('an-<%= p.host %>').value = this.options[this.selectedIndex].dataset.name || ''">
+                    <option value="" data-name="">— none —</option>
+                    <% ga4Properties.forEach(function(g){ %>
+                      <option value="<%= g.id %>" data-name="<%= g.name %>"
+                              <%= p.ga4 && p.ga4.id === g.id ? 'selected' : '' %>>
+                        <%= g.name %> — <%= g.account %> (<%= g.id %>)
+                      </option>
+                    <% }) %>
+                  </select>
+                  <input type="hidden" id="an-<%= p.host %>" name="ga4name_<%= p.host %>" value="<%= p.ga4 ? p.ga4.name : '' %>">
+                  <div class="hint">
+                    <% if (!p.ga4) { %>
+                      <span class="badge medium">no match</span> No GA4 property name resembles this domain — pick one if it has one.
+                    <% } else if (p.ga4AlreadyUsed) { %>
+                      <span class="badge medium">in use</span> Already attached to another site — check this is right.
+                    <% } else if (p.ga4Ambiguous) { %>
+                      <span class="badge medium">uncertain</span> Loose name match — confirm before adding.
+                    <% } else { %>
+                      <span class="badge good">matched</span> Paired automatically by name.
+                    <% } %>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+
+        <div class="section-divider"></div>
+        <div class="form-row" style="align-items:flex-end">
+          <div style="max-width:230px">
+            <label for="days">History to pull for each</label>
+            <select id="days" name="days">
+              <option value="30">Last 30 days</option>
+              <option value="90" selected>Last 90 days</option>
+              <option value="180">Last 180 days</option>
+              <option value="480">Last 16 months (GSC max)</option>
+            </select>
+          </div>
+          <button class="btn" type="submit">Add selected sites</button>
+        </div>
+        <p class="hint">
+          Syncs run one after another so a multi-client import cannot exhaust the shared Google quota. You can keep
+          using the app while they finish.
+        </p>
+      </div>
+    </div>
+  </form>
+<% } %>
+
+<% if (already.length) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>Already in the suite</h3>
+      <span class="sub"><%= already.length %> site<%= already.length === 1 ? '' : 's' %></span>
+    </div>
+    <div class="table-wrap">
+      <table class="data compact">
+        <thead><tr><th class="wrap">Site</th><th class="wrap">Search Console</th><th class="wrap">GA4</th><th></th></tr></thead>
+        <tbody>
+          <% already.forEach(function(p){ %>
+            <tr>
+              <td class="wrap"><strong><%= p.existing.name %></strong><div class="sub-line"><%= p.host %></div></td>
+              <td class="wrap"><%= p.existing.gsc_property || '—' %></td>
+              <td class="wrap"><%= p.existing.ga4_property_name || p.existing.ga4_property_id || '—' %></td>
+              <td><a class="btn secondary xs" href="/brands/<%= p.existing.id %>">Open</a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>
+
+<% if (unmatchedGa4.length) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>GA4 properties with no Search Console match</h3>
+      <span class="sub">Listed so nothing is silently ignored</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data compact">
+        <thead><tr><th class="wrap">Property</th><th class="wrap">Account</th><th>ID</th></tr></thead>
+        <tbody>
+          <% unmatchedGa4.forEach(function(g){ %>
+            <tr><td class="wrap"><%= g.name %></td><td class="wrap"><%= g.account %></td><td class="mono"><%= g.id %></td></tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <div class="card-foot">
+      These have no Search Console property whose domain resembles their name. Either the site is not verified in
+      Search Console, or the property is named something unrelated to its domain — attach it to a site above by hand.
+    </div>
+  </div>
+<% } %>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

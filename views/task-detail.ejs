@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+    <div class="btn-row" style="margin-bottom:12px">
+      <a class="btn secondary sm" href="/tasks">&larr; Back to tasks</a>
+    </div>
+
+    <% if (task.requires_approval) { %>
+      <div class="lock-note">
+        <% if (task.approved_at) { %>
+          <div>
+            <strong>Approved</strong> by <%= task.approved_by %> on <%= task.approved_at %>.
+            This task can be marked done.
+            <form method="POST" action="/tasks/<%= task.id %>/revoke-approval" style="display:inline-block;margin-left:8px">
+              <input type="hidden" name="back" value="/tasks/<%= task.id %>">
+              <button class="btn danger-ghost xs" type="submit">Revoke approval</button>
+            </form>
+          </div>
+        <% } else { %>
+          <div>
+            <strong>This task requires SEO-team approval</strong> before it can be marked done — it touches a restricted action (publishing, URL/redirect changes, canonical, robots.txt, sitemap, bulk internal links, or titles on high-performing pages).
+            <form method="POST" action="/tasks/<%= task.id %>/approve" style="margin-top:8px">
+              <input type="hidden" name="back" value="/tasks/<%= task.id %>">
+              <div class="form-row">
+                <div>
+                  <label for="approved_by">Approved by</label>
+                  <input type="text" id="approved_by" name="approved_by" placeholder="<%= currentUser ? (currentUser.name || currentUser.email) : 'SEO team' %>">
+                </div>
+              </div>
+              <button class="btn success sm" type="submit">Approve</button>
+            </form>
+          </div>
+        <% } %>
+      </div>
+    <% } %>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-head">
+          <h2><%= task.title %></h2>
+          <span class="badge <%= task.severity %>"><%= task.severity %></span>
+        </div>
+        <div class="card-body">
+          <p class="muted">
+            <%= task.source %>
+            <% if (task.brand_name) { %> · <%= task.brand_name %><% } %>
+            <% if (task.affected_url) { %> · <a href="<%= task.affected_url %>" target="_blank" rel="noopener"><%= task.affected_url %></a><% } %>
+          </p>
+          <% if (task.detail) { %><pre style="white-space:pre-wrap;font-family:inherit;font-size:13px"><%= task.detail %></pre><% } %>
+
+          <div class="section-divider"></div>
+          <h4>Change status</h4>
+          <form method="POST" action="/tasks/<%= task.id %>/status">
+            <input type="hidden" name="back" value="/tasks/<%= task.id %>">
+            <div class="form-row">
+              <div>
+                <label for="status">Status</label>
+                <select id="status" name="status">
+                  <% statuses.forEach(function(s){ %>
+                    <option value="<%= s.value %>" <%= task.status === s.value ? 'selected' : '' %>><%= s.label %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div>
+                <label for="note">Note (optional)</label>
+                <input type="text" id="note" name="note" placeholder="completion / dismissal note">
+              </div>
+            </div>
+            <button class="btn sm" type="submit">Update status</button>
+          </form>
+
+          <div class="section-divider"></div>
+          <h4>Edit</h4>
+          <form method="POST" action="/tasks/<%= task.id %>/update">
+            <div class="form-row">
+              <div>
+                <label for="e-title">Title</label>
+                <input type="text" id="e-title" name="title" value="<%= task.title %>">
+              </div>
+              <div>
+                <label for="e-brand">Brand</label>
+                <select id="e-brand" name="brand_id">
+                  <option value="">— none —</option>
+                  <% brands.forEach(function(b){ %>
+                    <option value="<%= b.id %>" <%= task.brand_id === b.id ? 'selected' : '' %>><%= b.name %></option>
+                  <% }) %>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label for="e-severity">Severity</label>
+                <select id="e-severity" name="severity">
+                  <% ['critical','high','medium','low','info'].forEach(function(sv){ %>
+                    <option value="<%= sv %>" <%= task.severity === sv ? 'selected' : '' %>><%= sv %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div>
+                <label for="e-due">Due date</label>
+                <input type="date" id="e-due" name="due_date" value="<%= task.due_date || '' %>">
+              </div>
+              <div>
+                <label for="e-effort">Effort</label>
+                <input type="text" id="e-effort" name="effort" value="<%= task.effort || '' %>">
+              </div>
+            </div>
+            <div>
+              <label for="e-category">Category</label>
+              <input type="text" id="e-category" name="category" value="<%= task.category || '' %>">
+            </div>
+            <label for="e-detail">Detail</label>
+            <textarea id="e-detail" name="detail" rows="4"><%= task.detail || '' %></textarea>
+            <button class="btn secondary sm" type="submit">Save changes</button>
+          </form>
+
+          <div class="section-divider"></div>
+          <form method="POST" action="/tasks/<%= task.id %>/delete" onsubmit="return confirm('Delete this task? This cannot be undone.');">
+            <button class="btn danger sm" type="submit">Delete task</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Assignment. Only rendered for people allowed to assign; the route
+           enforces the same rule, so hiding it is convenience, not security. -->
+      <div class="card">
+        <div class="card-head">
+          <h3>Assignment</h3>
+          <% if (task.assignee) { %>
+            <span class="sub">
+              <%= task.assignee %><%= task.assignee_email ? ' · ' + task.assignee_email : '' %>
+              <%= task.assigned_at ? ' · ' + fmtDateTime(task.assigned_at) : '' %>
+            </span>
+          <% } else { %>
+            <span class="badge neutral">Unassigned</span>
+          <% } %>
+        </div>
+        <div class="card-body">
+          <% if (!perms.canAssign) { %>
+            <p class="hint" style="margin:0">
+              <% if (task.assignee) { %>
+                Assigned to <strong><%= task.assignee %></strong>.
+              <% } else { %>
+                Nobody is assigned to this task yet.
+              <% } %>
+              You do not have permission to change assignments — a team admin can grant it.
+            </p>
+          <% } else { %>
+            <form method="POST" action="/tasks/<%= task.id %>/assign" id="assign-form">
+              <input type="hidden" name="back" value="/tasks/<%= task.id %>">
+              <div class="form-row">
+                <div>
+                  <label for="a-person">Assign to</label>
+                  <select id="a-person" name="person_id" onchange="assignPersonChanged()">
+                    <option value="">— choose someone —</option>
+                    <% people.forEach(function(p){ %>
+                      <option value="<%= p.id %>"
+                              data-email="<%= p.email || '' %>"
+                              <%= task.assignee_person_id === p.id ? 'selected' : '' %>>
+                        <%= p.name %><%= p.email ? '' : ' (no email yet)' %> — <%= p.role %>
+                      </option>
+                    <% }) %>
+                    <option value="new">+ Someone new…</option>
+                  </select>
+                </div>
+                <div id="a-new-name-wrap" style="display:none">
+                  <label for="a-new-name">Their name</label>
+                  <input type="text" id="a-new-name" name="new_name" placeholder="e.g. Sara">
+                </div>
+                <div id="a-new-role-wrap" style="display:none">
+                  <label for="a-new-role">They are a</label>
+                  <select id="a-new-role" name="new_role">
+                    <option value="dev">Developer (email only)</option>
+                    <option value="writer">Writer (email only)</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="a-email">Email <span class="hint" style="display:inline">— saved for next time</span></label>
+                  <input type="text" id="a-email" name="new_email" placeholder="name@example.com">
+                </div>
+              </div>
+              <label for="a-note">Note to include in the email (optional)</label>
+              <textarea id="a-note" name="note" rows="2" placeholder="Anything they need to know before starting"></textarea>
+              <label class="check">
+                <input type="checkbox" name="notify" value="on" checked>
+                <span>Email the task to them
+                  <span class="check-hint">Sends the full task — title, site, severity, detail and the affected URL —
+                    so a developer or writer with no account can act on it. Several tasks assigned to the same person
+                    are combined into a single email.</span>
+                </span>
+              </label>
+              <button class="btn" type="submit">Assign</button>
+            </form>
+
+            <% if (task.assignee_email) { %>
+              <div class="section-divider"></div>
+              <form method="POST" action="/tasks/<%= task.id %>/resend-assignment" class="inline-form">
+                <button class="btn secondary sm" type="submit">Re-send the email to <%= task.assignee_email %></button>
+              </form>
+            <% } %>
+          <% } %>
+
+          <% if (notifications && notifications.length) { %>
+            <div class="section-divider"></div>
+            <h4 style="margin-bottom:8px">Email history</h4>
+            <div class="table-wrap">
+              <table class="data compact">
+                <thead><tr><th class="wrap">To</th><th>Result</th><th>Sent by</th><th>When</th></tr></thead>
+                <tbody>
+                  <% notifications.forEach(function(n){ %>
+                    <tr>
+                      <td class="wrap"><%= n.email %></td>
+                      <td>
+                        <% if (n.sent) { %><span class="badge good">sent</span>
+                        <% } else { %><span class="badge critical" title="<%= n.error %>">failed</span><% } %>
+                      </td>
+                      <td class="wrap"><%= n.sent_by_name || n.sent_by_email || '—' %></td>
+                      <td class="narrow"><%= fmtDateTime(n.created_at) %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <script>
+        // Picking a known person pre-fills the email already on file; choosing
+        // "Someone new" asks for a name instead. Either way the address is
+        // captured once and reused afterwards.
+        function assignPersonChanged() {
+          var sel = document.getElementById('a-person');
+          var isNew = sel.value === 'new';
+          document.getElementById('a-new-name-wrap').style.display = isNew ? '' : 'none';
+          document.getElementById('a-new-role-wrap').style.display = isNew ? '' : 'none';
+          document.getElementById('a-new-name').required = isNew;
+          var email = document.getElementById('a-email');
+          if (isNew) { email.value = ''; email.placeholder = 'name@example.com'; return; }
+          var opt = sel.options[sel.selectedIndex];
+          var known = opt ? (opt.dataset.email || '') : '';
+          email.value = known;
+          email.placeholder = known ? known : 'No email on file — add one to notify them';
+        }
+        if (document.getElementById('a-person')) assignPersonChanged();
+      </script>
+
+      <div class="card">
+        <div class="card-head"><h3>Activity</h3></div>
+        <div class="card-body">
+          <form method="POST" action="/tasks/<%= task.id %>/comment">
+            <label for="c-note">Add a comment</label>
+            <textarea id="c-note" name="note" rows="2" required></textarea>
+            <button class="btn secondary sm" type="submit">Comment</button>
+          </form>
+          <div class="section-divider"></div>
+          <% if (!task.events || !task.events.length) { %>
+            <div class="empty-state">No activity yet.</div>
+          <% } else { %>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <% task.events.forEach(function(e){ %>
+                <div style="border-left:2px solid var(--border);padding-left:10px">
+                  <div style="font-size:12px;color:var(--text-2)">
+                    <strong><%= e.kind %></strong> · <%= e.created_at %>
+                  </div>
+                  <% if (e.note) { %><div style="font-size:13px;white-space:pre-wrap"><%= e.note %></div><% } %>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+  </div>
+  </div>
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

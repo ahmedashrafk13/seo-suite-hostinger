@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+    <div class="toolbar">
+      <a class="btn ghost sm" href="/ai-lab">&larr; AI Lab</a>
+      <div class="spacer"></div>
+      <a class="btn secondary sm" href="/keywords/<%= realBriefLinkRunId %>" target="_blank" rel="noopener">View real clustering run &rarr;</a>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700">AI Content Brief (Beta)</div>
+          <h2 style="margin-top:4px"><%= resolved.cluster.primaryKeyword %></h2>
+        </div>
+        <span class="sub"><%= brand.name %></span>
+      </div>
+      <div class="card-body">
+        <div class="stat-row">
+          <div class="stat">
+            <div class="label">Search intent (real data)</div>
+            <div class="value sm"><%= resolved.cluster.intent %></div>
+          </div>
+          <div class="stat">
+            <div class="label">Word count target (real data)</div>
+            <div class="value sm"><%= resolved.wordCountRange ? (fmtInt(resolved.wordCountRange.low) + '–' + fmtInt(resolved.wordCountRange.high)) : 'Not enough data' %></div>
+          </div>
+          <div class="stat">
+            <div class="label">Recommendation (real data)</div>
+            <div class="value sm"><%= resolved.cluster.recommendation %></div>
+          </div>
+        </div>
+        <p class="hint">Supporting keywords: <%= resolved.cluster.supportingKeywords.slice(0, 15).join(', ') %><%= resolved.cluster.supportingKeywords.length > 15 ? ', …' : '' %></p>
+        <% if (resolved.internalLinkCandidates && resolved.internalLinkCandidates.length) { %>
+          <p class="hint">Internal link candidates (real data, from the latest linking crawl): <%= resolved.internalLinkCandidates.slice(0, 8).map(function(c){ return c.url; }).join(', ') %></p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>AI-generated creative fields</h3>
+        <% if (!row) { %>
+        <form method="POST" action="/ai-lab/<%= brand.id %>/brief/<%= clusterKey %>/generate">
+          <button class="btn sm" type="submit">Generate with AI</button>
+        </form>
+        <% } %>
+      </div>
+      <div class="card-body">
+        <% if (!row) { %>
+          <div class="empty-state">Not generated yet. Click "Generate with AI" above — this makes one real, billed API call.</div>
+        <% } else { %>
+          <div class="grid cols-2">
+            <div>
+              <div class="label">AI title</div>
+              <div class="value sm"><%= row.title %></div>
+            </div>
+            <div>
+              <div class="label">Angle / hook</div>
+              <div class="value sm"><%= row.angle_note %></div>
+            </div>
+          </div>
+          <div style="margin-top:10px">
+            <div class="label">AI-suggested headings</div>
+            <ul>
+              <% (row.headings || []).forEach(function(h){ %><li><%= h %></li><% }) %>
+            </ul>
+          </div>
+          <p class="hint">Generated <%= fmtDateTime(row.created_at) %> · <%= fmtInt(row.prompt_tokens) %> prompt / <%= fmtInt(row.completion_tokens) %> completion tokens · $<%= Number(row.cost_usd).toFixed(4) %></p>
+          <form method="POST" action="/ai-lab/<%= brand.id %>/brief/<%= clusterKey %>/generate" style="margin-top:6px">
+            <input type="hidden" name="force" value="1">
+            <button class="btn secondary sm" type="submit">Regenerate (forces a new, billed call)</button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

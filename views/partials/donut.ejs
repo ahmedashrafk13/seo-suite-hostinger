@@ -1,0 +1,63 @@
+<%
+/* Interactive donut chart (ApexCharts) for share-of-total data — task
+   severity mix, traffic channel mix, etc. Expects: label (string),
+   rows (array), nameKey (string), valueKey (string), colors (array of hex,
+   matched to rows in order — falls back to a default categorical palette). */
+const _label = typeof label !== 'undefined' ? label : '';
+const _rows = (typeof rows !== 'undefined' ? rows : []).filter((r) => Number(r[typeof valueKey !== 'undefined' ? valueKey : 'value']) > 0);
+const _nameKey = typeof nameKey !== 'undefined' ? nameKey : 'name';
+const _valueKey = typeof valueKey !== 'undefined' ? valueKey : 'value';
+const _palette = typeof colors !== 'undefined' ? colors : ['#2563eb', '#4f46e5', '#0d9488', '#ea580c', '#ca8a04', '#94a3b8'];
+const _uid = `dn${Math.random().toString(36).slice(2, 9)}`;
+%>
+<div class="donut-card">
+  <% if (_label) { %><div class="trendchart-label" style="margin-bottom:8px"><%= _label %></div><% } %>
+  <% if (!_rows.length) { %>
+    <div class="empty" style="padding:18px 0;font-size:12.5px;color:var(--text-3)">Not enough data yet</div>
+  <% } else { %>
+    <div id="<%= _uid %>" class="donut-mount"></div>
+    <script>
+      (function () {
+        var labels = <%- JSON.stringify(_rows.map((r) => String(r[_nameKey]))) %>;
+        var values = <%- JSON.stringify(_rows.map((r) => Number(r[_valueKey]) || 0)) %>;
+        var colors = <%- JSON.stringify(_palette) %>;
+        function render() {
+          if (!window.ApexCharts) { setTimeout(render, 60); return; }
+          var total = values.reduce(function (a, b) { return a + b; }, 0);
+          new ApexCharts(document.querySelector('#<%= _uid %>'), {
+            chart: {
+              type: 'donut', height: 240, fontFamily: 'inherit', animations: { easing: 'easeinout', speed: 400 },
+              parentHeightOffset: 0,
+            },
+            series: values,
+            labels: labels,
+            colors: colors,
+            // Percentages live in the legend and the hover tooltip instead of
+            // inside the slices — in-slice labels clip against the card's
+            // rounded corners on thin/edge segments and read poorly on light
+            // fill colors.
+            legend: {
+              position: 'bottom', fontSize: '12px', labels: { colors: '#475569' },
+              markers: { width: 9, height: 9, radius: 3 }, itemMargin: { horizontal: 8, vertical: 4 },
+              formatter: function (seriesName, opts) {
+                var v = opts.w.globals.series[opts.seriesIndex];
+                var pct = total > 0 ? Math.round((v / total) * 100) : 0;
+                return seriesName + ' — ' + pct + '%';
+              },
+            },
+            dataLabels: { enabled: false },
+            stroke: { width: 2, colors: ['var(--surface, #fff)'] },
+            plotOptions: { pie: { donut: { size: '68%', labels: {
+              show: true,
+              value: { fontSize: '22px', fontWeight: 700, color: '#0f172a', offsetY: -4 },
+              total: { show: true, label: 'Total', fontSize: '11px', color: '#94a3b8',
+                formatter: function () { return total.toLocaleString('en-US'); } },
+            } } } },
+            tooltip: { theme: 'light', y: { formatter: function (v) { return v.toLocaleString('en-US') + ' (' + (total > 0 ? Math.round((v / total) * 100) : 0) + '%)'; } } },
+          }).render();
+        }
+        render();
+      })();
+    </script>
+  <% } %>
+</div>

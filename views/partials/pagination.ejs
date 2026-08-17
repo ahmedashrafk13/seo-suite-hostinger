@@ -1,0 +1,20 @@
+<%
+/* Server-side pagination footer, styled after GSC's "Rows per page: 1-10 of 69".
+   Expects: total (int), page (1-indexed int), pageSize (int), makeHref (fn(pageNum) => url). */
+const _total = typeof total !== 'undefined' ? total : 0;
+const _pageSize = typeof pageSize !== 'undefined' ? pageSize : 50;
+const _page = typeof page !== 'undefined' ? page : 1;
+const _pages = Math.max(1, Math.ceil(_total / _pageSize));
+const _from = _total === 0 ? 0 : (_page - 1) * _pageSize + 1;
+const _to = Math.min(_total, _page * _pageSize);
+%>
+<% if (_total > 0) { %>
+<div class="pager">
+  <span class="pager-range"><%= _from %>&ndash;<%= _to %> of <%= _total.toLocaleString('en-US') %></span>
+  <div class="pager-nav">
+    <a class="pager-btn <%= _page <= 1 ? 'disabled' : '' %>" href="<%= _page <= 1 ? '#' : makeHref(_page - 1) %>" aria-label="Previous page">&#8249;</a>
+    <span class="pager-page">Page <%= _page %> of <%= _pages %></span>
+    <a class="pager-btn <%= _page >= _pages ? 'disabled' : '' %>" href="<%= _page >= _pages ? '#' : makeHref(_page + 1) %>" aria-label="Next page">&#8250;</a>
+  </div>
+</div>
+<% } %>

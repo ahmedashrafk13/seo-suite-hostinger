@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<% if (!tool.exists) { %>
+  <div class="notice error">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body">
+      Internal linking agent not found at <span class="mono"><%= tool.script %></span>.
+      Runs will fail until the sibling tool is present.
+    </div>
+  </div>
+<% } %>
+
+<div class="split">
+  <div>
+    <div class="card">
+      <div class="card-head"><h3>Recent runs</h3></div>
+      <% if (!runs.length) { %>
+        <div class="card-body">
+          <div class="empty">
+            <div class="empty-icon">&#8646;</div>
+            <h3>No linking runs yet</h3>
+            <p>Start one from the panel on the right — it crawls the site, scores semantic relatedness between pages,
+              and recommends source/target/anchor links plus orphan pages.</p>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Site</th><th>Brand</th><th>Status</th>
+              <th class="num">Pages</th><th class="num">Recs</th><th class="num">Orphans</th>
+              <th>Started</th><th></th>
+            </tr></thead>
+            <tbody>
+              <% runs.forEach(function(r){ %>
+                <tr>
+                  <td class="url"><a href="/linking/<%= r.id %>"><%= shortUrl(r.site_url, 44) === '/' ? r.site_url : r.site_url %></a></td>
+                  <td><%= r.brand_name || '—' %></td>
+                  <td>
+                    <span class="badge <%= r.status === 'completed' ? 'good' : (r.status === 'error' ? 'critical' : 'medium') %>"><%= r.status %></span>
+                  </td>
+                  <td class="num"><%= r.summary ? fmtInt(r.summary.pages_crawled) : '—' %></td>
+                  <td class="num"><%= r.summary ? fmtInt(r.summary.recommendations_total) : '—' %></td>
+                  <td class="num"><%= r.summary ? fmtInt(r.summary.orphan_pages) : '—' %></td>
+                  <td><%= fmtDateTime(r.created_at) %></td>
+                  <td><a class="btn ghost sm" href="/linking/<%= r.id %>">Open</a></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <div class="card-head"><h3>Start a linking run</h3></div>
+      <div class="card-body">
+        <form method="POST" action="/linking/start">
+          <div class="field">
+            <label for="brand_id">Brand <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>
+            <select id="brand_id" name="brand_id">
+              <option value="">— none, use the URL below —</option>
+              <% brands.forEach(function(b){ %>
+                <option value="<%= b.id %>"><%= b.name %><%= b.hasGsc ? '' : ' (no GSC data synced)' %></option>
+              <% }) %>
+            </select>
+            <div class="hint">Picking a brand fills the site URL and links this run to it for tasks and reporting.</div>
+          </div>
+
+          <div class="field">
+            <label for="site_url">Site URL</label>
+            <input type="text" id="site_url" name="site_url" placeholder="https://example.com">
+          </div>
+
+          <div class="field">
+            <label for="max_pages">Max pages to crawl</label>
+            <input type="number" id="max_pages" name="max_pages" value="200" min="10" max="2000">
+          </div>
+
+          <div class="check">
+            <input type="checkbox" id="use_gsc" name="use_gsc">
+            <label for="use_gsc">Blend in Search Console data to boost orphan/opportunity scoring</label>
+          </div>
+          <%# Disabled rather than hidden when no headless browser is available:
+              the option existing but doing nothing is the failure mode worth
+              avoiding, and hiding it entirely would make the two deployments
+              look like different products. %>
+          <div class="check">
+            <input type="checkbox" id="render" name="render" <%= tool.canRender ? '' : 'disabled' %>>
+            <label for="render">
+              Render pages with JS (slower, needed for JS-heavy sites)<%
+                %><%= tool.canRender ? '' : ' — unavailable on this server' %>
+            </label>
+          </div>
+          <div class="check">
+            <input type="checkbox" id="create_tasks" name="create_tasks" checked>
+            <label for="create_tasks">Create backlog tasks from the findings automatically</label>
+          </div>
+
+          <button type="submit" class="btn block" style="margin-top:10px">Start linking run</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

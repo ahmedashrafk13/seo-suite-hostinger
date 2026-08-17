@@ -1,0 +1,1040 @@
+<%
+const isAjax = typeof ajax !== 'undefined' && ajax;
+// Named chart palette — single source of truth for the per-metric colors
+// used across trendchart/barchart/worldmap partials below (kept as literal
+// hex since these render as SVG fill attributes, not CSS classes).
+const chartColor = { volume: '#6b46c1', engagement: '#0d9488', rank: '#b45309' };
+%>
+<% if (!isAjax) { %>
+<!DOCTYPE html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+<% } %>
+
+<%
+function deltaHtml(recent, prior, invert) {
+  const abs = recent - prior;
+  if (!prior && !recent) return '<span class="delta flat">no data</span>';
+  const pct = prior === 0 ? null : (abs / prior) * 100;
+  const good = invert ? abs < 0 : abs > 0;
+  const cls = abs === 0 ? 'flat' : (good ? 'up' : 'down');
+  const arrow = abs === 0 ? '' : (abs > 0 ? '▲' : '▼');
+  const label = pct === null ? (abs > 0 ? 'new' : '') : `${Math.abs(pct).toFixed(1)}%`;
+  return `<span class="delta ${cls}">${arrow} ${label}</span>`;
+}
+function qs(overrides) {
+  const p = Object.assign({ brand: selectedId, days, tab, sort, dir, q }, overrides);
+  return Object.keys(p).filter((k) => p[k] !== null && p[k] !== undefined && p[k] !== '')
+    .map((k) => `${k}=${encodeURIComponent(p[k])}`).join('&');
+}
+function sortLink(key, label) {
+  const nextDir = (sort === key && dir === 'desc') ? 'asc' : 'desc';
+  const arrow = sort === key ? (dir === 'desc' ? ' ▼' : ' ▲') : '';
+  return `<a href="/performance?${qs({ sort: key, dir: nextDir })}">${label}${arrow}</a>`;
+}
+%>
+
+<% if (!brands.length) { %>
+  <% if (!isAjax) { %>
+  <div class="notice info">
+    <span class="notice-icon">&#9673;</span>
+    <div class="notice-body">
+      <strong>Add a brand first.</strong> Performance mirrors the Search Console and GA4 data synced per brand.
+      <div style="margin-top:9px"><a class="btn sm" href="/brands">Add a brand</a></div>
+    </div>
+  </div>
+  <% } %>
+<% } else { %>
+
+  <% if (!isAjax) { %>
+  <div class="toolbar">
+    <form method="GET" action="/performance">
+      <label for="brand" style="margin:0;font-size:12.5px;color:var(--text-2)">Brand</label>
+      <select id="brand" name="brand" onchange="this.form.submit()">
+        <% brands.forEach(function(b){ %>
+          <option value="<%= b.id %>" <%= selectedId === b.id ? 'selected' : '' %>><%= b.name %></option>
+        <% }) %>
+      </select>
+      <label for="days" style="margin:0 0 0 10px;font-size:12.5px;color:var(--text-2)">Range</label>
+      <select id="days" name="days" onchange="this.form.submit()">
+        <% RANGES.forEach(function(r){ %>
+          <option value="<%= r %>" <%= days === r ? 'selected' : '' %>>Last <%= r %> days</option>
+        <% }) %>
+      </select>
+      <input type="hidden" name="tab" value="<%= tab %>">
+      <noscript><button type="submit" class="btn secondary sm">Apply</button></noscript>
+    </form>
+    <div class="spacer"></div>
+    <% if (brand) { %>
+      <span style="font-size:12px;color:var(--text-3)"><%= brand.site_url %></span>
+    <% } %>
+  </div>
+
+  <% if (!brand) { %>
+    <div class="notice warn"><div class="notice-body">No brand selected.</div></div>
+  <% } else { %>
+    <!-- Live "active users right now" — the in-app equivalent of GA4 Home's realtime card -->
+    <div class="card" id="realtime-card">
+      <div class="card-head">
+        <h3>Right now</h3>
+        <span class="sub" id="realtime-updated">—</span>
+      </div>
+      <div class="card-body">
+        <div id="realtime-body" style="font-size:13px;color:var(--text-2)">Loading live data…</div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var brandId = <%= JSON.stringify(brand.id) %>;
+        var body = document.getElementById('realtime-body');
+        var updated = document.getElementById('realtime-updated');
+        function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+        }); }
+        function render(d) {
+          if (!d.ok) { body.innerHTML = '<span style="color:var(--text-3)">Realtime unavailable — ' + esc(d.reason || 'no GA4 property linked') + '</span>'; return; }
+          var countryHtml = (d.byCountry || []).slice(0, 5).map(function (c) {
+            return '<tr><td>' + esc(c.country) + '</td><td class="num">' + c.activeUsers + '</td></tr>';
+          }).join('') || '<tr><td colspan="2" style="color:var(--text-3)">No active users right now.</td></tr>';
+          var pageHtml = (d.byPage || []).slice(0, 5).map(function (p) {
+            return '<tr><td>' + esc(p.page) + '</td><td class="num">' + p.activeUsers + '</td></tr>';
+          }).join('') || '<tr><td colspan="2" style="color:var(--text-3)">No active users right now.</td></tr>';
+          body.innerHTML =
+            '<div class="stat-row" style="margin-bottom:14px">' +
+              '<div class="stat"><div class="label">Active users (last 30 min)</div><div class="value">' + d.activeUsers + '</div></div>' +
+            '</div>' +
+            '<div class="grid cols-2" style="gap:16px">' +
+              '<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);margin-bottom:6px">By country</div>' +
+                '<table class="data compact"><tbody>' + countryHtml + '</tbody></table></div>' +
+              '<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);margin-bottom:6px">By page</div>' +
+                '<table class="data compact"><tbody>' + pageHtml + '</tbody></table></div>' +
+            '</div>';
+          updated.textContent = 'Updated ' + new Date().toLocaleTimeString();
+        }
+        function poll() {
+          fetch('/performance/realtime.json?brand=' + encodeURIComponent(brandId))
+            .then(function (r) { return r.json(); }).then(render)
+            .catch(function () { body.innerHTML = '<span style="color:var(--text-3)">Realtime unavailable right now.</span>'; });
+        }
+        poll();
+        setInterval(poll, 30000);
+      })();
+    </script>
+  <% } %>
+  <% } %>
+
+  <% if (brand) { %>
+  <% if (!data.gsc && !data.ga4) { %>
+    <% if (!isAjax) { %>
+    <div class="notice warn">
+      <span class="notice-icon">&#9888;</span>
+      <div class="notice-body">
+        No Search Console or GA4 history synced for this brand yet.
+        <a href="/brands/<%= brand.id %>">Run a sync</a> to populate this dashboard.
+      </div>
+    </div>
+    <% } %>
+  <% } else { %>
+
+    <% if (!isAjax) { %>
+    <!-- Search Console style KPI row -->
+    <div class="card">
+      <div class="card-head"><h3>Search Console — performance</h3></div>
+      <div class="card-body">
+        <% if (!data.gsc) { %>
+          <p style="font-size:13px;color:var(--text-2);margin:0">No Search Console data for this window.</p>
+        <% } else { %>
+          <div class="stat-row">
+            <div class="stat">
+              <div class="label">Total clicks</div>
+              <div class="value"><%= fmtInt(data.gsc.recent.clicks) %></div>
+              <div class="meta"><%- deltaHtml(data.gsc.recent.clicks, data.gsc.prior.clicks) %> vs prior period</div>
+            </div>
+            <div class="stat">
+              <div class="label">Total impressions</div>
+              <div class="value"><%= fmtInt(data.gsc.recent.impressions) %></div>
+              <div class="meta"><%- deltaHtml(data.gsc.recent.impressions, data.gsc.prior.impressions) %> vs prior period</div>
+            </div>
+            <div class="stat">
+              <div class="label">Average CTR</div>
+              <div class="value"><%= fmtPct(data.gsc.recent.ctr * 100, 2) %></div>
+              <div class="meta"><%- deltaHtml(data.gsc.recent.ctr, data.gsc.prior.ctr) %> vs prior period</div>
+            </div>
+            <div class="stat">
+              <div class="label">Average position</div>
+              <div class="value"><%= fmtPos(data.gsc.recent.position) %></div>
+              <div class="meta"><%- deltaHtml(data.gsc.recent.position, data.gsc.prior.position, true) %> vs prior period</div>
+            </div>
+          </div>
+
+          <div class="grid cols-4" style="gap:16px;margin-top:16px">
+            <%- include('partials/trendchart', { label: 'Clicks', points: data.series.map(s => ({ date: fmtDate(s.date), value: s.clicks })), color: '#2563eb', fmt: 'int' }) %>
+            <%- include('partials/trendchart', { label: 'Impressions', points: data.series.map(s => ({ date: fmtDate(s.date), value: s.impressions })), color: chartColor.volume, fmt: 'int' }) %>
+            <%- include('partials/trendchart', { label: 'CTR', points: data.series.map(s => ({ date: fmtDate(s.date), value: s.ctr })), color: chartColor.engagement, fmt: 'pct' }) %>
+            <%- include('partials/trendchart', { label: 'Average position', points: data.series.map(s => ({ date: fmtDate(s.date), value: s.position })), color: chartColor.rank, fmt: 'pos', invert: true }) %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- GA4 style KPI row (Organic Search channel) -->
+    <div class="card">
+      <div class="card-head"><h3>GA4 — organic search traffic</h3></div>
+      <div class="card-body">
+        <% if (!data.ga4) { %>
+          <p style="font-size:13px;color:var(--text-2);margin:0">No GA4 data for this window.</p>
+        <% } else { %>
+          <div class="stat-row">
+            <div class="stat">
+              <div class="label">Sessions</div>
+              <div class="value"><%= fmtInt(data.ga4.recent.sessions) %></div>
+              <div class="meta"><%- deltaHtml(data.ga4.recent.sessions, data.ga4.prior.sessions) %> vs prior period</div>
+            </div>
+            <div class="stat">
+              <div class="label">Users</div>
+              <div class="value"><%= fmtInt(data.ga4.recent.users) %></div>
+              <div class="meta"><%- deltaHtml(data.ga4.recent.users, data.ga4.prior.users) %> vs prior period</div>
+            </div>
+            <div class="stat">
+              <div class="label">Engagement rate</div>
+              <div class="value"><%= fmtPct(data.ga4.recent.engagement_rate * 100, 1) %></div>
+              <div class="meta"><%- deltaHtml(data.ga4.recent.engagement_rate, data.ga4.prior.engagement_rate) %> vs prior period</div>
+            </div>
+            <div class="stat">
+              <div class="label">Bounce rate</div>
+              <div class="value"><%= fmtPct(data.ga4.recent.bounce_rate * 100, 1) %></div>
+              <div class="meta"><%- deltaHtml(data.ga4.recent.bounce_rate, data.ga4.prior.bounce_rate, true) %> vs prior period</div>
+            </div>
+            <div class="stat">
+              <div class="label">Avg session duration</div>
+              <div class="value sm"><%= fmtDuration(data.ga4.recent.avg_duration) %></div>
+              <div class="meta"><%- deltaHtml(data.ga4.recent.avg_duration, data.ga4.prior.avg_duration) %> vs prior period</div>
+            </div>
+            <div class="stat">
+              <div class="label">Conversions</div>
+              <div class="value"><%= fmtInt(data.ga4.recent.conversions) %></div>
+              <div class="meta"><%- deltaHtml(data.ga4.recent.conversions, data.ga4.prior.conversions) %> vs prior period</div>
+            </div>
+          </div>
+
+          <div class="grid cols-2" style="gap:16px;margin-top:16px">
+            <%- include('partials/trendchart', { label: 'Sessions', points: data.ga4Series.map(s => ({ date: fmtDate(s.date), value: s.sessions })), color: '#2563eb', fmt: 'int' }) %>
+            <%- include('partials/trendchart', { label: 'Conversions', points: data.ga4Series.map(s => ({ date: fmtDate(s.date), value: s.conversions })), color: chartColor.engagement, fmt: 'int' }) %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+    <% } %>
+
+    <% if (!isAjax) { %><div id="perf-tabs-wrap"><% } %>
+    <!-- Detail tabs: Queries / Pages / Channels / GA4 pages -->
+    <div class="card">
+      <div class="card-head" style="flex-wrap:wrap;gap:10px">
+        <div class="tabs" style="flex-wrap:wrap">
+          <a class="tab <%= tab === 'queries' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'queries' }) %>">Queries</a>
+          <a class="tab <%= tab === 'pages' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'pages' }) %>">Pages</a>
+          <a class="tab <%= tab === 'querypage' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'querypage' }) %>">Query &rarr; page</a>
+          <a class="tab <%= tab === 'countries' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'countries' }) %>">Countries</a>
+          <a class="tab <%= tab === 'devices' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'devices' }) %>">Devices</a>
+          <a class="tab <%= tab === 'appearance' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'appearance' }) %>">Search appearance</a>
+          <a class="tab <%= tab === 'sitemaps' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'sitemaps' }) %>">Sitemaps</a>
+          <a class="tab <%= tab === 'indexing' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'indexing' }) %>">Page indexing</a>
+          <a class="tab <%= tab === 'channels' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'channels' }) %>">GA4 channels</a>
+          <a class="tab <%= tab === 'ga4pages' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ga4pages' }) %>">GA4 pages</a>
+          <a class="tab <%= tab === 'ga4devices' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ga4devices' }) %>">GA4 tech</a>
+          <a class="tab <%= tab === 'ga4geo' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ga4geo' }) %>">GA4 geo</a>
+          <a class="tab <%= tab === 'ga4acquisition' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ga4acquisition' }) %>">GA4 acquisition</a>
+          <a class="tab <%= tab === 'ga4events' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ga4events' }) %>">GA4 events</a>
+          <a class="tab <%= tab === 'ai' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ai' }) %>">AI Suggestions</a>
+        </div>
+        <% if (['queries','pages','querypage','countries','ga4pages','ga4geo','ga4acquisition'].includes(tab)) { %>
+          <form method="GET" action="/performance" style="margin-left:auto">
+            <input type="hidden" name="brand" value="<%= selectedId %>">
+            <input type="hidden" name="days" value="<%= days %>">
+            <input type="hidden" name="tab" value="<%= tab %>">
+            <input type="text" name="q" value="<%= q %>" placeholder="Filter…" style="width:220px">
+          </form>
+        <% } %>
+      </div>
+
+      <% if (tab === 'queries') { %>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Query</th>
+              <th class="num"><%- sortLink('clicks', 'Clicks') %></th>
+              <th class="num"><%- sortLink('impressions', 'Impressions') %></th>
+              <th class="num"><%- sortLink('ctr', 'CTR') %></th>
+              <th class="num"><%- sortLink('position', 'Position') %></th>
+              <th class="num">vs prior</th>
+            </tr></thead>
+            <tbody>
+              <% if (!data.queryRows.length) { %>
+                <tr><td colspan="6"><div class="empty-state">No queries in this window.</div></td></tr>
+              <% } %>
+              <% data.queryRows.forEach(function(r){ %>
+                <tr>
+                  <td class="wide"><%= r.entity %></td>
+                  <td class="num"><%= fmtInt(r.clicks) %></td>
+                  <td class="num"><%= fmtInt(r.impressions) %></td>
+                  <td class="num"><%= fmtPct(r.ctr * 100, 2) %></td>
+                  <td class="num"><%= fmtPos(r.position) %></td>
+                  <td class="num"><%- deltaHtml(r.clicks, r.priorClicks) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <%- include('partials/pagination', { total: data.queryTotal, page, pageSize, makeHref: (n) => `/performance?${qs({ page: n })}` }) %>
+      <% } else if (tab === 'pages') { %>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Page</th>
+              <th class="num"><%- sortLink('clicks', 'Clicks') %></th>
+              <th class="num"><%- sortLink('impressions', 'Impressions') %></th>
+              <th class="num"><%- sortLink('ctr', 'CTR') %></th>
+              <th class="num"><%- sortLink('position', 'Position') %></th>
+            </tr></thead>
+            <tbody>
+              <% if (!data.pageRows.length) { %>
+                <tr><td colspan="5"><div class="empty-state">No pages in this window.</div></td></tr>
+              <% } %>
+              <% data.pageRows.forEach(function(r){ %>
+                <tr>
+                  <td class="url wide"><%= shortUrl(r.entity, 70) %></td>
+                  <td class="num"><%= fmtInt(r.clicks) %></td>
+                  <td class="num"><%= fmtInt(r.impressions) %></td>
+                  <td class="num"><%= fmtPct(r.ctr * 100, 2) %></td>
+                  <td class="num"><%= fmtPos(r.position) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <%- include('partials/pagination', { total: data.pageTotal, page, pageSize, makeHref: (n) => `/performance?${qs({ page: n })}` }) %>
+
+      <% } else if (tab === 'querypage') { %>
+        <div class="notice info" style="margin:16px">
+          <span class="notice-icon">&#8505;</span>
+          <div class="notice-body">
+            Which URL Google actually ranks for each keyword. Search Console caps two-dimension queries hard, so this
+            is a snapshot of the whole sync window rather than a daily breakdown
+            <% if (data.queryPagePeriod) { %>
+              (<strong><%= fmtDate(data.queryPagePeriod.period_start) %> &rarr; <%= fmtDate(data.queryPagePeriod.period_end) %></strong>,
+              so it ignores the range selector above).
+            <% } else { %>.<% } %>
+            A query listed against several URLs is a cannibalisation candidate.
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Query</th>
+              <th>Ranking URL</th>
+              <th class="num"><%- sortLink('clicks', 'Clicks') %></th>
+              <th class="num"><%- sortLink('impressions', 'Impressions') %></th>
+              <th class="num"><%- sortLink('ctr', 'CTR') %></th>
+              <th class="num"><%- sortLink('position', 'Position') %></th>
+            </tr></thead>
+            <tbody>
+              <% if (!data.queryPageRows.length) { %>
+                <tr><td colspan="6"><div class="empty-state">No query-to-page data yet — it lands with the next brand sync.</div></td></tr>
+              <% } %>
+              <% data.queryPageRows.forEach(function(r){ %>
+                <tr>
+                  <td class="wrap"><%= r.query %></td>
+                  <td class="url wrap"><%= shortUrl(r.page, 60) %></td>
+                  <td class="num"><%= fmtInt(r.clicks) %></td>
+                  <td class="num"><%= fmtInt(r.impressions) %></td>
+                  <td class="num"><%= fmtPct((r.ctr || 0) * 100, 2) %></td>
+                  <td class="num"><%= fmtPos(r.position) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <%- include('partials/pagination', { total: data.queryPageTotal, page, pageSize, makeHref: (n) => `/performance?${qs({ page: n })}` }) %>
+
+      <% } else if (tab === 'channels') { %>
+        <div class="grid cols-2" style="gap:20px;margin-bottom:16px">
+          <%- include('partials/barchart', { label: 'Sessions by channel', rows: data.channels, nameKey: 'channel', valueKey: 'sessions', color: '#2563eb', max: 8 }) %>
+          <%- include('partials/barchart', { label: 'Conversions by channel', rows: data.channels, nameKey: 'channel', valueKey: 'conversions', color: chartColor.engagement, max: 8 }) %>
+        </div>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Channel</th>
+              <th class="num">Sessions</th>
+              <th class="num">Users</th>
+              <th class="num">Engaged sessions</th>
+              <th class="num">Engagement rate</th>
+              <th class="num">Bounce rate</th>
+              <th class="num">Avg session duration</th>
+              <th class="num">Conversions</th>
+            </tr></thead>
+            <tbody>
+              <% if (!data.channels.length) { %>
+                <tr><td colspan="8"><div class="empty-state">No GA4 channel data in this window.</div></td></tr>
+              <% } %>
+              <% data.channels.forEach(function(c){ %>
+                <tr>
+                  <td><%= c.channel %></td>
+                  <td class="num"><%= fmtInt(c.sessions) %></td>
+                  <td class="num"><%= fmtInt(c.users) %></td>
+                  <td class="num"><%= fmtInt(c.engaged_sessions) %></td>
+                  <td class="num"><%= fmtPct(c.sessions > 0 ? (c.engaged_sessions / c.sessions) * 100 : 0, 1) %></td>
+                  <td class="num"><%= fmtPct((c.bounce_rate || 0) * 100, 1) %></td>
+                  <td class="num"><%= fmtDuration(c.avg_duration) %></td>
+                  <td class="num"><%= fmtInt(c.conversions) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } else if (tab === 'ga4pages') { %>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Page</th>
+              <th class="num">Sessions</th>
+              <th class="num">Users</th>
+              <th class="num">Conversions</th>
+            </tr></thead>
+            <tbody>
+              <% if (!data.ga4Pages.length) { %>
+                <tr><td colspan="4"><div class="empty-state">No GA4 page data in this window.</div></td></tr>
+              <% } %>
+              <% data.ga4Pages.forEach(function(p){ %>
+                <tr>
+                  <td class="url wide"><%= shortUrl(p.entity, 70) %></td>
+                  <td class="num"><%= fmtInt(p.sessions) %></td>
+                  <td class="num"><%= fmtInt(p.users) %></td>
+                  <td class="num"><%= fmtInt(p.conversions) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <%- include('partials/pagination', { total: data.ga4PageTotal, page, pageSize, makeHref: (n) => `/performance?${qs({ page: n })}` }) %>
+
+      <% } else if (tab === 'countries') { %>
+        <div class="grid cols-2" style="gap:16px;margin-bottom:16px;align-items:stretch">
+          <div class="card">
+            <div class="card-head"><h3>Clicks by country</h3></div>
+            <div class="card-body">
+              <%- include('partials/worldmap', { rows: data.countriesForChart, nameKey: 'entity', valueKey: 'clicks', codeType: 'alpha3', color: '#2563eb' }) %>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Top countries</h3></div>
+            <div class="card-body">
+              <%- include('partials/barchart', { label: '', rows: data.countriesForChart, nameKey: 'entity', valueKey: 'clicks', color: '#2563eb', max: 8 }) %>
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Country</th>
+              <th class="num">Clicks</th>
+              <th class="num">Impressions</th>
+              <th class="num">CTR</th>
+              <th class="num">Position</th>
+            </tr></thead>
+            <tbody>
+              <% if (!data.countries.length) { %>
+                <tr><td colspan="5"><div class="empty-state">No country data in this window.</div></td></tr>
+              <% } %>
+              <% data.countries.forEach(function(c){ %>
+                <tr>
+                  <td><%= c.entity %></td>
+                  <td class="num"><%= fmtInt(c.clicks) %></td>
+                  <td class="num"><%= fmtInt(c.impressions) %></td>
+                  <td class="num"><%= fmtPct(c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0, 2) %></td>
+                  <td class="num"><%= fmtPos(c.position) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <%- include('partials/pagination', { total: data.countryTotal, page, pageSize, makeHref: (n) => `/performance?${qs({ page: n })}` }) %>
+
+      <% } else if (tab === 'devices') { %>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-body">
+            <%- include('partials/barchart', { label: 'Clicks by device', rows: data.devices, nameKey: 'entity', valueKey: 'clicks', color: chartColor.volume, max: 5 }) %>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Device</th>
+              <th class="num">Clicks</th>
+              <th class="num">Impressions</th>
+              <th class="num">CTR</th>
+              <th class="num">Position</th>
+            </tr></thead>
+            <tbody>
+              <% if (!data.devices.length) { %>
+                <tr><td colspan="5"><div class="empty-state">No device data in this window.</div></td></tr>
+              <% } %>
+              <% data.devices.forEach(function(d){ %>
+                <tr>
+                  <td style="text-transform:capitalize"><%= (d.entity || '').toLowerCase() %></td>
+                  <td class="num"><%= fmtInt(d.clicks) %></td>
+                  <td class="num"><%= fmtInt(d.impressions) %></td>
+                  <td class="num"><%= fmtPct(d.impressions > 0 ? (d.clicks / d.impressions) * 100 : 0, 2) %></td>
+                  <td class="num"><%= fmtPos(d.position) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+      <% } else if (tab === 'appearance') { %>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-body">
+            <%- include('partials/barchart', { label: 'Clicks by search appearance', rows: data.appearance, nameKey: 'entity', valueKey: 'clicks', color: chartColor.rank, max: 8 }) %>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Search appearance</th>
+              <th class="num">Clicks</th>
+              <th class="num">Impressions</th>
+              <th class="num">CTR</th>
+              <th class="num">Position</th>
+            </tr></thead>
+            <tbody>
+              <% if (!data.appearance.length) { %>
+                <tr><td colspan="5"><div class="empty-state">No rich-result / search-appearance data in this window — most sites only see this once they qualify for a rich feature.</div></td></tr>
+              <% } %>
+              <% data.appearance.forEach(function(a){ %>
+                <tr>
+                  <td><%= a.entity %></td>
+                  <td class="num"><%= fmtInt(a.clicks) %></td>
+                  <td class="num"><%= fmtInt(a.impressions) %></td>
+                  <td class="num"><%= fmtPct(a.impressions > 0 ? (a.clicks / a.impressions) * 100 : 0, 2) %></td>
+                  <td class="num"><%= fmtPos(a.position) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+      <% } else if (tab === 'sitemaps') { %>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Sitemap</th>
+              <th>Type</th>
+              <th class="num">Submitted URLs</th>
+              <th class="num">Indexed URLs</th>
+              <th>Last submitted</th>
+              <th>Last read</th>
+              <th class="num">Warnings</th>
+              <th class="num">Errors</th>
+            </tr></thead>
+            <tbody>
+              <% if (!data.sitemaps.length) { %>
+                <tr><td colspan="8"><div class="empty-state">No sitemaps submitted in Search Console for this property.</div></td></tr>
+              <% } %>
+              <% data.sitemaps.forEach(function(s){ %>
+                <tr>
+                  <td class="url wide"><%= s.path %></td>
+                  <td><%= s.is_sitemaps_index ? 'Sitemap index' : (s.type || 'Sitemap') %></td>
+                  <td class="num"><%= s.submitted_count != null ? fmtInt(s.submitted_count) : '—' %></td>
+                  <td class="num"><%= s.indexed_count != null ? fmtInt(s.indexed_count) : '—' %></td>
+                  <td><%= s.last_submitted ? fmtDate(s.last_submitted) : '—' %></td>
+                  <td><%= s.last_downloaded ? fmtDate(s.last_downloaded) : 'Not yet read' %></td>
+                  <td class="num"><span class="badge <%= s.warnings > 0 ? 'medium' : 'good' %>"><%= s.warnings %></span></td>
+                  <td class="num"><span class="badge <%= s.errors > 0 ? 'critical' : 'good' %>"><%= s.errors %></span></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+      <% } else if (tab === 'indexing') { %>
+        <div class="notice info" style="margin-bottom:16px">
+          <span class="notice-icon">&#8505;</span>
+          <div class="notice-body">
+            Google publishes no bulk "index coverage" API, so this checks pages one at a time via the URL Inspection API
+            (quota-limited to ~2,000 checks/day/property). Sampling your top-traffic pages would mostly just confirm
+            pages that are already indexed — a page needs to be indexed before it can earn clicks — so this instead
+            prioritises pages the internal-linking crawl already flagged as <strong>broken links</strong> or
+            <strong>orphaned / under-linked</strong>, which are the pages actually at risk of not being indexed. It
+            fills any remaining quota with top-traffic pages to keep a baseline fresh, and skips anything checked in
+            the last 7 days.
+          </div>
+        </div>
+
+        <% if (data.brokenLinks && data.brokenLinks.length) { %>
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-head">
+              <h3>Broken links found by the internal-linking crawl</h3>
+              <span class="sub"><%= data.brokenLinksTotal %> total &middot; not from URL Inspection, no quota used</span>
+              <a class="btn ghost sm" href="/linking">View full report</a>
+            </div>
+            <div class="table-wrap">
+              <table class="data compact">
+                <thead><tr><th>Broken URL</th><th>Type</th><th>Linked from</th><th class="num">Referring pages</th></tr></thead>
+                <tbody>
+                  <% data.brokenLinks.forEach(function(b){ %>
+                    <tr>
+                      <td class="url wide"><%= shortUrl(b.url, 60) %></td>
+                      <td><span class="badge high"><%= b.classification || 'broken' %></span></td>
+                      <td class="url wide"><%= shortUrl(b.linked_from, 50) %></td>
+                      <td class="num"><%= b.referring_pages || '—' %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <% } %>
+
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-body" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <form method="POST" action="/performance/inspect" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <input type="hidden" name="brand_id" value="<%= brand.id %>">
+              <label for="inspect-limit" style="margin:0;font-size:12.5px;color:var(--text-2);white-space:nowrap">Pages to check</label>
+              <select id="inspect-limit" name="limit">
+                <option value="20">20</option>
+                <option value="40" selected>40</option>
+                <option value="100">100</option>
+              </select>
+              <button type="submit" class="btn sm">Run indexing check</button>
+            </form>
+            <% if (data.indexing.totals.total) { %>
+              <span style="font-size:12.5px;color:var(--text-3)">
+                Last checked: <%= fmtDateTime(data.indexing.totals.lastChecked) %>
+              </span>
+            <% } %>
+          </div>
+        </div>
+
+        <% if (!data.indexing.totals.total) { %>
+          <div class="notice warn">
+            <span class="notice-icon">&#9888;</span>
+            <div class="notice-body">No pages have been checked yet for this brand. Run a check above to get started.</div>
+          </div>
+        <% } else { %>
+          <div class="stat-row" style="margin-bottom:16px">
+            <div class="stat">
+              <div class="label">Pages checked</div>
+              <div class="value"><%= fmtInt(data.indexing.totals.total) %></div>
+            </div>
+            <div class="stat">
+              <div class="label">Indexed</div>
+              <div class="value" style="color:var(--good)"><%= fmtInt(data.indexing.totals.indexed) %></div>
+            </div>
+            <div class="stat">
+              <div class="label">Not indexed</div>
+              <div class="value" style="color:var(--critical)"><%= fmtInt(data.indexing.totals.notIndexed) %></div>
+            </div>
+          </div>
+
+          <div class="grid cols-2" style="margin-bottom:16px;align-items:start">
+            <div class="card" style="margin:0">
+              <div class="card-head"><h3>Why pages aren't indexed</h3></div>
+              <div class="card-body">
+                <%- include('partials/barchart', {
+                  label: '',
+                  rows: data.indexing.reasons.filter(function(r){ return r.verdict !== 'PASS'; }),
+                  nameKey: 'reason', valueKey: 'pages', color: '#e8590c', max: 10,
+                }) %>
+              </div>
+            </div>
+
+            <div class="card" style="margin:0">
+              <div class="card-head">
+                <h3>Crawled by</h3>
+                <span class="sub">Which Googlebot indexed each page</span>
+              </div>
+              <div class="card-body">
+                <% if (!data.crawlers.length) { %>
+                  <div class="empty-state">No crawl data yet.</div>
+                <% } else { %>
+                  <table class="data compact">
+                    <thead><tr><th>Googlebot</th><th class="num">Pages</th><th class="num">Share</th></tr></thead>
+                    <tbody>
+                      <% var crawlTotal = data.crawlers.reduce(function(a,c){ return a + c.pages; }, 0); %>
+                      <% data.crawlers.forEach(function(c){ %>
+                        <tr>
+                          <td style="text-transform:capitalize"><%= String(c.crawled_as).toLowerCase() %></td>
+                          <td class="num"><%= fmtInt(c.pages) %></td>
+                          <td class="num"><%= fmtPct(crawlTotal ? (c.pages / crawlTotal) * 100 : 0, 1) %></td>
+                        </tr>
+                      <% }) %>
+                    </tbody>
+                  </table>
+                  <% if (data.crawlers.some(function(c){ return c.crawled_as === 'DESKTOP'; })) { %>
+                    <p class="hint">Google indexes mobile-first. Pages crawled as desktop are usually ones its
+                      smartphone crawler could not fetch — worth checking those URLs directly.</p>
+                  <% } %>
+                <% } %>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rich results — read straight from the URL Inspection response, so
+               this is what Google actually detected, not what the page declares. -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-head">
+              <h3>Rich results &amp; structured data</h3>
+              <span class="sub">
+                <%= fmtInt(data.richResults.totals.withRichResults || 0) %> of
+                <%= fmtInt(data.richResults.totals.checked || 0) %> checked pages are eligible
+              </span>
+            </div>
+            <div class="card-body">
+              <% if (!data.richResults.totals.checked) { %>
+                <div class="empty-state">Run an indexing check to see what Google detects.</div>
+              <% } else if (!data.richResults.types.length) { %>
+                <div class="notice warn" style="margin:0">
+                  <span class="notice-icon">&#9888;</span>
+                  <div class="notice-body">
+                    Google detected <strong>no rich-result types</strong> on any of the
+                    <%= fmtInt(data.richResults.totals.checked) %> pages checked. If this site has schema markup,
+                    Google is not recognising it as eligible — worth validating the JSON-LD.
+                  </div>
+                </div>
+              <% } else { %>
+                <div class="grid cols-2" style="gap:16px;align-items:start">
+                  <div class="table-wrap">
+                    <table class="data compact">
+                      <thead><tr><th>Rich result type</th><th class="num">Pages</th></tr></thead>
+                      <tbody>
+                        <% data.richResults.types.forEach(function(t){ %>
+                          <tr>
+                            <td><span class="badge good"><%= t.type %></span></td>
+                            <td class="num"><%= fmtInt(t.pages) %></td>
+                          </tr>
+                        <% }) %>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div>
+                    <div class="stat-row" style="margin:0">
+                      <div class="stat">
+                        <div class="label">Eligible pages</div>
+                        <div class="value" style="color:var(--good)"><%= fmtInt(data.richResults.totals.withRichResults || 0) %></div>
+                      </div>
+                      <div class="stat">
+                        <div class="label">With errors</div>
+                        <div class="value <%= data.richResults.totals.withIssues ? '' : '' %>"
+                             style="color:<%= data.richResults.totals.withIssues ? 'var(--critical)' : 'var(--text)' %>">
+                          <%= fmtInt(data.richResults.totals.withIssues || 0) %>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <% if (data.richResults.issues.length) { %>
+                  <div class="section-divider"></div>
+                  <h4 style="margin-bottom:8px">Structured data issues</h4>
+                  <div class="table-wrap">
+                    <table class="data compact">
+                      <thead><tr><th>URL</th><th>Type</th><th>Severity</th><th>Issue</th></tr></thead>
+                      <tbody>
+                        <% data.richResults.issues.forEach(function(i){ %>
+                          <tr>
+                            <td class="url wrap"><%= shortUrl(i.url, 45) %></td>
+                            <td class="narrow"><%= i.type %></td>
+                            <td><span class="badge <%= i.severity === 'ERROR' ? 'critical' : 'medium' %>"><%= (i.severity || 'warning').toLowerCase() %></span></td>
+                            <td class="wrap"><%= i.message %></td>
+                          </tr>
+                        <% }) %>
+                      </tbody>
+                    </table>
+                  </div>
+                <% } %>
+              <% } %>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data compact">
+              <thead><tr>
+                <th>URL</th>
+                <th>Verdict</th>
+                <th>Coverage reason</th>
+                <th>Crawled as</th>
+                <th>Rich results</th>
+                <th>In sitemap</th>
+                <th>Last crawled</th>
+              </tr></thead>
+              <tbody>
+                <% data.indexingRows.forEach(function(r){ %>
+                  <tr>
+                    <td class="url wrap"><%= shortUrl(r.url, 55) %></td>
+                    <td><span class="badge <%= r.verdict === 'PASS' ? 'good' : (r.error ? 'neutral' : 'critical') %>"><%= r.error ? 'error' : (r.verdict || 'unknown') %></span></td>
+                    <td class="wrap"><%= r.error ? r.error : (r.coverage_state || '—') %></td>
+                    <td class="narrow" style="text-transform:capitalize"><%= r.crawled_as ? String(r.crawled_as).toLowerCase() : '—' %></td>
+                    <td class="wrap">
+                      <% if (r.rich_result_types) { %>
+                        <span class="badge <%= r.rich_result_issues ? 'medium' : 'good' %>" title="<%= r.rich_result_types %>"><%= r.rich_result_types %></span>
+                      <% } else { %>—<% } %>
+                    </td>
+                    <td class="narrow"><%= r.sitemap ? 'Yes' : '—' %></td>
+                    <td class="narrow"><%= r.last_crawl_time ? fmtDate(r.last_crawl_time) : '—' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <%- include('partials/pagination', { total: data.indexingTotal, page, pageSize, makeHref: (n) => `/performance?${qs({ tab: 'indexing', page: n })}` }) %>
+        <% } %>
+
+      <% } else if (tab === 'ga4devices') { %>
+        <div class="grid cols-2" style="gap:20px;margin-bottom:16px">
+          <%- include('partials/barchart', { label: 'Sessions by device', rows: data.ga4DeviceRows, nameKey: 'device_category', valueKey: 'sessions', color: chartColor.volume, max: 5 }) %>
+          <%- include('partials/barchart', { label: 'Sessions by browser', rows: data.ga4BrowserRows, nameKey: 'browser', valueKey: 'sessions', color: chartColor.engagement, max: 8 }) %>
+        </div>
+        <div class="grid cols-2" style="gap:16px">
+          <div class="table-wrap">
+            <table class="data compact">
+              <thead><tr><th>Device category</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
+              <tbody>
+                <% if (!data.ga4DeviceRows.length) { %>
+                  <tr><td colspan="4"><div class="empty-state">No device data in this window.</div></td></tr>
+                <% } %>
+                <% data.ga4DeviceRows.forEach(function(d){ %>
+                  <tr>
+                    <td style="text-transform:capitalize"><%= d.device_category %></td>
+                    <td class="num"><%= fmtInt(d.sessions) %></td>
+                    <td class="num"><%= fmtInt(d.users) %></td>
+                    <td class="num"><%= fmtInt(d.conversions) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-wrap">
+            <table class="data compact">
+              <thead><tr><th>Browser</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
+              <tbody>
+                <% if (!data.ga4BrowserRows.length) { %>
+                  <tr><td colspan="4"><div class="empty-state">No browser data in this window.</div></td></tr>
+                <% } %>
+                <% data.ga4BrowserRows.forEach(function(b){ %>
+                  <tr>
+                    <td><%= b.browser %></td>
+                    <td class="num"><%= fmtInt(b.sessions) %></td>
+                    <td class="num"><%= fmtInt(b.users) %></td>
+                    <td class="num"><%= fmtInt(b.conversions) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      <% } else if (tab === 'ga4geo') { %>
+        <div class="grid cols-2" style="gap:16px;margin-bottom:16px;align-items:stretch">
+          <div class="card">
+            <div class="card-head"><h3>Sessions by country</h3></div>
+            <div class="card-body">
+              <%- include('partials/worldmap', { rows: data.ga4CountriesForChart, nameKey: 'country', valueKey: 'sessions', codeType: 'name', color: chartColor.engagement }) %>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Top countries</h3></div>
+            <div class="card-body">
+              <%- include('partials/barchart', { label: '', rows: data.ga4CountriesForChart, nameKey: 'country', valueKey: 'sessions', color: chartColor.engagement, max: 8 }) %>
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr><th>Country</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
+            <tbody>
+              <% if (!data.ga4CountryRows.length) { %>
+                <tr><td colspan="4"><div class="empty-state">No GA4 geography data in this window.</div></td></tr>
+              <% } %>
+              <% data.ga4CountryRows.forEach(function(c){ %>
+                <tr>
+                  <td><%= c.country %></td>
+                  <td class="num"><%= fmtInt(c.sessions) %></td>
+                  <td class="num"><%= fmtInt(c.users) %></td>
+                  <td class="num"><%= fmtInt(c.conversions) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <%- include('partials/pagination', { total: data.ga4CountryTotal, page, pageSize, makeHref: (n) => `/performance?${qs({ page: n })}` }) %>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-head">
+            <h3>Top cities</h3>
+            <span class="sub">Synced with the country breakdown &middot; top <%= data.ga4CityRows.length %></span>
+          </div>
+          <div class="table-wrap">
+            <table class="data compact">
+              <thead><tr><th>City</th><th>Country</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
+              <tbody>
+                <% if (!data.ga4CityRows.length) { %>
+                  <tr><td colspan="5"><div class="empty-state">No city-level data in this window.</div></td></tr>
+                <% } %>
+                <% data.ga4CityRows.forEach(function(c){ %>
+                  <tr>
+                    <td><%= c.city %></td>
+                    <td><%= c.country %></td>
+                    <td class="num"><%= fmtInt(c.sessions) %></td>
+                    <td class="num"><%= fmtInt(c.users) %></td>
+                    <td class="num"><%= fmtInt(c.conversions) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      <% } else if (tab === 'ga4acquisition') { %>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-body">
+            <%- include('partials/barchart', { label: 'Top sources by sessions', rows: data.ga4AcquisitionForChart.map(function(a){ return { name: a.source + ' / ' + a.medium, sessions: a.sessions }; }), nameKey: 'name', valueKey: 'sessions', color: chartColor.engagement, max: 8 }) %>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr><th>Source / medium</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">New users</th><th class="num">Conversions</th></tr></thead>
+            <tbody>
+              <% if (!data.ga4AcquisitionRows.length) { %>
+                <tr><td colspan="5"><div class="empty-state">No GA4 acquisition data in this window.</div></td></tr>
+              <% } %>
+              <% data.ga4AcquisitionRows.forEach(function(a){ %>
+                <tr>
+                  <td><%= a.source %> / <%= a.medium %></td>
+                  <td class="num"><%= fmtInt(a.sessions) %></td>
+                  <td class="num"><%= fmtInt(a.users) %></td>
+                  <td class="num"><%= fmtInt(a.new_users) %></td>
+                  <td class="num"><%= fmtInt(a.conversions) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <%- include('partials/pagination', { total: data.ga4AcquisitionTotal, page, pageSize, makeHref: (n) => `/performance?${qs({ page: n })}` }) %>
+
+      <% } else if (tab === 'ga4events') { %>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-body">
+            <%- include('partials/barchart', { label: 'Top events by count', rows: data.ga4EventsForChart, nameKey: 'event_name', valueKey: 'event_count', color: chartColor.rank, max: 8 }) %>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr><th>Event name</th><th class="num">Event count</th><th class="num">Total users</th><th class="num">Event value</th></tr></thead>
+            <tbody>
+              <% if (!data.ga4EventRows.length) { %>
+                <tr><td colspan="4"><div class="empty-state">No GA4 event data in this window.</div></td></tr>
+              <% } %>
+              <% data.ga4EventRows.forEach(function(e){ %>
+                <tr>
+                  <td><%= e.event_name %></td>
+                  <td class="num"><%= fmtInt(e.event_count) %></td>
+                  <td class="num"><%= fmtInt(e.total_users) %></td>
+                  <td class="num"><%= fmtInt(e.event_value) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <%- include('partials/pagination', { total: data.ga4EventTotal, page, pageSize, makeHref: (n) => `/performance?${qs({ page: n })}` }) %>
+      <% } else if (tab === 'ai') { %>
+        <div class="empty-state">
+          <div class="icon">&#10024;</div>
+          <h3>AI Suggestions — coming soon</h3>
+          <p>Requires an ongoing paid AI API connection, so it isn't switched on yet. This is where an AI-written
+            summary of this brand's performance will appear, generated from the real data already on this page.</p>
+          <a class="btn secondary sm" href="/ai-suggestions">See what's planned</a>
+        </div>
+      <% } %>
+    </div>
+    <% if (!isAjax) { %></div><% } %>
+  <% } %>
+  <% } %>
+<% } %>
+
+<% if (!isAjax) { %>
+<script>
+  // Swaps the tab card's content via fetch() instead of a full navigation
+  // whenever a tab, sort header, filter, or pagination link inside it is
+  // used — those are all plain <a>/<form> elements pointing at /performance,
+  // so this is a drop-in progressive enhancement, not a rewrite of the tabs.
+  (function () {
+    var wrap = document.getElementById('perf-tabs-wrap');
+    if (!wrap) return;
+
+    function withAjaxParam(url) {
+      var u = new URL(url, window.location.origin);
+      u.searchParams.set('ajax', '1');
+      return u.toString();
+    }
+    function withoutAjaxParam(url) {
+      var u = new URL(url, window.location.origin);
+      u.searchParams.delete('ajax');
+      return u.pathname + u.search;
+    }
+    function executeScripts(container) {
+      Array.prototype.forEach.call(container.querySelectorAll('script'), function (old) {
+        var s = document.createElement('script');
+        Array.prototype.forEach.call(old.attributes, function (a) { s.setAttribute(a.name, a.value); });
+        s.textContent = old.textContent;
+        old.parentNode.replaceChild(s, old);
+      });
+    }
+    function loadUrl(url, pushState) {
+      wrap.style.opacity = '.55';
+      fetch(withAjaxParam(url), { headers: { 'X-Requested-With': 'fetch' } })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(function (html) {
+          wrap.innerHTML = html;
+          wrap.style.opacity = '';
+          // Rows replayed the card/row entrance animation on every tab
+          // swap (it re-fires on any fresh DOM insert), reading as flicker
+          // rather than polish — suppress it after the initial page load.
+          wrap.classList.add('no-entrance-anim');
+          executeScripts(wrap);
+          if (pushState) window.history.pushState({ perfTabAjax: true }, '', withoutAjaxParam(url));
+        })
+        .catch(function () { window.location.href = url; });
+    }
+
+    wrap.addEventListener('click', function (e) {
+      var a = e.target.closest('a');
+      if (!a || !wrap.contains(a)) return;
+      var href = a.getAttribute('href') || '';
+      if (!href || href.charAt(0) === '#' || a.target === '_blank') return;
+      e.preventDefault();
+      loadUrl(href, true);
+    });
+    wrap.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      e.preventDefault();
+      var params = new URLSearchParams(new FormData(form)).toString();
+      var action = form.getAttribute('action') || window.location.pathname;
+      loadUrl(action + (params ? '?' + params : ''), true);
+    });
+    window.addEventListener('popstate', function () {
+      loadUrl(window.location.pathname + window.location.search, false);
+    });
+  })();
+</script>
+<% } %>
+
+<% if (!isAjax) { %>
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>
+<% } %>

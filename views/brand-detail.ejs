@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<div class="toolbar">
+  <a class="btn ghost sm" href="/brands">&larr; All brands</a>
+  <div class="spacer"></div>
+  <a class="btn secondary sm" href="/alerts?brand=<%= brand.id %>">Alerts</a>
+  <a class="btn secondary sm" href="/tasks?brand=<%= brand.id %>">Tasks</a>
+  <a class="btn secondary sm" href="/tasks/opportunities/<%= brand.id %>">Opportunities</a>
+  <a class="btn secondary sm" href="/reports?brand=<%= brand.id %>">Reports</a>
+</div>
+
+<div class="stat-row">
+  <div class="stat">
+    <div class="label">Search Console</div>
+    <div class="value sm">
+      <span class="badge <%= caps.gsc ? 'good' : 'medium' %>"><%= caps.gsc ? 'Connected' : 'No data' %></span>
+    </div>
+    <div class="meta">
+      <% if (coverage.gsc && coverage.gsc.n) { %><%= coverage.gsc.a %> → <%= coverage.gsc.b %><% } else { %>nothing synced<% } %>
+    </div>
+  </div>
+  <div class="stat">
+    <div class="label">GA4</div>
+    <div class="value sm">
+      <span class="badge <%= caps.ga4 ? 'good' : 'medium' %>"><%= caps.ga4 ? 'Connected' : 'No data' %></span>
+    </div>
+    <div class="meta">
+      <% if (coverage.ga4 && coverage.ga4.n) { %><%= coverage.ga4.a %> → <%= coverage.ga4.b %><% } else { %>nothing synced<% } %>
+    </div>
+  </div>
+  <div class="stat">
+    <div class="label">PageSpeed</div>
+    <div class="value sm">
+      <span class="badge <%= caps.psi ? 'good' : 'neutral' %>"><%= caps.psi ? 'Measured' : 'Not measured' %></span>
+    </div>
+    <div class="meta"><%= fmtInt(rowCounts.psi_snapshots) %> snapshots</div>
+  </div>
+  <div class="stat">
+    <div class="label">Uptime probe</div>
+    <div class="value sm">
+      <% if (uptime.length) { %>
+        <span class="badge <%= uptime[0].ok ? 'good' : 'critical' %>">
+          <%= uptime[0].ok ? ('HTTP ' + uptime[0].status_code) : 'Down' %>
+        </span>
+      <% } else { %><span class="badge neutral">No checks</span><% } %>
+    </div>
+    <div class="meta"><%= uptime.length ? (fmtInt(uptime[0].response_ms) + 'ms · ' + fmtDateTime(uptime[0].checked_at)) : '—' %></div>
+  </div>
+  <div class="stat">
+    <div class="label">Rows stored</div>
+    <div class="value sm"><%= fmtInt(Object.values(rowCounts).reduce(function(a,b){return a+b;},0)) %></div>
+    <div class="meta">across all consolidated tables</div>
+  </div>
+</div>
+
+<div class="split">
+  <div>
+    <div class="card">
+      <div class="card-head">
+        <h2>Consolidated data</h2>
+        <span class="sub">Every table the sync writes, and where you can see it</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data compact">
+          <thead><tr><th>Table</th><th class="num">Rows</th><th>What it holds</th><th>Shown on</th></tr></thead>
+          <tbody>
+            <% dataTables.forEach(function(t){ %>
+              <tr>
+                <td class="mono"><%= t.table %></td>
+                <td class="num"><%= fmtInt(t.rows) %></td>
+                <td class="wrap"><%= t.label %></td>
+                <td class="wrap">
+                  <% if (t.rows) { %><%= t.where %>
+                  <% } else { %><span class="muted">nothing synced yet</span><% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <% if (uptime.length) { %>
+      <div class="card">
+        <div class="card-head">
+          <h3>Uptime checks</h3>
+          <span class="sub">Last <%= uptime.length %> probes &middot; <%= fmtInt(rowCounts.uptime_checks) %> stored</span>
+        </div>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr><th>Checked</th><th>Result</th><th class="num">Response</th><th>Detail</th></tr></thead>
+            <tbody>
+              <% uptime.forEach(function(u){ %>
+                <tr>
+                  <td class="narrow"><%= fmtDateTime(u.checked_at) %></td>
+                  <td><span class="badge <%= u.ok ? 'good' : 'critical' %>"><%= u.ok ? ('HTTP ' + u.status_code) : 'Down' %></span></td>
+                  <td class="num"><%= u.response_ms == null ? '—' : (fmtInt(u.response_ms) + 'ms') %></td>
+                  <td class="wrap"><%= u.error || (u.ok ? 'OK' : ('HTTP ' + (u.status_code || '—'))) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="card">
+      <div class="card-head"><h2>Sync history</h2></div>
+      <% if (!syncRuns.length) { %>
+        <div class="card-body"><p style="color:var(--text-2);margin:0">No syncs have run for this brand yet.</p></div>
+      <% } else { %>
+        <div class="card-body" style="padding:0">
+          <% syncRuns.forEach(function(r){ %>
+            <div style="padding:11px 16px;border-bottom:1px solid var(--border)">
+              <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+                <span class="badge <%= r.status === 'completed' ? 'good' : (r.status === 'running' ? 'accent' : (r.status === 'error' ? 'critical' : 'neutral')) %>"><%= r.status %></span>
+                <strong style="font-size:12.8px"><%= r.kind %></strong>
+                <span style="font-size:12px;color:var(--text-2)"><%= fmtDateTime(r.started_at) %></span>
+                <span style="font-size:12px;color:var(--text-2)"><%= fmtInt(r.rows_written) %> rows</span>
+              </div>
+              <% if (r.error) { %>
+                <div style="font-size:12px;color:var(--critical);margin-top:5px"><%= r.error %></div>
+              <% } %>
+              <% if (r.steps && r.steps.length) { %>
+                <details class="plain" style="margin-top:6px">
+                  <summary style="font-size:12px">Per-source detail</summary>
+                  <table class="data compact" style="margin-top:6px">
+                    <tbody>
+                      <% r.steps.forEach(function(s){ %>
+                        <tr>
+                          <td style="width:130px"><span class="dot-sev <%= s.ok ? 'low' : 'critical' %>"></span> <span class="mono"><%= s.step %></span></td>
+                          <td class="num" style="width:80px"><%= fmtInt(s.rows) %></td>
+                          <td style="color:var(--text-2)"><%= s.note || '' %></td>
+                        </tr>
+                      <% }) %>
+                    </tbody>
+                  </table>
+                </details>
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-head"><h3>Recent audits</h3><a class="btn ghost sm" href="/audit">New</a></div>
+        <% if (!audits.length) { %>
+          <div class="card-body"><p style="color:var(--text-2);margin:0;font-size:13px">None yet.</p></div>
+        <% } else { %>
+          <div class="card-body" style="padding:0">
+            <% audits.forEach(function(a){ %>
+              <a href="/audit/<%= a.id %>" style="display:block;padding:9px 14px;border-bottom:1px solid var(--border);color:var(--text)">
+                <span class="badge <%= a.status === 'completed' ? 'good' : (a.status === 'running' ? 'accent' : 'critical') %>"><%= a.status %></span>
+                <span style="font-size:12.5px;margin-left:5px"><%= fmtDateTime(a.created_at) %></span>
+              </a>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Recent linking runs</h3><a class="btn ghost sm" href="/linking">New</a></div>
+        <% if (!linkings.length) { %>
+          <div class="card-body"><p style="color:var(--text-2);margin:0;font-size:13px">None yet.</p></div>
+        <% } else { %>
+          <div class="card-body" style="padding:0">
+            <% linkings.forEach(function(l){ %>
+              <a href="/linking/<%= l.id %>" style="display:block;padding:9px 14px;border-bottom:1px solid var(--border);color:var(--text)">
+                <span class="badge <%= l.status === 'completed' ? 'good' : (l.status === 'running' ? 'accent' : 'critical') %>"><%= l.status %></span>
+                <span style="font-size:12.5px;margin-left:5px"><%= fmtDateTime(l.created_at) %></span>
+              </a>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (psi.length) { %>
+      <div class="card">
+        <div class="card-head"><h3>Core Web Vitals snapshots</h3></div>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr><th>Measured</th><th>Device</th><th class="num">Score</th><th class="num">LCP</th><th class="num">INP</th><th class="num">CLS</th><th class="num">FCP</th><th class="num">TTFB</th><th>Source</th></tr></thead>
+            <tbody>
+              <% psi.forEach(function(p){ %>
+                <tr>
+                  <td class="narrow"><%= fmtDateTime(p.captured_at) %></td>
+                  <td><%= p.strategy %></td>
+                  <td class="num"><%= p.perf_score == null ? '—' : p.perf_score %></td>
+                  <td class="num"><%= p.lcp == null ? '—' : (fmtInt(p.lcp) + 'ms') %></td>
+                  <td class="num"><%= p.inp == null ? '—' : (fmtInt(p.inp) + 'ms') %></td>
+                  <td class="num"><%= p.cls == null ? '—' : Number(p.cls).toFixed(3) %></td>
+                  <td class="num"><%= p.fcp == null ? '—' : (fmtInt(p.fcp) + 'ms') %></td>
+                  <td class="num"><%= p.ttfb == null ? '—' : (fmtInt(p.ttfb) + 'ms') %></td>
+                  <td>
+                    <% if (p.error) { %><span class="badge critical" title="<%= p.error %>">error</span>
+                    <% } else { %><span class="badge neutral"><%= p.source === 'crux-field' ? 'real users' : 'lab' %></span><% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <div>
+    <div class="card">
+      <div class="card-head"><h3>Run a sync</h3></div>
+      <div class="card-body">
+        <form method="POST" action="/brands/<%= brand.id %>/sync">
+          <div class="field">
+            <label for="days">History to pull</label>
+            <select id="days" name="days">
+              <option value="30">Last 30 days</option>
+              <option value="90" selected>Last 90 days</option>
+              <option value="180">Last 180 days</option>
+              <option value="480">Last 16 months (GSC maximum)</option>
+            </select>
+            <div class="hint">Overlapping days are replaced, never double-counted.</div>
+          </div>
+          <label class="check">
+            <input type="checkbox" name="include_psi">
+            <span>Also measure PageSpeed / Core Web Vitals
+              <span class="check-hint">Adds a minute or two. Required before any CWV alert can fire.</span>
+            </span>
+          </label>
+          <button type="submit" class="btn block">Sync now</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Brand settings</h3></div>
+      <div class="card-body">
+        <form method="POST" action="/brands/<%= brand.id %>/update">
+          <div class="field">
+            <label for="b_name">Name</label>
+            <input type="text" id="b_name" name="name" value="<%= brand.name %>" required>
+          </div>
+          <div class="field">
+            <label for="b_url">Website URL</label>
+            <input type="text" id="b_url" name="site_url" value="<%= brand.site_url %>" required>
+          </div>
+          <div class="field">
+            <label for="b_gsc">Search Console property</label>
+            <input type="text" id="b_gsc" name="gsc_property" value="<%= brand.gsc_property || '' %>">
+          </div>
+          <div class="field">
+            <label for="b_ga4">GA4 property id</label>
+            <input type="text" id="b_ga4" name="ga4_property_id" value="<%= brand.ga4_property_id || '' %>">
+            <% if (brand.ga4_property_name) { %><div class="hint"><%= brand.ga4_property_name %></div><% } %>
+          </div>
+          <div class="field">
+            <label for="b_email">Alert recipients</label>
+            <input type="text" id="b_email" name="notify_email" value="<%= brand.notify_email || '' %>">
+          </div>
+          <div class="field">
+            <label for="b_slack">Slack webhook</label>
+            <input type="text" id="b_slack" name="slack_webhook" value="<%= brand.slack_webhook || '' %>">
+          </div>
+          <label class="check">
+            <input type="checkbox" name="active" <%= brand.active ? 'checked' : '' %>>
+            <span>Active
+              <span class="check-hint">Inactive brands are skipped by the nightly sync and the alert scheduler.</span>
+            </span>
+          </label>
+          <button type="submit" class="btn block">Save changes</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Content brief settings</h3>
+        <span class="sub">One-time setup the Content Brief Agent reuses for every brief — free, and never asked again unless you change it here.</span>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="/brands/<%= brand.id %>/content-settings">
+          <div class="field">
+            <label for="b_vertical">Business vertical</label>
+            <select id="b_vertical" name="vertical">
+              <% const verticals = [
+                ['', 'Not set (generic / other)'],
+                ['ecommerce', 'Ecommerce'],
+                ['saas', 'SaaS'],
+                ['local_service', 'Local service'],
+                ['professional_services', 'Professional services / agency'],
+                ['publisher_content', 'Publisher / content site'],
+                ['marketplace', 'Marketplace'],
+                ['other', 'Other'],
+              ]; %>
+              <% verticals.forEach(function(v){ %>
+                <option value="<%= v[0] %>" <%= (brand.vertical || '') === v[0] ? 'selected' : '' %>><%= v[1] %></option>
+              <% }) %>
+            </select>
+            <div class="hint">Drives keyword intent, page-type suggestions and title templates in clustering and content briefs. Leave unset for the generic, services-oriented defaults.</div>
+          </div>
+          <div class="field">
+            <label for="b_market">Market</label>
+            <input type="text" id="b_market" name="market" value="<%= brand.market || '' %>" placeholder="US, UK, global, ...">
+            <div class="hint">Free text, e.g. "US", "UK", "global" — helps local-intent detection avoid assuming a US-only audience.</div>
+          </div>
+          <div class="field">
+            <label for="b_services">Products / services</label>
+            <textarea id="b_services" name="services" rows="4" placeholder="Shopify development: shopify, ecommerce, online store&#10;SEO audits: seo audit, technical seo&#10;Logo design"><%=
+              (function(){
+                if (!brand.services_json) return '';
+                try {
+                  const s = JSON.parse(brand.services_json);
+                  return s.map(function(x){ return x.keywords && x.keywords.length ? (x.name + ': ' + x.keywords.join(', ')) : x.name; }).join('\n');
+                } catch { return ''; }
+              })()
+            %></textarea>
+            <div class="hint">One per line: "Service name" or "Service name: keyword one, keyword two" to help briefs match it to the right topic.</div>
+          </div>
+          <div class="field">
+            <label for="b_cta_default">Default call to action</label>
+            <input type="text" id="b_cta_default" name="cta_default" value="<%=
+              (function(){ if (!brand.cta_json) return ''; try { return JSON.parse(brand.cta_json).default || ''; } catch { return ''; } })()
+            %>" placeholder="Contact us for a free quote">
+          </div>
+          <div class="field">
+            <label for="b_cta_rules">Call-to-action overrides (optional)</label>
+            <textarea id="b_cta_rules" name="cta_rules" rows="3" placeholder="commercial: Book a free consultation&#10;local: Call us today&#10;transactional: Get a quote"><%=
+              (function(){
+                if (!brand.cta_json) return '';
+                try {
+                  const c = JSON.parse(brand.cta_json);
+                  return (c.rules || []).map(function(r){ return r.pageType + ': ' + r.cta; }).join('\n');
+                } catch { return ''; }
+              })()
+            %></textarea>
+            <div class="hint">One per line: "page type: CTA text" — matched against a brief's suggested page type/intent (e.g. commercial, transactional, local, informational). Leave blank to always use the default above.</div>
+          </div>
+          <button type="submit" class="btn secondary block">Save content brief settings</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3 style="color:var(--critical)">Delete brand</h3></div>
+      <div class="card-body">
+        <p style="font-size:12.5px;color:var(--text-2)">
+          Removes the brand and every row attached to it — consolidated data, alert subscriptions,
+          alert history, tasks and reports. This cannot be undone.
+        </p>
+        <form method="POST" action="/brands/<%= brand.id %>/delete"
+              onsubmit="return confirm('Delete <%= brand.name %> and all of its data? This cannot be undone.')">
+          <button type="submit" class="btn danger-ghost block">Delete <%= brand.name %></button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

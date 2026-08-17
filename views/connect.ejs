@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<% if (!googleConfigured) { %>
+  <div class="notice error">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body">
+      Google OAuth is not configured. Set <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code>
+      in your <code>.env</code> file, then restart the server.
+    </div>
+  </div>
+<% } %>
+<% errors.forEach(function(e){ %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body">Could not load your Google property list — <%= e %></div>
+  </div>
+<% }) %>
+
+<div class="card">
+  <div class="card-head"><h2>Google account</h2></div>
+  <div class="card-body">
+    <% if (connection) { %>
+      <div class="stat-row" style="margin-bottom:0">
+        <div class="stat">
+          <div class="label">Connected as</div>
+          <div class="value sm"><%= connection.connected_email || 'unknown email' %></div>
+        </div>
+        <div class="stat">
+          <div class="label">Scopes granted</div>
+          <div class="value sm" style="font-size:12px;font-weight:500"><%= connection.scope || 'n/a' %></div>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:14px">
+        <form method="POST" action="/connect/disconnect">
+          <button class="btn danger" type="submit">Disconnect Google account</button>
+        </form>
+      </div>
+    <% } else { %>
+      <p style="font-size:13px;color:var(--text-2);margin:0 0 12px">
+        Not connected. Connecting pulls live Search Console and GA4 data into audits, linking runs, alerts and reports.
+      </p>
+      <a class="btn" href="/auth/google">Connect Google account</a>
+    <% } %>
+  </div>
+</div>
+
+<div class="grid cols-2" style="gap:14px">
+  <div class="card">
+    <div class="card-head"><h3>Search Console sites</h3></div>
+    <% if (!connection) { %>
+      <div class="card-body"><p style="font-size:13px;color:var(--text-2);margin:0">Connect your Google account above to list verified GSC sites.</p></div>
+    <% } else if (sites === null) { %>
+      <div class="card-body"><p style="font-size:13px;color:var(--text-2);margin:0">Could not load sites.</p></div>
+    <% } else if (!sites.length) { %>
+      <div class="card-body"><p style="font-size:13px;color:var(--text-2);margin:0">No verified Search Console sites found on this account.</p></div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="data compact">
+          <thead><tr><th>Site</th><th>Permission</th><th></th></tr></thead>
+          <tbody>
+            <% sites.forEach(function(s){ %>
+              <tr>
+                <td class="mono" style="font-size:12.5px"><%= s.siteUrl %></td>
+                <td><%= s.permissionLevel %></td>
+                <td><% if (s.used) { %><span class="badge good">used</span><% } %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>GA4 properties</h3></div>
+    <% if (!connection) { %>
+      <div class="card-body"><p style="font-size:13px;color:var(--text-2);margin:0">Connect your Google account above to list GA4 properties.</p></div>
+    <% } else if (properties === null) { %>
+      <div class="card-body"><p style="font-size:13px;color:var(--text-2);margin:0">Could not load properties.</p></div>
+    <% } else if (!properties.length) { %>
+      <div class="card-body"><p style="font-size:13px;color:var(--text-2);margin:0">No GA4 properties found on this account.</p></div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="data compact">
+          <thead><tr><th>Account</th><th>Property</th><th>Id</th><th></th></tr></thead>
+          <tbody>
+            <% properties.forEach(function(p){ %>
+              <tr>
+                <td><%= p.account %></td>
+                <td><%= p.name %></td>
+                <td class="mono" style="font-size:12.5px"><%= p.id %></td>
+                <td><% if (p.used) { %><span class="badge good">used</span><% } %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<% if (brands.length) { %>
+  <div class="card">
+    <div class="card-head"><h3>Brands using these properties</h3></div>
+    <div class="table-wrap">
+      <table class="data compact">
+        <thead><tr><th>Brand</th><th>GSC property</th><th>GA4 property</th></tr></thead>
+        <tbody>
+          <% brands.forEach(function(b){ %>
+            <tr>
+              <td><a href="/brands/<%= b.id %>"><%= b.name %></a></td>
+              <td class="mono" style="font-size:12px"><%= b.gsc_property || '—' %></td>
+              <td class="mono" style="font-size:12px"><%= b.ga4_property_name || b.ga4_property_id || '—' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

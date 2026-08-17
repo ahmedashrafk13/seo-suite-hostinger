@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+    <div class="toolbar">
+      <a class="btn ghost sm" href="/alerts/history<%= event.brand_id ? ('?brand=' + event.brand_id) : '' %>">&larr; Alert history</a>
+      <div class="spacer"></div>
+      <a class="btn secondary sm" href="/alerts<%= event.brand_id ? ('?brand=' + event.brand_id) : '' %>">Alerts for this brand</a>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><%= event.title %></h2>
+        <span class="badge <%= event.severity %> lg"><%= severityMeta.label %></span>
+      </div>
+      <div class="card-body">
+        <div class="stat-row">
+          <div class="stat">
+            <div class="label">Brand</div>
+            <div class="value sm"><%= event.brand_name || '—' %></div>
+            <div class="meta"><%= event.brand_url || '' %></div>
+          </div>
+          <div class="stat">
+            <div class="label">Alert type</div>
+            <div class="value sm"><%= def ? def.label : event.alert_key %></div>
+            <div class="meta"><%= def ? def.group : 'Not in current catalog' %></div>
+          </div>
+          <div class="stat">
+            <div class="label">Fired</div>
+            <div class="value sm"><%= event.created_at %></div>
+            <div class="meta">
+              <% if (event.acknowledged_at) { %>acknowledged <%= event.acknowledged_at %><% } else { %>not yet acknowledged<% } %>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="label">Notified</div>
+            <div class="value sm">
+              <% if (notified && notified.length) { %>
+                <span class="badge <%= notified.some(function(n){ return n && n.sent; }) ? 'good' : 'medium' %>">
+                  <%= notified.filter(function(n){ return n && n.sent; }).length %>/<%= notified.length %> sent
+                </span>
+              <% } else { %>
+                <span class="badge neutral">No delivery record</span>
+              <% } %>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <h3>Message</h3>
+        <p style="white-space:pre-wrap"><%= event.message %></p>
+
+        <% if (event.suggested_action) { %>
+          <h3>Suggested action</h3>
+          <p style="white-space:pre-wrap"><%= event.suggested_action %></p>
+        <% } %>
+
+        <% if (affected && affected.length) { %>
+          <h3>Affected (<%= affected.length %>)</h3>
+          <div class="table-wrap">
+            <table class="data compact">
+              <thead><tr><th>#</th><th>URL / item</th></tr></thead>
+              <tbody>
+                <% affected.forEach(function(a, i){ %>
+                  <tr>
+                    <td class="num"><%= i + 1 %></td>
+                    <td class="url">
+                      <% if (typeof a === 'string' && /^https?:\/\//.test(a)) { %>
+                        <a href="<%= a %>" target="_blank" rel="noopener"><%= a %></a>
+                      <% } else { %>
+                        <%= typeof a === 'object' ? JSON.stringify(a) : a %>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <% if (notified && notified.length) { %>
+          <h3>Delivery</h3>
+          <div class="table-wrap">
+            <table class="data compact">
+              <thead><tr><th>Channel</th><th>Sent</th><th>Detail</th></tr></thead>
+              <tbody>
+                <% notified.forEach(function(n){ %>
+                  <tr>
+                    <td><%= (n && n.channel) || '—' %></td>
+                    <td><span class="badge <%= n && n.sent ? 'good' : 'medium' %>"><%= n && n.sent ? 'Sent' : 'Not sent' %></span></td>
+                    <td><%= (n && (n.reason || n.error)) || '' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <% if (details && Object.keys(details).length) { %>
+          <h3>Evidence</h3>
+          <div class="table-wrap">
+            <pre style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;font-size:12px;overflow-x:auto"><%= JSON.stringify(details, null, 2) %></pre>
+          </div>
+        <% } %>
+
+        <div class="section-divider"></div>
+
+        <div class="btn-row">
+          <% if (!event.acknowledged_at) { %>
+            <form method="POST" action="/alerts/event/<%= event.id %>/acknowledge">
+              <input type="hidden" name="back" value="/alerts/event/<%= event.id %>">
+              <button class="btn success" type="submit">Acknowledge</button>
+            </form>
+          <% } else { %>
+            <span class="badge good">Acknowledged</span>
+          <% } %>
+
+          <% if (task) { %>
+            <a class="btn secondary" href="/tasks/<%= task.id %>">View linked task &rarr;</a>
+          <% } %>
+        </div>
+  </div>
+  </div>
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

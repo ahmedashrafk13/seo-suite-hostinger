@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+    <div class="toolbar">
+      <a class="btn ghost sm" href="/ai-lab">&larr; AI Lab</a>
+      <% if (run) { %>
+      <div class="spacer"></div>
+      <a class="btn secondary sm" href="/linking/<%= run.id %>" target="_blank" rel="noopener">View real linking run &rarr;</a>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>AI Linking Rationale (Beta) — <%= brand.name %></h3>
+        <% if (run && recs.length) { %>
+        <form method="POST" action="/ai-lab/<%= brand.id %>/linking/generate">
+          <button class="btn sm" type="submit"><%= row ? 'Regenerate (new billed call)' : 'Generate with AI' %></button>
+          <% if (row) { %><input type="hidden" name="force" value="1"><% } %>
+        </form>
+        <% } %>
+      </div>
+      <div class="card-body">
+        <% if (!run) { %>
+          <div class="empty-state">No completed internal linking run found for this brand yet. Run the internal linking agent first.</div>
+        <% } else if (!recs.length) { %>
+          <div class="empty-state">The latest linking run has no recommendations to rationalise.</div>
+        <% } else { %>
+          <p class="hint">Top <%= recs.length %> of up to <%= maxRecs %> recommendations by priority, from linking run #<%= run.id %>.</p>
+          <% if (row) { %>
+            <p class="hint">Generated <%= fmtDateTime(row.created_at) %> · <%= fmtInt(row.prompt_tokens) %> prompt / <%= fmtInt(row.completion_tokens) %> completion tokens · $<%= Number(row.cost_usd).toFixed(4) %></p>
+          <% } %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Link from</th><th>Link to</th><th>Anchor text</th><th>AI rationale</th></tr></thead>
+            <tbody>
+            <% recs.forEach(function(r){ %>
+              <tr>
+                <td><%= shortUrl(r.source_url) %></td>
+                <td><%= shortUrl(r.target_url) %></td>
+                <td><%= r.anchor_text %></td>
+                <td><%= (row && row.notes && row.notes[r.id]) || (row ? '—' : 'Not generated yet') %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+      </div>
+    </div>
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

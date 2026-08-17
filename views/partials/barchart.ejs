@@ -1,0 +1,69 @@
+<%
+/* Interactive ranked horizontal bar chart (ApexCharts) for "value by
+   category" data — countries, devices, search appearance, acquisition
+   sources, events, etc. Same call signature as before: label (string),
+   rows (array), nameKey (string), valueKey (string), color (hex),
+   fmt (optional formatter: 'int'|'pct'), max (optional row cap). */
+const _label = typeof label !== 'undefined' ? label : '';
+const _rows = (typeof rows !== 'undefined' ? rows : []).slice(0, typeof max !== 'undefined' ? max : 8);
+const _nameKey = typeof nameKey !== 'undefined' ? nameKey : 'entity';
+const _valueKey = typeof valueKey !== 'undefined' ? valueKey : 'clicks';
+const _color = typeof color !== 'undefined' ? color : '#2563eb';
+const _fmt = typeof fmt !== 'undefined' ? fmt : 'int';
+const _uid = `bc${Math.random().toString(36).slice(2, 9)}`;
+%>
+<div class="barchart-card">
+  <% if (_label) { %><div class="trendchart-label" style="margin-bottom:8px"><%= _label %></div><% } %>
+  <% if (!_rows.length) { %>
+    <div class="empty" style="padding:10px 0;font-size:12.5px;color:var(--text-3)">Not enough data yet</div>
+  <% } else { %>
+    <div id="<%= _uid %>" class="barchart-mount" style="height:<%= Math.max(160, _rows.length * 34) %>px"></div>
+    <script>
+      (function () {
+        var categories = <%- JSON.stringify(_rows.map((r) => String(r[_nameKey]))) %>;
+        var values = <%- JSON.stringify(_rows.map((r) => Number(r[_valueKey]) || 0)) %>;
+        var color = <%- JSON.stringify(_color) %>;
+        var fmt = <%- JSON.stringify(_fmt) %>;
+        function fmtV(v) {
+          if (fmt === 'pct') return Number(v).toFixed(1) + '%';
+          return Math.round(v).toLocaleString('en-US');
+        }
+        function render() {
+          if (!window.ApexCharts) { setTimeout(render, 60); return; }
+          // Headroom past the longest bar so its value label always lands on
+          // the plot's empty space instead of overlapping the fill or being
+          // clipped at the chart edge.
+          var peak = Math.max.apply(null, values.concat([1]));
+          new ApexCharts(document.querySelector('#<%= _uid %>'), {
+            chart: {
+              type: 'bar', height: '100%', toolbar: { show: false },
+              fontFamily: 'inherit', animations: { easing: 'easeinout', speed: 380 },
+            },
+            series: [{ name: <%- JSON.stringify(_label || 'Value') %>, data: values }],
+            plotOptions: {
+              bar: {
+                horizontal: true, borderRadius: 5, barHeight: '58%',
+                distributed: false,
+              },
+            },
+            xaxis: {
+              categories: categories, max: peak * 1.28,
+              labels: { style: { fontSize: '11px', colors: '#94a3b8' }, formatter: fmtV },
+              axisBorder: { show: false }, axisTicks: { show: false },
+            },
+            yaxis: { labels: { style: { fontSize: '12px', colors: '#334155' } } },
+            grid: { borderColor: 'var(--border, #e5e9f0)', strokeDashArray: 3, xaxis: { lines: { show: true } }, yaxis: { lines: { show: false } }, padding: { right: 24 } },
+            colors: [color],
+            dataLabels: {
+              enabled: true, offsetX: 10, textAnchor: 'start',
+              style: { fontSize: '11.5px', fontWeight: 700, colors: ['#334155'] },
+              formatter: fmtV, background: { enabled: false }, dropShadow: { enabled: false },
+            },
+            tooltip: { theme: 'light', y: { formatter: fmtV } },
+          }).render();
+        }
+        render();
+      })();
+    </script>
+  <% } %>
+</div>

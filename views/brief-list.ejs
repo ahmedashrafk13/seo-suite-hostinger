@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+    <div class="toolbar">
+      <span style="font-size:13px;color:var(--text-2)">Generated from the "Content brief" button on any keyword cluster.</span>
+      <div class="spacer"></div>
+      <a class="btn secondary sm" href="/keywords">Keyword clustering</a>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Content briefs</h2>
+        <div class="btn-row">
+          <a class="btn <%= !selectedBrand ? '' : 'secondary' %> sm" href="/keywords/briefs">All brands</a>
+          <% brands.forEach(function(b){ %>
+            <a class="btn <%= selectedBrand === b.id ? '' : 'secondary' %> sm" href="/keywords/briefs?brand=<%= b.id %>"><%= b.name %></a>
+          <% }) %>
+        </div>
+      </div>
+      <% if (!briefs.length) { %>
+        <div class="empty-state"><div class="icon">&#9776;</div>No content briefs yet. Open a keyword clustering run and click "Content brief" on any cluster.</div>
+      <% } else { %>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Primary keyword</th><th>Brand</th><th>Generated</th><th></th></tr></thead>
+          <tbody>
+          <% briefs.forEach(function(b){ %>
+            <tr>
+              <td><strong><%= b.primary_keyword %></strong></td>
+              <td><%= b.brand_name || '—' %></td>
+              <td><%= fmtDateTime(b.created_at) %></td>
+              <td><a class="btn secondary sm" href="/keywords/brief/<%= b.id %>">View</a></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+      <% } %>
+    </div>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

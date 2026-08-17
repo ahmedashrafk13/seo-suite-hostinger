@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<%
+// Severity palette — mirrors the --critical/--high/--medium/--low/--text-4
+// tokens in public/css/style.css so the donut matches badges/dots elsewhere.
+const severityColor = { critical: '#dc2626', high: '#ea580c', medium: '#7d5900', low: '#2563eb', info: '#94a3b8' };
+// Renders a period-over-period delta consistently everywhere on this page.
+function deltaHtml(recent, prior, invert) {
+  const abs = recent - prior;
+  if (!prior && !recent) return '<span class="delta flat">no data</span>';
+  const pct = prior === 0 ? null : (abs / prior) * 100;
+  const good = invert ? abs < 0 : abs > 0;
+  const cls = abs === 0 ? 'flat' : (good ? 'up' : 'down');
+  const arrow = abs === 0 ? '' : (abs > 0 ? '▲' : '▼');
+  const label = pct === null ? (abs > 0 ? 'new' : '') : `${Math.abs(pct).toFixed(1)}%`;
+  return `<span class="delta ${cls}">${arrow} ${label}</span>`;
+}
+%>
+
+<% if (!connected) { %>
+  <div class="notice info">
+    <span class="notice-icon">&#8853;</span>
+    <div class="notice-body">
+      <strong>Connect Google to begin.</strong>
+      Search Console and GA4 supply the data behind every alert, report and opportunity in this suite.
+      <div style="margin-top:9px"><a class="btn sm" href="/connect">Connect Google</a></div>
+    </div>
+  </div>
+<% } else if (!brands.length) { %>
+  <div class="notice info">
+    <span class="notice-icon">&#9673;</span>
+    <div class="notice-body">
+      <strong>Add your first brand.</strong>
+      A brand pairs a website with its Search Console property and GA4 property. Everything else — alerts,
+      reports, tasks — is organised per brand.
+      <div style="margin-top:9px"><a class="btn sm" href="/brands">Add a brand</a></div>
+    </div>
+  </div>
+<% } %>
+
+<% if (brands.length) { %>
+  <div class="toolbar">
+    <form method="GET" action="/dashboard">
+      <label for="brand" style="margin:0;font-size:12.5px;color:var(--text-2)">Brand</label>
+      <select id="brand" name="brand" onchange="this.form.submit()">
+        <option value="">All brands</option>
+        <% brands.forEach(function(b){ %>
+          <option value="<%= b.id %>" <%= selectedId === b.id ? 'selected' : '' %>><%= b.name %></option>
+        <% }) %>
+      </select>
+      <noscript><button type="submit" class="btn secondary sm">Apply</button></noscript>
+    </form>
+    <div class="spacer"></div>
+    <% if (selectedId) { %>
+      <span id="rt-badge" style="font-size:12px;color:var(--text-3)">&#9679; <span id="rt-count">…</span> active now</span>
+    <% } %>
+    <% if (lastSync) { %>
+      <span style="font-size:12px;color:var(--text-3)">
+        Last sync <%= fmtDateTime(lastSync.finished_at || lastSync.started_at) %>
+        <% if (lastSync.status === 'error') { %><span class="badge critical" style="margin-left:5px">failed</span><% } %>
+      </span>
+    <% } %>
+    <form method="POST" action="/dashboard/refresh">
+      <button type="submit" class="btn secondary sm">Sync &amp; check alerts now</button>
+    </form>
+  </div>
+  <% if (selectedId) { %>
+    <script>
+      (function () {
+        var el = document.getElementById('rt-count');
+        if (!el) return;
+        function poll() {
+          fetch('/performance/realtime.json?brand=<%= selectedId %>')
+            .then(function (r) { return r.json(); })
+            .then(function (d) { el.textContent = d.ok ? d.activeUsers : '—'; })
+            .catch(function () { el.textContent = '—'; });
+        }
+        poll();
+        setInterval(poll, 30000);
+      })();
+    </script>
+  <% } %>
+
+  <!-- Roll-up across the brands in scope -->
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Clicks · 28 days</div>
+      <div class="value"><%= fmtInt(totals.clicks) %></div>
+      <div class="meta"><%- deltaHtml(totals.clicks, totals.priorClicks) %> vs prior 28 days</div>
+    </div>
+    <div class="stat">
+      <div class="label">Impressions · 28 days</div>
+      <div class="value"><%= fmtInt(totals.impressions) %></div>
+      <div class="meta"><%- deltaHtml(totals.impressions, totals.priorImpressions) %> vs prior 28 days</div>
+    </div>
+    <div class="stat">
+      <div class="label">Organic sessions · 28d</div>
+      <div class="value"><%= fmtInt(totals.sessions) %></div>
+      <div class="meta">GA4, organic search only</div>
+    </div>
+    <div class="stat">
+      <div class="label">Conversions · 28 days</div>
+      <div class="value"><%= fmtInt(totals.conversions) %></div>
+      <div class="meta"><%- deltaHtml(totals.conversions, totals.priorConversions) %> vs prior 28 days</div>
+    </div>
+    <div class="stat">
+      <div class="label">Open tasks</div>
+      <div class="value"><%= fmtInt(totals.openTasks) %></div>
+      <div class="meta">
+        <% if (totals.needsApproval) { %>
+          <a href="/tasks?status=awaiting_approval"><%= totals.needsApproval %> awaiting approval</a>
+        <% } else { %>none awaiting approval<% } %>
+      </div>
+    </div>
+    <div class="stat">
+      <div class="label">Unread alerts</div>
+      <div class="value"><%= fmtInt(totals.openAlerts) %></div>
+      <div class="meta">
+        <% if (totals.criticalAlerts) { %>
+          <span class="badge critical"><%= totals.criticalAlerts %> high or critical</span>
+        <% } else { %>nothing urgent<% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full-width flow instead of a two-column split: an asymmetric sidebar
+       tends to leave one side visibly empty whenever its content is shorter
+       than the other's, which got worse as this page grew more cards. -->
+
+  <!-- Per-brand cards -->
+  <% cards.forEach(function(c){ %>
+        <div class="card">
+          <div class="card-head">
+            <h2><a href="/brands/<%= c.brand.id %>"><%= c.brand.name %></a></h2>
+            <span class="sub"><%= shortUrl(c.brand.site_url, 44) === '/' ? c.brand.site_url : c.brand.site_url %></span>
+            <div class="btn-row">
+              <a class="btn ghost sm" href="/performance?brand=<%= c.brand.id %>">Performance</a>
+              <a class="btn ghost sm" href="/tasks/opportunities/<%= c.brand.id %>">Opportunities</a>
+              <a class="btn secondary sm" href="/reports?brand=<%= c.brand.id %>">Reports</a>
+            </div>
+          </div>
+
+          <% if (!c.gsc28) { %>
+            <div class="card-body">
+              <div class="notice warn" style="margin:0">
+                <span class="notice-icon">&#9888;</span>
+                <div class="notice-body">
+                  No Search Console history for this brand yet.
+                  <% if (!c.brand.gsc_property) { %>
+                    No property is linked — <a href="/brands/<%= c.brand.id %>">set one on the brand</a>.
+                  <% } else { %>
+                    <a href="/brands/<%= c.brand.id %>">Run a sync</a> to pull it in.
+                  <% } %>
+                </div>
+              </div>
+            </div>
+          <% } else { %>
+            <div class="card-body">
+              <div class="grid cols-4" style="gap:14px">
+                <div class="stat" style="padding:0">
+                  <div class="label">Clicks · 28d</div>
+                  <div class="value sm"><%= fmtInt(c.gsc28.recent.clicks) %></div>
+                  <div><%- deltaHtml(c.gsc28.recent.clicks, c.gsc28.prior.clicks) %></div>
+                </div>
+                <div class="stat" style="padding:0">
+                  <div class="label">Impressions</div>
+                  <div class="value sm"><%= fmtInt(c.gsc28.recent.impressions) %></div>
+                  <div><%- deltaHtml(c.gsc28.recent.impressions, c.gsc28.prior.impressions) %></div>
+                </div>
+                <div class="stat" style="padding:0">
+                  <div class="label">Avg position</div>
+                  <div class="value sm"><%= fmtPos(c.gsc28.recent.position) %></div>
+                  <div><%- deltaHtml(c.gsc28.recent.position, c.gsc28.prior.position, true) %></div>
+                </div>
+                <div class="stat" style="padding:0">
+                  <div class="label">CTR</div>
+                  <div class="value sm"><%= fmtPct(c.gsc28.recent.ctr * 100, 2) %></div>
+                  <div><%- deltaHtml(c.gsc28.recent.ctr, c.gsc28.prior.ctr) %></div>
+                </div>
+              </div>
+
+              <div style="margin-top:14px">
+                <div style="font-size:11px;color:var(--text-3);margin-bottom:2px">Clicks, last 30 days</div>
+                <%- include('partials/sparkline', { points: c.series.map(function(s){ return s.clicks; }), dates: c.series.map(function(s){ return s.date; }) }) %>
+              </div>
+            </div>
+
+            <div class="card-foot">
+              <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+                <% if (c.health != null) { %>
+                  <span>Site health
+                    <strong class="badge <%= c.health >= 90 ? 'good' : (c.health >= 70 ? 'medium' : 'critical') %>"><%= c.health %>/100</strong>
+                  </span>
+                <% } else { %>
+                  <span><a href="/audit">Run a technical audit</a> for a health score</span>
+                <% } %>
+                <span><%= c.openTasks %> open task<%= c.openTasks === 1 ? '' : 's' %></span>
+                <% if (c.needsApproval) { %>
+                  <span class="badge medium"><%= c.needsApproval %> awaiting approval</span>
+                <% } %>
+                <% if (c.criticalAlerts) { %>
+                  <span class="badge critical"><%= c.criticalAlerts %> urgent alert<%= c.criticalAlerts === 1 ? '' : 's' %></span>
+                <% } %>
+                <% if (c.ga4) { %>
+                  <span><%= fmtInt(c.ga4.recent.sessions) %> sessions · <%= fmtInt(c.ga4.recent.conversions) %> conversions</span>
+                <% } %>
+              </div>
+            </div>
+          <% } %>
+        </div>
+      <% }) %>
+
+  <!-- Operational panels: approval queue, recent alerts, next up — a wide
+       row of matched-height cards instead of a single tall narrow column. -->
+  <div class="grid cols-3">
+    <div class="card">
+      <div class="card-head">
+        <h3>Awaiting your approval</h3>
+      </div>
+      <% if (!approvalQueue.length) { %>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--text-2);margin:0">Nothing is waiting on approval right now.</p>
+        </div>
+      <% } else { %>
+        <div class="card-body" style="padding:10px">
+          <div class="lock-note" style="margin-bottom:9px">
+            <span>&#128274;</span>
+            <div>These change something the operating rule protects, so they cannot be completed until approved.</div>
+          </div>
+          <% approvalQueue.slice(0, 5).forEach(function(t){ %>
+            <a class="task-card <%= t.severity %>" href="/tasks/<%= t.id %>" style="margin-bottom:6px">
+              <div class="tc-title"><%= t.title %></div>
+              <div class="tc-meta">
+                <span class="badge <%= t.severity %>"><%= t.severity %></span>
+                <% if (t.brand_name) { %><span><%= t.brand_name %></span><% } %>
+              </div>
+            </a>
+          <% }) %>
+          <a class="btn secondary sm block" href="/tasks?status=awaiting_approval" style="margin-top:8px">Open approval queue</a>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Recent alerts</h3>
+        <a class="btn ghost sm" href="/alerts/history">History</a>
+      </div>
+      <% if (!recentAlerts.length) { %>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--text-2);margin:0">
+            Nothing has fired yet. <a href="/alerts">Choose which alerts you want</a> and set your thresholds.
+          </p>
+        </div>
+      <% } else { %>
+        <div class="card-body" style="padding:0">
+          <% recentAlerts.slice(0, 5).forEach(function(e){ %>
+            <a href="/alerts/event/<%= e.id %>" style="display:block;padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text)">
+              <div style="display:flex;gap:7px;align-items:center;margin-bottom:3px">
+                <span class="dot-sev <%= e.severity %>"></span>
+                <strong style="font-size:12.8px;font-weight:570"><%= e.title %></strong>
+              </div>
+              <div style="font-size:11.5px;color:var(--text-2)">
+                <%= e.brand_name || '—' %> · <%= fmtDateTime(e.created_at) %>
+                <% if (!e.acknowledged_at) { %><span class="badge accent" style="margin-left:4px">new</span><% } %>
+              </div>
+            </a>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Next up</h3>
+        <a class="btn ghost sm" href="/tasks">All tasks</a>
+      </div>
+      <% if (!urgentTasks.length) { %>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--text-2);margin:0">
+            No open tasks. Run an audit or check
+            <a href="/tasks/opportunities">content opportunities</a> to build a backlog.
+          </p>
+        </div>
+      <% } else { %>
+        <div class="card-body" style="padding:10px;display:flex;flex-direction:column;gap:6px">
+          <% urgentTasks.slice(0, 5).forEach(function(t){ %>
+            <a class="task-card <%= t.severity %>" href="/tasks/<%= t.id %>">
+              <div class="tc-title"><%= t.title %></div>
+              <div class="tc-meta">
+                <span class="badge <%= t.severity %>"><%= t.severity %></span>
+                <span class="badge neutral"><%= t.source %></span>
+                <% if (t.brand_name) { %><span><%= t.brand_name %></span><% } %>
+              </div>
+            </a>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (trendSeries.length >= 2) { %>
+    <div class="card">
+      <div class="card-head"><h3>Organic clicks &amp; impressions — last 30 days</h3></div>
+      <div class="card-body">
+        <div class="grid cols-2" style="gap:16px">
+          <%- include('partials/trendchart', { label: 'Clicks', points: trendSeries.map(s => ({ date: fmtDate(s.date), value: s.clicks })), color: '#2563eb', fmt: 'int' }) %>
+          <%- include('partials/trendchart', { label: 'Impressions', points: trendSeries.map(s => ({ date: fmtDate(s.date), value: s.impressions })), color: '#4f46e5', fmt: 'int' }) %>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (severityMix.length || channelMix.length) { %>
+    <div class="grid cols-2">
+      <% if (severityMix.length) { %>
+        <div class="card">
+          <div class="card-head"><h3>Open tasks by severity</h3></div>
+          <div class="card-body">
+            <%- include('partials/donut', {
+              label: '', rows: severityMix, nameKey: 'severity', valueKey: 'n',
+              colors: severityMix.map(function(s){ return severityColor[s.severity] || severityColor.info; }),
+            }) %>
+          </div>
+        </div>
+      <% } %>
+      <% if (channelMix.length) { %>
+        <div class="card">
+          <div class="card-head"><h3>Sessions by channel &middot; 28d</h3></div>
+          <div class="card-body">
+            <%- include('partials/donut', { label: '', rows: channelMix, nameKey: 'channel', valueKey: 'n' }) %>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  <% } %>
+<% } %>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

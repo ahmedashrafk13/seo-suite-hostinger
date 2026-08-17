@@ -1,0 +1,571 @@
+<%
+// d = row.data (the reportBuilder output). Small local helpers so the
+// markup below stays readable.
+function pct(v) { return v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`; }
+function num(v) { return fmtInt(v); }
+function deltaCls(abs, invert) {
+  if (!abs) return 'flat';
+  const good = invert ? abs < 0 : abs > 0;
+  return good ? 'up' : 'down';
+}
+function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
+%>
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<div class="toolbar">
+  <a class="btn ghost sm" href="/reports?brand=<%= row.brand_id %>">&larr; All reports</a>
+  <div class="spacer"></div>
+  <a class="btn secondary sm" href="/reports/<%= row.id %>/print" target="_blank">Print view</a>
+  <a class="btn secondary sm" href="/reports/<%= row.id %>/xlsx">Excel export</a>
+  <a class="btn secondary sm" href="/reports/<%= row.id %>/json">JSON export</a>
+  <% if (!d.full) { %>
+    <form method="POST" action="/reports/generate" style="display:inline">
+      <input type="hidden" name="brand_id" value="<%= row.brand_id %>">
+      <input type="hidden" name="week_end" value="<%= d.period.endDate %>">
+      <input type="hidden" name="full_data" value="1">
+      <button type="submit" class="btn secondary sm" title="Rebuilds this week's report with every Search Console and GA4 dimension attached">Add full data</button>
+    </form>
+  <% } %>
+  <form method="POST" action="/reports/<%= row.id %>/send" style="display:inline">
+    <button type="submit" class="btn sm">Email now</button>
+  </form>
+  <form method="POST" action="/reports/<%= row.id %>/delete" style="display:inline"
+        onsubmit="return confirm('Delete this report? This cannot be undone.')">
+    <button type="submit" class="btn danger-ghost sm">Delete</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2><%= row.brand_name %></h2>
+    <span class="sub"><%= d.period.startDate %> &rarr; <%= d.period.endDate %> &middot; generated <%= fmtDateTime(row.generated_at) %></span>
+  </div>
+  <div class="card-body">
+    <% if (d.headline && d.headline.length) { %>
+      <ul style="margin:0;padding-left:18px;line-height:1.7">
+        <% d.headline.forEach(function(h){ %><li><%= h %></li><% }) %>
+      </ul>
+    <% } else { %>
+      <p style="color:var(--text-2);margin:0">No summary available for this period.</p>
+    <% } %>
+  </div>
+</div>
+
+<% if (!d.search.hasData) { %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body">No Search Console data for this week. The numbers below will read as zero until the brand syncs.</div>
+  </div>
+<% } %>
+
+<div class="stat-row">
+  <div class="stat">
+    <div class="label">Clicks</div>
+    <div class="value"><%= num(d.search.clicks.recent) %></div>
+    <div class="meta"><span class="delta <%= deltaCls(d.search.clicks.abs) %>"><%= deltaArrow(d.search.clicks.abs) %> <%= pct(d.search.clicks.pct) %></span> vs prior week</div>
+  </div>
+  <div class="stat">
+    <div class="label">Impressions</div>
+    <div class="value"><%= num(d.search.impressions.recent) %></div>
+    <div class="meta"><span class="delta <%= deltaCls(d.search.impressions.abs) %>"><%= deltaArrow(d.search.impressions.abs) %> <%= pct(d.search.impressions.pct) %></span> vs prior week</div>
+  </div>
+  <div class="stat">
+    <div class="label">CTR</div>
+    <div class="value"><%= fmtPct(d.search.ctr.recent, 2) %></div>
+    <div class="meta"><span class="delta <%= deltaCls(d.search.ctr.abs) %>"><%= deltaArrow(d.search.ctr.abs) %> <%= pct(d.search.ctr.pct) %></span> vs prior week</div>
+  </div>
+  <div class="stat">
+    <div class="label">Avg position</div>
+    <div class="value"><%= fmtPos(d.search.position.recent) %></div>
+    <div class="meta"><span class="delta <%= d.search.position.improved ? 'up' : 'down' %>"><%= d.search.position.improved ? '▲' : '▼' %> <%= Math.abs(d.search.position.abs).toFixed(1) %></span> vs prior week</div>
+  </div>
+  <% if (d.analytics.hasData) { %>
+  <div class="stat">
+    <div class="label">Organic conversions</div>
+    <div class="value"><%= num(d.analytics.conversions.recent) %></div>
+    <div class="meta"><span class="delta <%= deltaCls(d.analytics.conversions.abs) %>"><%= deltaArrow(d.analytics.conversions.abs) %> <%= pct(d.analytics.conversions.pct) %></span> vs prior week</div>
+  </div>
+  <% } %>
+</div>
+
+<div class="split">
+  <div>
+    <div class="card">
+      <div class="card-head"><h3>Top gaining keywords</h3></div>
+      <% var gain = d.keywords.useImpressionFallback ? d.keywords.impressionGainers : d.keywords.gainers; %>
+      <% if (!gain.length) { %>
+        <div class="card-body"><p style="color:var(--text-2);margin:0;font-size:13px">No gainers this week.</p></div>
+      <% } else { %>
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr><th>Query</th><th class="num"><%= d.keywords.useImpressionFallback ? 'Impressions +' : 'Clicks +' %></th><th class="num">Position</th></tr></thead>
+          <tbody>
+            <% gain.forEach(function(q){ %>
+              <tr>
+                <td><%= q.entity %></td>
+                <td class="num"><%= num(d.keywords.useImpressionFallback ? q.impressionDelta : q.clickDelta) %></td>
+                <td class="num"><%= fmtPos(q.recentPosition) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Top declining keywords</h3></div>
+      <% var decl = d.keywords.useImpressionFallback ? d.keywords.impressionDecliners : d.keywords.decliners; %>
+      <% if (!decl.length) { %>
+        <div class="card-body"><p style="color:var(--text-2);margin:0;font-size:13px">No decliners this week.</p></div>
+      <% } else { %>
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr><th>Query</th><th class="num"><%= d.keywords.useImpressionFallback ? 'Impressions' : 'Clicks' %></th><th class="num">Position</th></tr></thead>
+          <tbody>
+            <% decl.forEach(function(q){ %>
+              <tr>
+                <td><%= q.entity %></td>
+                <td class="num"><%= num(d.keywords.useImpressionFallback ? q.impressionDelta : q.clickDelta) %></td>
+                <td class="num"><%= fmtPos(q.recentPosition) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Top landing pages</h3></div>
+      <% if (!d.pages.topLanding.length) { %>
+        <div class="card-body"><p style="color:var(--text-2);margin:0;font-size:13px">No page data this week.</p></div>
+      <% } else { %>
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr><th>Page</th><th class="num">Clicks</th><th class="num">Impressions</th><th class="num">Position</th></tr></thead>
+          <tbody>
+            <% d.pages.topLanding.forEach(function(pg){ %>
+              <tr>
+                <td><%= shortUrl(pg.entity, 60) %></td>
+                <td class="num"><%= num(pg.recentClicks) %></td>
+                <td class="num"><%= num(pg.recentImpressions) %></td>
+                <td class="num"><%= fmtPos(pg.recentPosition) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      <% } %>
+    </div>
+
+    <% if (d.pages.convertingPages && d.pages.convertingPages.length) { %>
+    <div class="card">
+      <div class="card-head"><h3>Top converting landing pages (GA4)</h3></div>
+      <div class="table-wrap"><table class="data compact">
+        <thead><tr><th>Page</th><th class="num">Sessions</th><th class="num">Conversions</th></tr></thead>
+        <tbody>
+          <% d.pages.convertingPages.forEach(function(pg){ %>
+            <tr><td><%= shortUrl(pg.entity, 60) %></td><td class="num"><%= num(pg.sessions) %></td><td class="num"><%= num(pg.conversions) %></td></tr>
+          <% }) %>
+        </tbody>
+      </table></div>
+    </div>
+    <% } %>
+  </div>
+
+  <div>
+    <% if (d.technical) { %>
+    <div class="card">
+      <div class="card-head">
+        <h3>Technical health</h3>
+        <a class="btn ghost sm" href="/audit/<%= d.technical.runId %>">Full audit</a>
+      </div>
+      <div class="card-body">
+        <p style="margin:0 0 10px">
+          <span class="badge <%= d.technical.health >= 90 ? 'good' : (d.technical.health >= 70 ? 'medium' : 'critical') %> lg"><%= d.technical.health %>/100</span>
+          <span style="font-size:12.5px;color:var(--text-2);margin-left:8px"><%= num(d.technical.pagesCrawled) %> pages crawled &middot; <%= fmtDateTime(d.technical.crawledAt) %></span>
+        </p>
+        <div class="sev-legend" style="margin-bottom:10px">
+          <% ['critical','high','medium','low'].forEach(function(s){ %>
+            <span><span class="dot-sev <%= s %>"></span> <%= d.technical.bySeverity[s] || 0 %> <%= s %></span>
+          <% }) %>
+        </div>
+        <% if (d.technical.top.length) { %>
+          <table class="data compact">
+            <thead><tr><th>Issue</th><th>Sev.</th><th class="num">Affected</th></tr></thead>
+            <tbody>
+              <% d.technical.top.forEach(function(t){ %>
+                <tr><td><%= t.issue %></td><td><span class="badge <%= t.severity %>"><%= t.severity %></span></td><td class="num"><%= num(t.failed) %> <%= t.unit %></td></tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </div>
+    <% } %>
+
+    <% if (d.linking) { %>
+    <div class="card">
+      <div class="card-head">
+        <h3>Internal linking</h3>
+        <a class="btn ghost sm" href="/linking/<%= d.linking.runId %>">Full report</a>
+      </div>
+      <div class="card-body" style="font-size:13px;display:flex;flex-direction:column;gap:4px">
+        <div>Orphan pages: <strong><%= d.linking.orphanPages == null ? '—' : d.linking.orphanPages %></strong></div>
+        <div>Under-linked pages: <strong><%= d.linking.underlinkedPages == null ? '—' : d.linking.underlinkedPages %></strong></div>
+        <div>Cannibalisation pairs: <strong><%= d.linking.cannibalizationPairs == null ? '—' : d.linking.cannibalizationPairs %></strong></div>
+        <div>Recommendations: <strong><%= d.linking.recommendationCount == null ? '—' : d.linking.recommendationCount %></strong></div>
+      </div>
+    </div>
+    <% } %>
+
+    <% if (d.cwv.mobile || d.cwv.desktop) { %>
+    <div class="card">
+      <div class="card-head"><h3>Core Web Vitals</h3></div>
+      <div class="card-body">
+        <% ['mobile','desktop'].forEach(function(strategy){ var c = d.cwv[strategy]; if (!c) return; %>
+          <div style="margin-bottom:8px">
+            <strong style="font-size:12.8px;text-transform:capitalize"><%= strategy %></strong>
+            <span class="badge <%= c.score >= 90 ? 'good' : (c.score >= 50 ? 'medium' : 'critical') %>" style="margin-left:6px"><%= c.score == null ? '—' : c.score %></span>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">
+              LCP <%= c.lcp == null ? '—' : num(c.lcp) + 'ms' %> &middot; INP <%= c.inp == null ? '—' : num(c.inp) + 'ms' %> &middot; CLS <%= c.cls == null ? '—' : Number(c.cls).toFixed(3) %>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+    <% } %>
+
+    <% if (d.alerts && d.alerts.length) { %>
+    <div class="card">
+      <div class="card-head"><h3>Alerts this week</h3></div>
+      <div class="card-body" style="padding:0">
+        <% d.alerts.forEach(function(a){ %>
+          <div style="padding:9px 14px;border-bottom:1px solid var(--border);display:flex;gap:7px;align-items:center">
+            <span class="dot-sev <%= a.severity %>"></span>
+            <span style="font-size:12.8px"><%= a.title %></span>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+    <% } %>
+
+    <div class="card">
+      <div class="card-head"><h3>Work this week</h3></div>
+      <div class="card-body">
+        <p style="font-size:13px;margin:0 0 8px"><%= d.work.completed.length %> task<%= d.work.completed.length === 1 ? '' : 's' %> completed
+          <% if (d.work.awaitingApproval.length) { %> &middot; <a href="/tasks?status=awaiting_approval"><%= d.work.awaitingApproval.length %> awaiting approval</a><% } %>
+        </p>
+        <% if (d.work.nextActions.length) { %>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <% d.work.nextActions.slice(0, 8).forEach(function(t){ %>
+              <a class="task-card <%= t.severity %>" href="/tasks/<%= t.id %>">
+                <div class="tc-title"><%= t.title %></div>
+                <div class="tc-meta"><span class="badge <%= t.severity %>"><%= t.severity %></span><span class="badge neutral"><%= t.source %></span></div>
+              </a>
+            <% }) %>
+          </div>
+        <% } else { %>
+          <p style="color:var(--text-2);font-size:13px;margin:0">No open tasks.</p>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (d.full) { %>
+  <%
+  // Appendix — the complete synced dataset for the report week. Each block is
+  // a <details> so the page stays readable: the report leads with its
+  // interpretation, and the raw numbers are one click away rather than
+  // 2,000 rows of scrolling.
+  const F = d.full;
+  function gscTable(rows, head) {
+    if (!rows || !rows.length) return '<div class="empty-state">Nothing synced for this dimension.</div>';
+    const body = rows.map((r) => `<tr>
+      <td class="wrap">${String(r.entity == null ? '—' : r.entity).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</td>
+      <td class="num">${fmtInt(r.clicks)}</td>
+      <td class="num">${fmtInt(r.impressions)}</td>
+      <td class="num">${fmtPct((r.ctr || 0) * 100, 2)}</td>
+      <td class="num">${fmtPos(r.position)}</td>
+    </tr>`).join('');
+    return `<div class="table-wrap"><table class="data compact">
+      <thead><tr><th>${head}</th><th class="num">Clicks</th><th class="num">Impressions</th><th class="num">CTR</th><th class="num">Position</th></tr></thead>
+      <tbody>${body}</tbody></table></div>`;
+  }
+  %>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Full data appendix</h2>
+      <span class="sub">Everything synced from Search Console and GA4 for <%= d.period.startDate %> &rarr; <%= d.period.endDate %></span>
+      <a class="btn secondary sm" href="/reports/<%= row.id %>/xlsx">Download as Excel</a>
+    </div>
+    <div class="card-body">
+      <p class="hint" style="margin:0">
+        Long lists are capped for readability — up to <%= F.limits.queries %> queries and pages, <%= F.limits.countries %> countries,
+        <%= F.limits.sources %> traffic sources and <%= F.limits.events %> events. The Excel export carries the same rows in full-width columns.
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Search Console</h3></div>
+    <div class="card-body">
+      <div class="stat-row" style="margin-bottom:14px">
+        <div class="stat"><div class="label">Clicks</div><div class="value"><%= num(F.gsc.totals.clicks) %></div></div>
+        <div class="stat"><div class="label">Impressions</div><div class="value"><%= num(F.gsc.totals.impressions) %></div></div>
+        <div class="stat"><div class="label">CTR</div><div class="value"><%= fmtPct(F.gsc.totals.ctr * 100, 2) %></div></div>
+        <div class="stat"><div class="label">Avg position</div><div class="value"><%= fmtPos(F.gsc.totals.position) %></div></div>
+        <div class="stat"><div class="label">Days of data</div><div class="value"><%= F.gsc.totals.days %></div></div>
+      </div>
+
+      <details class="plain" open>
+        <summary>Daily totals (<%= F.gsc.daily.length %> days)</summary>
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr><th>Date</th><th class="num">Clicks</th><th class="num">Impressions</th><th class="num">CTR</th><th class="num">Position</th></tr></thead>
+          <tbody>
+            <% F.gsc.daily.forEach(function(r){ %>
+              <tr><td><%= fmtDate(r.date) %></td><td class="num"><%= num(r.clicks) %></td><td class="num"><%= num(r.impressions) %></td>
+                <td class="num"><%= fmtPct((r.ctr || 0) * 100, 2) %></td><td class="num"><%= fmtPos(r.position) %></td></tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      </details>
+
+      <details class="plain"><summary>Queries (<%= F.gsc.queries.length %>)</summary><%- gscTable(F.gsc.queries, 'Query') %></details>
+      <details class="plain"><summary>Pages (<%= F.gsc.pages.length %>)</summary><%- gscTable(F.gsc.pages, 'Page') %></details>
+
+      <details class="plain">
+        <summary>Query &rarr; page (<%= F.gsc.queryPage.length %>)</summary>
+        <p class="hint">
+          <% if (F.gsc.queryPagePeriod) { %>
+            Snapshot of the whole sync window (<%= fmtDate(F.gsc.queryPagePeriod.period_start) %> &rarr; <%= fmtDate(F.gsc.queryPagePeriod.period_end) %>),
+            not just the report week — Search Console does not return this pairing per day.
+          <% } else { %>No query-to-page data synced yet.<% } %>
+        </p>
+        <% if (F.gsc.queryPage.length) { %>
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr><th>Query</th><th>Ranking URL</th><th class="num">Clicks</th><th class="num">Impressions</th><th class="num">CTR</th><th class="num">Position</th></tr></thead>
+          <tbody>
+            <% F.gsc.queryPage.forEach(function(r){ %>
+              <tr><td class="wrap"><%= r.query %></td><td class="url wrap"><%= shortUrl(r.page, 60) %></td>
+                <td class="num"><%= num(r.clicks) %></td><td class="num"><%= num(r.impressions) %></td>
+                <td class="num"><%= fmtPct((r.ctr || 0) * 100, 2) %></td><td class="num"><%= fmtPos(r.position) %></td></tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+        <% } %>
+      </details>
+
+      <details class="plain"><summary>Countries (<%= F.gsc.countries.length %>)</summary><%- gscTable(F.gsc.countries, 'Country') %></details>
+      <details class="plain"><summary>Devices (<%= F.gsc.devices.length %>)</summary><%- gscTable(F.gsc.devices, 'Device') %></details>
+      <details class="plain"><summary>Search appearance (<%= F.gsc.appearance.length %>)</summary><%- gscTable(F.gsc.appearance, 'Search appearance') %></details>
+
+      <details class="plain">
+        <summary>Sitemaps (<%= F.gsc.sitemaps.length %>)</summary>
+        <% if (!F.gsc.sitemaps.length) { %><div class="empty-state">No sitemaps submitted in Search Console.</div><% } else { %>
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr><th>Sitemap</th><th>Type</th><th class="num">Submitted</th><th class="num">Indexed</th><th>Last read</th><th class="num">Warnings</th><th class="num">Errors</th></tr></thead>
+          <tbody>
+            <% F.gsc.sitemaps.forEach(function(s){ %>
+              <tr><td class="url wrap"><%= s.path %></td><td><%= s.is_sitemaps_index ? 'Sitemap index' : (s.type || 'Sitemap') %></td>
+                <td class="num"><%= s.submitted_count == null ? '—' : num(s.submitted_count) %></td>
+                <td class="num"><%= s.indexed_count == null ? '—' : num(s.indexed_count) %></td>
+                <td><%= s.last_downloaded ? fmtDate(s.last_downloaded) : 'Not yet read' %></td>
+                <td class="num"><%= s.warnings %></td><td class="num"><%= s.errors %></td></tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+        <% } %>
+      </details>
+
+      <details class="plain">
+        <summary>Page indexing (<%= F.gsc.indexing.totals.total || 0 %> pages checked)</summary>
+        <% if (!F.gsc.indexing.totals.total) { %>
+          <div class="empty-state">No URL Inspection checks have been run for this brand yet.</div>
+        <% } else { %>
+          <p class="hint">
+            <%= num(F.gsc.indexing.totals.indexed) %> indexed &middot; <%= num(F.gsc.indexing.totals.notIndexed) %> not indexed &middot;
+            sampled via the URL Inspection API, so it covers the pages checked so far rather than every URL on the site.
+          </p>
+          <div class="table-wrap"><table class="data compact">
+            <thead><tr><th>URL</th><th>Verdict</th><th>Coverage state</th><th>Declared canonical</th><th>Google canonical</th><th>Last crawled</th></tr></thead>
+            <tbody>
+              <% F.gsc.indexing.rows.forEach(function(r){ %>
+                <tr>
+                  <td class="url wrap"><%= shortUrl(r.url, 60) %></td>
+                  <td><span class="badge <%= r.verdict === 'PASS' ? 'good' : (r.error ? 'neutral' : 'critical') %>"><%= r.error ? 'error' : (r.verdict || 'unknown') %></span></td>
+                  <td class="wrap"><%= r.error ? r.error : (r.coverage_state || '—') %></td>
+                  <td class="url wrap"><%= r.user_canonical ? shortUrl(r.user_canonical, 40) : '—' %></td>
+                  <td class="url wrap"><%= r.google_canonical ? shortUrl(r.google_canonical, 40) : '—' %></td>
+                  <td class="narrow"><%= r.last_crawl_time ? fmtDate(r.last_crawl_time) : '—' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+      </details>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>GA4</h3></div>
+    <div class="card-body">
+      <details class="plain" open>
+        <summary>Channels (<%= F.ga4.channels.length %>)</summary>
+        <% if (!F.ga4.channels.length) { %><div class="empty-state">No GA4 data for this week.</div><% } else { %>
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr><th>Channel</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Engaged</th>
+            <th class="num">Engagement rate</th><th class="num">Bounce rate</th><th class="num">Avg duration</th><th class="num">Conversions</th></tr></thead>
+          <tbody>
+            <% F.ga4.channels.forEach(function(c){ %>
+              <tr><td><%= c.channel %></td><td class="num"><%= num(c.sessions) %></td><td class="num"><%= num(c.users) %></td>
+                <td class="num"><%= num(c.engaged_sessions) %></td>
+                <td class="num"><%= fmtPct(c.sessions > 0 ? (c.engaged_sessions / c.sessions) * 100 : 0, 1) %></td>
+                <td class="num"><%= fmtPct((c.bounce_rate || 0) * 100, 1) %></td>
+                <td class="num"><%= fmtDuration(c.avg_duration) %></td>
+                <td class="num"><%= num(c.conversions) %></td></tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+        <% } %>
+      </details>
+
+      <details class="plain">
+        <summary>Organic landing pages (<%= F.ga4.landingPages.length %>)</summary>
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr><th>Landing page</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
+          <tbody>
+            <% F.ga4.landingPages.forEach(function(r){ %>
+              <tr><td class="url wrap"><%= shortUrl(r.page_path, 60) %></td><td class="num"><%= num(r.sessions) %></td>
+                <td class="num"><%= num(r.users) %></td><td class="num"><%= num(r.conversions) %></td></tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      </details>
+
+      <details class="plain">
+        <summary>Devices &amp; browsers</summary>
+        <div class="grid cols-2" style="gap:16px">
+          <div class="table-wrap"><table class="data compact">
+            <thead><tr><th>Device</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
+            <tbody>
+              <% F.ga4.devices.forEach(function(r){ %>
+                <tr><td style="text-transform:capitalize"><%= r.device_category %></td><td class="num"><%= num(r.sessions) %></td>
+                  <td class="num"><%= num(r.users) %></td><td class="num"><%= num(r.conversions) %></td></tr>
+              <% }) %>
+            </tbody>
+          </table></div>
+          <div class="table-wrap"><table class="data compact">
+            <thead><tr><th>Browser</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
+            <tbody>
+              <% F.ga4.browsers.forEach(function(r){ %>
+                <tr><td><%= r.browser %></td><td class="num"><%= num(r.sessions) %></td>
+                  <td class="num"><%= num(r.users) %></td><td class="num"><%= num(r.conversions) %></td></tr>
+              <% }) %>
+            </tbody>
+          </table></div>
+        </div>
+      </details>
+
+      <details class="plain">
+        <summary>Countries &amp; cities</summary>
+        <div class="grid cols-2" style="gap:16px">
+          <div class="table-wrap"><table class="data compact">
+            <thead><tr><th>Country</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
+            <tbody>
+              <% F.ga4.countries.forEach(function(r){ %>
+                <tr><td><%= r.country %></td><td class="num"><%= num(r.sessions) %></td>
+                  <td class="num"><%= num(r.users) %></td><td class="num"><%= num(r.conversions) %></td></tr>
+              <% }) %>
+            </tbody>
+          </table></div>
+          <div class="table-wrap"><table class="data compact">
+            <thead><tr><th>City</th><th>Country</th><th class="num">Sessions</th><th class="num">Users</th></tr></thead>
+            <tbody>
+              <% F.ga4.cities.forEach(function(r){ %>
+                <tr><td><%= r.city %></td><td><%= r.country %></td><td class="num"><%= num(r.sessions) %></td><td class="num"><%= num(r.users) %></td></tr>
+              <% }) %>
+            </tbody>
+          </table></div>
+        </div>
+      </details>
+
+      <details class="plain">
+        <summary>Acquisition — source / medium (<%= F.ga4.acquisition.length %>)</summary>
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr><th>Source / medium</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">New users</th><th class="num">Conversions</th></tr></thead>
+          <tbody>
+            <% F.ga4.acquisition.forEach(function(r){ %>
+              <tr><td class="wrap"><%= r.source %> / <%= r.medium %></td><td class="num"><%= num(r.sessions) %></td>
+                <td class="num"><%= num(r.users) %></td><td class="num"><%= num(r.new_users) %></td><td class="num"><%= num(r.conversions) %></td></tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      </details>
+
+      <details class="plain">
+        <summary>Events (<%= F.ga4.events.length %>)</summary>
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr><th>Event name</th><th class="num">Count</th><th class="num">Users</th><th class="num">Value</th></tr></thead>
+          <tbody>
+            <% F.ga4.events.forEach(function(r){ %>
+              <tr><td><%= r.event_name %></td><td class="num"><%= num(r.event_count) %></td>
+                <td class="num"><%= num(r.total_users) %></td><td class="num"><%= num(r.event_value) %></td></tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      </details>
+    </div>
+  </div>
+
+  <% if ((F.site.psi && F.site.psi.length) || (F.site.uptime && F.site.uptime.length)) { %>
+  <div class="card">
+    <div class="card-head"><h3>Site health measurements</h3></div>
+    <div class="card-body">
+      <% if (F.site.psi.length) { %>
+      <details class="plain" open>
+        <summary>Core Web Vitals snapshots (<%= F.site.psi.length %>)</summary>
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr><th>Measured</th><th>Device</th><th class="num">Score</th><th class="num">LCP</th><th class="num">INP</th>
+            <th class="num">CLS</th><th class="num">FCP</th><th class="num">TTFB</th><th>Source</th></tr></thead>
+          <tbody>
+            <% F.site.psi.forEach(function(p){ %>
+              <tr><td class="narrow"><%= fmtDateTime(p.captured_at) %></td><td><%= p.strategy %></td>
+                <td class="num"><%= p.perf_score == null ? '—' : p.perf_score %></td>
+                <td class="num"><%= p.lcp == null ? '—' : num(p.lcp) + 'ms' %></td>
+                <td class="num"><%= p.inp == null ? '—' : num(p.inp) + 'ms' %></td>
+                <td class="num"><%= p.cls == null ? '—' : Number(p.cls).toFixed(3) %></td>
+                <td class="num"><%= p.fcp == null ? '—' : num(p.fcp) + 'ms' %></td>
+                <td class="num"><%= p.ttfb == null ? '—' : num(p.ttfb) + 'ms' %></td>
+                <td><%= p.error ? 'error' : (p.source === 'crux-field' ? 'real users' : 'lab') %></td></tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      </details>
+      <% } %>
+      <% if (F.site.uptime.length) { %>
+      <details class="plain">
+        <summary>Uptime checks (<%= F.site.uptime.length %>)</summary>
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr><th>Checked</th><th>Result</th><th class="num">Response</th><th>Detail</th></tr></thead>
+          <tbody>
+            <% F.site.uptime.forEach(function(u){ %>
+              <tr><td class="narrow"><%= fmtDateTime(u.checked_at) %></td>
+                <td><span class="badge <%= u.ok ? 'good' : 'critical' %>"><%= u.ok ? ('HTTP ' + u.status_code) : 'Down' %></span></td>
+                <td class="num"><%= u.response_ms == null ? '—' : num(u.response_ms) + 'ms' %></td>
+                <td class="wrap"><%= u.error || 'OK' %></td></tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      </details>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+<% } %>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

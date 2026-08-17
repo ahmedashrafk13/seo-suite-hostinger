@@ -1,0 +1,186 @@
+--- #8 robots group parsing (Crawl-delay must not merge groups) ---
+  OK   '*' group did not adopt AhrefsBot's Disallow: got=True exp=True
+  OK   real disallow still honored: got=False exp=False
+  OK   other paths allowed: got=True exp=True
+  OK   multi-agent single group honored: got=False exp=False
+--- #23 robots wildcard performance ---
+  OK   deep wildcard matches: got=True exp=True
+  timing: non-matching long path took 0.0000s (must be fast)
+--- #18 tracking params ---
+  OK   is_tracking_param(refine): got=False exp=False
+  OK   is_tracking_param(reference): got=False exp=False
+  OK   is_tracking_param(refid): got=False exp=False
+  OK   is_tracking_param(ref): got=True exp=True
+  OK   is_tracking_param(source_category): got=False exp=False
+  OK   is_tracking_param(source): got=True exp=True
+  OK   is_tracking_param(cidx): got=False exp=False
+  OK   is_tracking_param(cid): got=True exp=True
+  OK   is_tracking_param(utm_campaign): got=True exp=True
+  OK   is_tracking_param(campaign_type): got=False exp=False
+  OK   distinct faceted URLs stay distinct: got=True exp=True
+--- #7 link spans use a cursor ---
+  OK   span count: got=1 exp=1
+  OK   span covers the LINKED occurrence: got='pricing' exp='pricing'
+  OK   span is the second occurrence: got=True exp=True
+--- #7b anchor never placed inside an existing link ---
+  spaCy not installed - company/person/product anchor filtering disabled (pip install spacy && python -m spacy download en_core_web_sm)
+  OK   chosen anchor does not overlap an existing link: got=False exp=False
+--- #5 PageRank percentile with ties ---
+  OK   all-tied PageRank gives identical percentiles: got=1 exp=1
+  OK   tied percentile is 0.5 (not spread to 1.0): got=0.5 exp=0.5
+--- #9 zero-valued CLI args are clamped ---
+  OK   max_new_inbound_per_target clamp: got=1 exp=1
+--- #21 keyword n-grams keep internal stopwords ---
+  OK   'shoes for men' derivable: got=True exp=True
+  OK   no stopword-final gram: got=False exp=False
+--- #13 shared-block marking runs on tiny sites ---
+  template blocks removed: 0 distinct (0 instances); link-list blocks dropped: 0
+  OK   2-page site marks shared blocks: got=True exp=True
+--- #16 XML is not accepted as a page ---
+  OK   rss content-type rejected: got=False exp=False
+--- NER anchor rejection (graceful degradation without spacy) ---
+  OK   no spacy installed -> _get_nlp returns None: got=None exp=None
+  OK   no spacy -> nothing overlaps rejected entities: got=False exp=False
+--- GSC CSV join: column mapping + normalize_url join ---
+  GSC csv: 1 matched, 1 unmatched
+  OK   gsc matched count: got=1 exp=1
+  OK   gsc unmatched count: got=1 exp=1
+  OK   gsc matched row has correct impressions: got=100.0 exp=100.0
+  OK   gsc unmatched sample recorded: got=['https://x.com/does-not-exist'] exp=['https://x.com/does-not-exist']
+--- GSC opportunity weighting: continuous decay, no cliff at position 10/11 ---
+  OK   opportunity decreases smoothly across the position-10 boundary: got=True exp=True
+  OK   no discontinuity: pos 10 and pos 11 differ by roughly the same step as 11->12: got=True exp=True
+--- A1 robots trailing-slash rules are honored (normalize_url de-slashes) ---
+  OK   Disallow: /private/ blocks the de-slashed /private: got=False exp=False
+  OK   Disallow: /private/ still blocks a child path: got=False exp=False
+  OK   Disallow: /cart (no slash) still works: got=False exp=False
+  OK   unrelated path still allowed: got=True exp=True
+--- A2 Crawl-delay is applied, not silently discarded ---
+  OK   crawl_delay parsed from the '*' group: got=5.0 exp=5.0
+  OK   another bot's Crawl-delay is not adopted: got=0.0 exp=0.0
+  OK   group separation still holds after adding delay parsing: got=False exp=False
+--- A3 anchor conflict is destination-aware (nav must not veto its own target) ---
+  OK   anchor_dests records the destination: got={'https://x.com/services'} exp={'https://x.com/services'}
+  OK   same words -> same target is NOT a conflict: got=False exp=False
+  OK   same words -> different target IS a conflict: got=True exp=True
+  OK   in-content anchor to the nav's own destination is now allowed: got=True exp=True
+  OK   same anchor to a DIFFERENT destination is still refused: got=None exp=None
+--- A3b the sentence test is not circular (anchor words don't count) ---
+  OK   an anchor cannot vouch for its own sentence: got=None exp=None
+  OK   with the check disabled it is accepted again: got=True exp=True
+--- A4 anchor must carry a token that discriminates the target ---
+  OK   without a discriminating set, the ambiguous phrase is offered: got=True exp=True
+  OK   with one, the ambiguous phrase is refused: got=False exp=False
+  OK   and a phrase naming the city is kept: got=True exp=True
+--- A4b discriminating tokens are the RARE identity tokens ---
+  OK   the city token is discriminating: got=True exp=True
+  OK   the shared words are not: got=False exp=False
+  OK   'company' is not either: got=False exp=False
+--- A4c an anchor must share a word with the target's URL slug ---
+  OK   'custom website design' is refused for the WordPress page: got=False exp=False
+  OK   a phrase from the slug is kept: got=True exp=True
+--- A4d format-only and truncated phrases are refused ---
+  OK   'comprehensive guide' (format words only) is refused: got=False exp=False
+  OK   'choosing the right' (dangling adjective) is refused: got=False exp=False
+  OK   something naming the subject survives: got=True exp=True
+--- A4e n-grams never span a punctuation boundary ---
+  OK   title split on ':' and ',': got=3 exp=3
+  OK   the cross-boundary pair exists when ignoring punctuation: got=True exp=True
+  OK   and does not exist per-segment: got=False exp=False
+--- A4f a page's unique token must appear in its anchor ---
+  OK   'york' is unique to the New York page: got=True exp=True
+  OK   'agencies' is not unique: got=False exp=False
+  OK   'development agencies' alone is refused for the New York page: got=False exp=False
+  OK   every surviving phrase names New York: got=True exp=True
+--- A4g clause fragments from question-style titles are refused ---
+  OK   'much does custom' is refused (leading dangler + auxiliary verb): got=False exp=False
+  OK   no surviving phrase contains an auxiliary verb: got=False exp=False
+  OK   no surviving phrase starts or ends on a dangler: got=False exp=False
+  OK   a real noun phrase still survives: got=True exp=True
+--- A4h a dropped URL qualifier is reported, not hidden ---
+  OK   'york' is a key slug token for the New York page: got=True exp=True
+  OK   'development' is not (every sibling has it): got=False exp=False
+--- A5 the sentence hosting the anchor must be about the target ---
+  OK   off-topic sentence is rejected even though the anchor is verbatim: got=None exp=None
+  OK   on-topic sentence is accepted: got=True exp=True
+--- A6 anchors are only placed in prose, never in table cells ---
+  OK   a <td> block cannot host an anchor: got=None exp=None
+  OK   the same text in a <p> can: got=True exp=True
+--- A7 one source page never carries the same anchor twice ---
+  OK   blocked when the anchor is already committed on this page: got=None exp=None
+--- A8 URL kind classification (archives are not orphans) ---
+  OK   classify_url_kind(/blog/page/7): got='pagination' exp='pagination'
+  OK   classify_url_kind(/blog?paged=3): got='pagination' exp='pagination'
+  OK   classify_url_kind(/tag/seo): got='archive' exp='archive'
+  OK   classify_url_kind(/category/news/sub): got='archive' exp='archive'
+  OK   classify_url_kind(/author/jane): got='archive' exp='archive'
+  OK   classify_url_kind(/2024/06): got='archive' exp='archive'
+  OK   classify_url_kind(/feed): got='feed' exp='feed'
+  OK   classify_url_kind(/?s=shoes): got='search' exp='search'
+  OK   classify_url_kind(/services/web-design): got='content' exp='content'
+  OK   classify_url_kind(/blog/page-speed-guide): got='content' exp='content'
+  OK   classify_url_kind(/?p=1234): got='content' exp='content'
+  OK   classify_url_kind(/top-10-tools): got='content' exp='content'
+--- A9 site-wide cut does not swallow a small site ---
+  OK   n=6 needs 4 (a flat floor of 3 meant 3-of-6 = 'site-wide'): got=4 exp=4
+  OK   n=5 needs 3: got=3 exp=3
+  OK   n=4 needs 3: got=3 exp=3
+  OK   n=3 needs 2, not 3: got=2 exp=2
+  OK   n=2 needs 2: got=2 exp=2
+  OK   n=100 is exactly 55% (a bare float ceil would demand 56): got=55 exp=55
+  OK   the floor still applies on a large site with a low ratio: got=3 exp=3
+--- A10 zero-vector pages are detected, not silently dropped ---
+  vectorized 31 pages over 29 content terms (1 page(s) produced an empty vector)
+  OK   the corpus is non-degenerate (filter not relaxed): got=True exp=True
+  OK   the all-unique-terms page is flagged zero_vector: got=True exp=True
+  OK   it is listed in the returned stats: got=True exp=True
+  OK   a normal page is not flagged: got=False exp=False
+--- A11 transient 5xx is not reported as a broken link ---
+  OK   503 is in the retry set: got=True exp=True
+  OK   429 is in the retry set: got=True exp=True
+  OK   404 is not (a real broken link): got=False exp=False
+--- A12 --include/--exclude filters ---
+  OK   include matches: got=True exp=True
+  OK   include excludes non-matching: got=False exp=False
+  OK   exclude beats include: got=False exp=False
+--- A13 min_source_words is clamped to the ACTUAL words_per_link ---
+  OK   with --words-per-link 300, a 120-word minimum is raised: got=300 exp=300
+--- A14 one thin-page threshold, used everywhere ---
+  OK   min_content_words exists in DEFAULTS: got=True exp=True
+  OK   no bare 'word_count < 40' left: got=False exp=False
+  OK   no bare 'word_count < 20' left: got=False exp=False
+--- A15 there is exactly one report generator (no markdown twin) ---
+  OK   build_report (markdown) is gone: got=False exp=False
+  OK   build_docx is wired in: got=True exp=True
+--- A16 same primary keyword blocks a link even below the cannibal threshold ---
+  vectorized 2 pages over 14 content terms
+  editorial internal links: 0 | site-wide/nav links: 0 | site-wide destinations detected: 0 (linked from >=2/2 pages)
+  (similarity between the two rivals: 0.196; cannibal rows: 0)
+  OK   no recommendation links two pages with the same primary keyword: got=[] exp=[]
+--- A17 recommend() returns (recs, reject_stats) ---
+  OK   returns a 2-tuple: got=True exp=True
+--- A18 locale support (i18n universality) ---
+  OK   apply_locale('en') applies 'en': got='en' exp='en'
+  OK   default STOPWORDS byte-for-byte == original hardcoded constant: got=True exp=True
+  OK   default GENERIC_ANCHORS byte-for-byte == original hardcoded constant: got=True exp=True
+  OK   default GENERIC_CONTENT_WORDS byte-for-byte == original hardcoded constant: got=True exp=True
+  OK   default CLAUSE_VERBS byte-for-byte == original hardcoded constant: got=True exp=True
+  OK   default DANGLING_TAIL_WORDS byte-for-byte == original hardcoded constant: got=True exp=True
+  OK   default Accept-Language header unchanged: got='en-US,en;q=0.9' exp='en-US,en;q=0.9'
+  OK   LOCALE_WORDLISTS['en'] STOPWORDS matches original: got=True exp=True
+  OK   LOCALE_WORDLISTS['en'] GENERIC_ANCHORS matches original: got=True exp=True
+  OK   LOCALE_WORDLISTS['en'] GENERIC_CONTENT_WORDS matches original: got=True exp=True
+  OK   LOCALE_WORDLISTS['en'] CLAUSE_VERBS matches original: got=True exp=True
+  OK   LOCALE_WORDLISTS['en'] DANGLING_TAIL_WORDS matches original: got=True exp=True
+  OK   apply_locale('es') applies 'es': got='es' exp='es'
+  OK   Spanish STOPWORDS differ from English: got=True exp=True
+  OK   Spanish STOPWORDS contain 'el'/'la' (Spanish articles): got=True exp=True
+  OK   Spanish STOPWORDS do NOT contain English-only stopwords like 'the': got=True exp=True
+  OK   Spanish GENERIC_ANCHORS contain a Spanish 'click here' equivalent: got=True exp=True
+  OK   Spanish Accept-Language prefers es: got=True exp=True
+  OK   apply_locale('ja') falls back to 'en': got='en' exp='en'
+  OK   unsupported-locale fallback reproduces English STOPWORDS: got=True exp=True
+  OK   unsupported locale prints a stderr warning: got=True exp=True
+  OK   unsupported-locale warning mentions fallback: got=True exp=True
+
+FAILURES: none

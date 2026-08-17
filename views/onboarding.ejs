@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<div class="card">
+  <div class="card-head">
+    <h2>Welcome<%= currentUser && currentUser.name ? ', ' + currentUser.name.split(' ')[0] : '' %></h2>
+    <span class="sub">
+      <% if (remaining === 0) { %>Everything is set up.
+      <% } else { %><%= steps.length - remaining %> of <%= steps.length %> done<% } %>
+    </span>
+  </div>
+  <div class="card-body">
+    <% if (remaining === 0) { %>
+      <p class="hint" style="margin-top:0">
+        Your workspace is ready. This page stays available if you add another client or another team member later.
+      </p>
+    <% } else { %>
+      <p class="hint" style="margin-top:0">
+        Four steps and your team can start working. Each one is checked against your actual data, so nothing here
+        claims to be done when it is not.
+      </p>
+    <% } %>
+    <div class="setup-progress" role="img" aria-label="<%= steps.length - remaining %> of <%= steps.length %> steps complete">
+      <% steps.forEach(function(s){ %><span class="<%= s.done ? 'done' : '' %>"></span><% }) %>
+    </div>
+  </div>
+</div>
+
+<% steps.forEach(function(s, i){ %>
+  <div class="card setup-step <%= s.done ? 'is-done' : '' %>" id="<%= s.key %>">
+    <div class="card-body">
+      <div class="setup-row">
+        <div class="setup-mark" aria-hidden="true"><%= s.done ? '✓' : (i + 1) %></div>
+        <div class="setup-body">
+          <h3><%= s.title %></h3>
+          <p class="hint" style="margin:4px 0 0"><%= s.body %></p>
+          <% if (s.detail) { %><p class="hint" style="margin:4px 0 0"><strong><%= s.detail %></strong></p><% } %>
+
+          <% if (s.key === 'workspace' && !s.done) { %>
+            <form method="POST" action="/onboarding/workspace" class="form-row" style="margin-top:10px;align-items:flex-end">
+              <div style="max-width:320px">
+                <label for="ws-name">Workspace name</label>
+                <input type="text" id="ws-name" name="name" placeholder="e.g. Canvas Digital" required
+                       value="<%= team && !/'s (team|workspace)$/i.test(team.name) ? team.name : '' %>">
+              </div>
+              <button class="btn sm" type="submit">Save</button>
+            </form>
+          <% } %>
+        </div>
+        <div class="setup-action">
+          <% if (s.done) { %>
+            <span class="badge good">done</span>
+          <% } else if (s.blockedBy) { %>
+            <span class="badge neutral" title="Connect Google first">waiting</span>
+          <% } else if (s.key !== 'workspace') { %>
+            <a class="btn sm" href="<%= s.href %>"><%= s.cta %></a>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+<% }) %>
+
+<div class="card">
+  <div class="card-head"><h3>How the roles work</h3></div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table class="data compact">
+        <thead><tr><th>Who</th><th>Gets an account?</th><th>How they receive work</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Admin</strong></td>
+            <td><span class="badge good">yes</span></td>
+            <td>In the portal. Runs the workspace, approves members, connects Google.</td>
+          </tr>
+          <tr>
+            <td><strong>SEO</strong></td>
+            <td><span class="badge good">yes</span></td>
+            <td>In the portal. Can assign work if you allow it.</td>
+          </tr>
+          <tr>
+            <td><strong>Developer</strong></td>
+            <td><span class="badge neutral">no</span></td>
+            <td>By email only — the task is sent in full.</td>
+          </tr>
+          <tr>
+            <td><strong>Writer</strong></td>
+            <td><span class="badge neutral">no</span></td>
+            <td>By email only — the task is sent in full.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="hint">
+      Client data stays inside the SEO team: developers and writers hold no account, so there is no portal for them
+      to sign in to. Assign someone several tasks and they receive a single email, not one per task.
+    </p>
+  </div>
+</div>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

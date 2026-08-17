@@ -1,0 +1,63 @@
+<%
+/* Interactive choropleth for country-level data (GSC or GA4).
+   Expects: rows (array), nameKey (string), valueKey (string), codeType
+   ('alpha3'|'name'), color (hex), fmt ('int'|'pct'). */
+const _rows = typeof rows !== 'undefined' ? rows : [];
+const _nameKey = typeof nameKey !== 'undefined' ? nameKey : 'entity';
+const _valueKey = typeof valueKey !== 'undefined' ? valueKey : 'clicks';
+const _codeType = typeof codeType !== 'undefined' ? codeType : 'alpha3';
+const _color = typeof color !== 'undefined' ? color : '#2563eb';
+const _uid = `wm${Math.random().toString(36).slice(2, 9)}`;
+const _values = {};
+_rows.forEach((r) => { _values[r[_nameKey]] = Number(r[_valueKey]) || 0; });
+%>
+<div class="worldmap-card">
+  <div id="<%= _uid %>" class="worldmap" style="height:340px"></div>
+  <div class="worldmap-legend">
+    <span>Low</span>
+    <span class="worldmap-legend-bar" style="background:linear-gradient(90deg, #eef2ff, <%= _color %>)"></span>
+    <span>High</span>
+  </div>
+</div>
+<script>
+  (function () {
+    var raw = <%- JSON.stringify(_values) %>;
+    var codeType = <%- JSON.stringify(_codeType) %>;
+    function ready(fn) {
+      if (window.jsVectorMap && window.CountryCodes) fn();
+      else setTimeout(function () { ready(fn); }, 60);
+    }
+    ready(function () {
+      var values = {};
+      var max = 1;
+      Object.keys(raw).forEach(function (k) {
+        var iso2 = codeType === 'alpha3' ? window.CountryCodes.iso2FromAlpha3(k) : window.CountryCodes.iso2FromName(k);
+        if (!iso2) return;
+        values[iso2.toUpperCase()] = raw[k];
+        if (raw[k] > max) max = raw[k];
+      });
+      new jsVectorMap({
+        selector: '#<%= _uid %>',
+        map: 'world',
+        zoomButtons: true,
+        zoomOnScroll: false,
+        selectedRegions: [],
+        series: {
+          regions: [{
+            values: values,
+            scale: ['#eef2ff', <%- JSON.stringify(_color) %>],
+            normalizeFunction: 'polynomial',
+          }],
+        },
+        regionStyle: {
+          initial: { fill: '#e5e9f0' },
+          hover: { fill: <%- JSON.stringify(_color) %>, cursor: 'pointer' },
+        },
+        onRegionTooltipShow: function (event, tooltip, code) {
+          var v = values[code];
+          tooltip.text((tooltip.text() || code) + (v != null ? ': ' + v.toLocaleString('en-US') : ': no data'), true);
+        },
+      });
+    });
+  })();
+</script>

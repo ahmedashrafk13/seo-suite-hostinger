@@ -1,0 +1,121 @@
+<%
+function n(v) { return Math.round(Number(v) || 0).toLocaleString('en-US'); }
+%>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= run.domain %> · SEO audit report</title>
+<style>
+  :root {
+    --text: #1a2129; --text-2: #5a6672; --border: #e3e7eb;
+    --accent: #1c64f2; --critical: #c8252b; --critical-soft: #fdecec;
+    --high: #d9540c; --high-soft: #fdf0e6; --medium: #b07d00; --medium-soft: #fdf7e3;
+    --low: #1668b8; --low-soft: #eaf3fc; --good: #1a7f4b; --good-soft: #e8f6ee;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: var(--text); max-width: 900px; margin: 0 auto; padding: 32px 24px 60px;
+    font-size: 14px; line-height: 1.55; background: #fff;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 26px 0 10px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .sub { color: var(--text-2); font-size: 13px; }
+  .print-bar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 18px; }
+  .print-bar button {
+    font: inherit; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--accent);
+    background: var(--accent); color: #fff; cursor: pointer;
+  }
+  .stat-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); margin: 12px 0; }
+  .stat { background: #fff; padding: 12px 14px; }
+  .stat .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); }
+  .stat .value { font-size: 20px; font-weight: 650; margin: 3px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 16px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-2); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .badge.critical { background: var(--critical-soft); color: var(--critical); border-color: #f6d4d5; }
+  .badge.high { background: var(--high-soft); color: var(--high); border-color: #f8ddc7; }
+  .badge.medium { background: var(--medium-soft); color: var(--medium); border-color: #f4e7bd; }
+  .badge.low { background: var(--low-soft); color: var(--low); border-color: #cfe3f8; }
+  .badge.info { background: #f1f3f5; color: var(--text-2); border-color: var(--border); }
+  .badge.good { background: var(--good-soft); color: var(--good); border-color: #c7e8d6; }
+  .urls { font-size: 11.5px; color: var(--text-2); margin: 0; padding-left: 16px; }
+  .urls li { margin-bottom: 2px; word-break: break-all; }
+  .action { font-size: 12px; color: var(--text-2); margin-top: 3px; }
+  @media print {
+    .print-bar { display: none; }
+    body { padding: 0; max-width: none; }
+    h2 { break-after: avoid; }
+    tr, .finding { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+  <div class="print-bar"><button onclick="window.print()">Print / Save as PDF</button></div>
+
+  <h1>Technical SEO Audit</h1>
+  <div class="sub">
+    <%= run.domain %><% if (run.brand_name) { %> &middot; <%= run.brand_name %><% } %>
+    &middot; crawled <%= String(run.created_at).slice(0, 16).replace('T', ' ') %>
+  </div>
+
+  <% if (!report) { %>
+    <p>No structured result is available for this run.</p>
+  <% } else { %>
+    <div class="stat-row">
+      <div class="stat"><div class="label">Site health</div>
+        <div class="value"><span class="badge <%= report.health >= 90 ? 'good' : (report.health >= 70 ? 'medium' : 'critical') %>"><%= report.health == null ? '—' : report.health %>/100</span></div>
+      </div>
+      <div class="stat"><div class="label">Pages crawled</div><div class="value"><%= n(report.pagesCrawled) %></div></div>
+      <div class="stat"><div class="label">Critical</div><div class="value"><%= report.bySeverity.critical || 0 %></div></div>
+      <div class="stat"><div class="label">High</div><div class="value"><%= report.bySeverity.high || 0 %></div></div>
+      <div class="stat"><div class="label">Medium + low</div><div class="value"><%= (report.bySeverity.medium || 0) + (report.bySeverity.low || 0) %></div></div>
+    </div>
+
+    <h2>Failing checks (<%= report.failing.length %>)</h2>
+    <% if (!report.failing.length) { %>
+      <p>No failing checks — every check passed.</p>
+    <% } else { %>
+      <table>
+        <thead><tr><th>Severity</th><th>Issue</th><th class="num">Affected</th><th>Recommended action</th></tr></thead>
+        <tbody>
+          <% report.failing.forEach(function(f){ %>
+            <tr class="finding">
+              <td><span class="badge <%= f.severity %>"><%= f.severity %></span></td>
+              <td>
+                <strong><%= f.issue %></strong>
+                <% if (f.items && f.items.length) { %>
+                  <ul class="urls">
+                    <% f.items.slice(0, 8).forEach(function(it){ %><li><%= it.url || it.note || '—' %><% if (it.url && it.note) { %> — <%= it.note %><% } %></li><% }) %>
+                  </ul>
+                  <% if (f.items.length > 8) { %><div class="action"><%= f.items.length - 8 %> more not shown.</div><% } %>
+                <% } %>
+              </td>
+              <td class="num"><%= n(f.failed) %> <%= f.unit %></td>
+              <td><%= f.action %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+
+    <h2>Passing checks (<%= report.passing.length %>)</h2>
+    <% if (!report.passing.length) { %>
+      <p>No checks passed.</p>
+    <% } else { %>
+      <table>
+        <thead><tr><th>Issue</th><th class="num">Checked</th></tr></thead>
+        <tbody>
+          <% report.passing.forEach(function(f){ %>
+            <tr><td><%= f.issue %></td><td class="num"><%= n(f.total) %> <%= f.unit %></td></tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  <% } %>
+</body>
+</html>

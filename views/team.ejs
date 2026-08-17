@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<%
+function roleBadge(role) {
+  return role === 'admin' ? 'accent' : (role === 'dev' ? 'neutral' : 'good');
+}
+%>
+
+<% if (pending.length) { %>
+  <div class="card" style="border-color:var(--accent-border)">
+    <div class="card-head" style="background:var(--accent-soft)">
+      <h2>Waiting for approval</h2>
+      <span class="sub"><%= pending.length %> request<%= pending.length === 1 ? '' : 's' %></span>
+    </div>
+    <div class="card-body">
+      <p class="hint" style="margin-top:0">
+        These people signed up with your invite code. They can sign in but see nothing at all until you approve
+        them — pick the role they should have first.
+      </p>
+      <% pending.forEach(function(m){ %>
+        <form method="POST" action="/team/members/<%= m.id %>/approve" class="approval-row">
+          <div class="ar-who">
+            <span class="avatar"><%= (m.name || m.email).slice(0,2) %></span>
+            <div>
+              <div class="ar-name"><%= m.name || '—' %></div>
+              <div class="ar-mail"><%= m.email %></div>
+            </div>
+          </div>
+          <label class="sr-only" for="role-<%= m.id %>">Role</label>
+          <select id="role-<%= m.id %>" name="role" style="width:auto;min-width:150px">
+            <% roles.forEach(function(r){ %>
+              <option value="<%= r.value %>" <%= r.value === 'seo' ? 'selected' : '' %>><%= r.label %></option>
+            <% }) %>
+          </select>
+          <label class="check" style="margin:0;white-space:nowrap">
+            <input type="checkbox" name="can_assign"> <span>Can assign tasks</span>
+          </label>
+          <button class="btn sm" type="submit">Approve</button>
+          <button class="btn danger-ghost sm" type="submit" formaction="/team/members/<%= m.id %>/remove">Reject</button>
+        </form>
+      <% }) %>
+    </div>
+  </div>
+<% } %>
+
+<div class="split">
+  <div>
+    <div class="card">
+      <div class="card-head">
+        <h2>SEO team — portal access</h2>
+        <span class="sub"><%= members.length %> in <%= team ? team.name : 'this workspace' %></span>
+      </div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr>
+            <th class="wrap">Person</th><th>Role</th><th>Can assign</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody>
+            <% members.forEach(function(m){ %>
+              <tr>
+                <td class="wrap">
+                  <strong><%= m.name || m.email.split('@')[0] %></strong>
+                  <% if (m.is_owner) { %><span class="badge accent" style="margin-left:5px">owner</span><% } %>
+                  <div class="sub-line"><%= m.email %></div>
+                </td>
+                <td>
+                  <% if (m.is_owner) { %>
+                    <span class="badge accent">Admin</span>
+                  <% } else { %>
+                    <form method="POST" action="/team/members/<%= m.id %>/role" class="inline-form">
+                      <label class="sr-only" for="r-<%= m.id %>">Role for <%= m.email %></label>
+                      <select id="r-<%= m.id %>" name="role" onchange="this.form.submit()" style="width:auto;min-width:120px">
+                        <% roles.forEach(function(r){ %>
+                          <option value="<%= r.value %>" <%= m.role === r.value ? 'selected' : '' %>><%= r.label %></option>
+                        <% }) %>
+                      </select>
+                    </form>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (m.role === 'admin') { %>
+                    <span class="badge good">always</span>
+                  <% } else if (m.role === 'dev') { %>
+                    <span class="badge neutral">no</span>
+                  <% } else { %>
+                    <form method="POST" action="/team/members/<%= m.id %>/assign-rights" class="inline-form">
+                      <input type="hidden" name="allowed" value="<%= m.can_assign ? '0' : '1' %>">
+                      <button class="btn <%= m.can_assign ? 'success' : 'secondary' %> xs" type="submit">
+                        <%= m.can_assign ? 'Allowed' : 'Not allowed' %>
+                      </button>
+                    </form>
+                  <% } %>
+                </td>
+                <td>
+                  <span class="badge <%= m.status === 'active' ? 'good' : 'neutral' %>"><%= m.status %></span>
+                </td>
+                <td style="white-space:nowrap">
+                  <% if (!m.is_owner) { %>
+                    <% if (m.status === 'active') { %>
+                      <form method="POST" action="/team/members/<%= m.id %>/suspend" class="inline-form">
+                        <button class="btn ghost xs" type="submit">Suspend</button>
+                      </form>
+                    <% } else { %>
+                      <form method="POST" action="/team/members/<%= m.id %>/reactivate" class="inline-form">
+                        <button class="btn ghost xs" type="submit">Reactivate</button>
+                      </form>
+                    <% } %>
+                    <form method="POST" action="/team/members/<%= m.id %>/remove" class="inline-form"
+                          onsubmit="return confirm('Remove <%= m.email %> from the team?')">
+                      <button class="btn danger-ghost xs" type="submit">Remove</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-foot">
+        <strong>Admin</strong> runs the workspace and can always assign ·
+        <strong>SEO</strong> does the work, and can assign only if you allow it.
+        Only these two roles can sign in — developers and writers are managed below and never see the portal.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Developers &amp; writers</h2>
+        <span class="sub">No portal access — they receive work by email only</span>
+      </div>
+      <div class="card-body" style="padding-bottom:0">
+        <p class="hint" style="margin-top:0">
+          These people are <strong>not</strong> members and cannot sign in. Assigning them a task emails it to them
+          in full. Emails are remembered, so you type an address once. However many tasks you assign someone, they
+          receive <strong>one</strong> email.
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr>
+            <th class="wrap">Name</th><th class="wrap">Email</th><th>Role</th>
+            <th class="num">Assigned</th><th>Last assigned</th><th></th>
+          </tr></thead>
+          <tbody>
+            <% if (!contacts.length) { %>
+              <tr><td colspan="6"><div class="empty-state">No developers or writers added yet.</div></td></tr>
+            <% } %>
+            <% contacts.forEach(function(p){ %>
+              <tr style="<%= p.active ? '' : 'opacity:.5' %>">
+                <td class="wrap"><%= p.name %></td>
+                <td class="wrap">
+                  <% if (p.email) { %><%= p.email %>
+                  <% } else { %><span class="badge medium">no email yet</span><% } %>
+                </td>
+                <td><span class="badge <%= roleBadge(p.role) %>"><%= p.role %></span></td>
+                <td class="num"><%= p.assignment_count %></td>
+                <td class="narrow"><%= p.last_assigned_at ? fmtDateTime(p.last_assigned_at) : '—' %></td>
+                <td>
+                  <% if (p.active) { %>
+                    <form method="POST" action="/team/people/<%= p.id %>/remove" class="inline-form">
+                      <button class="btn ghost xs" type="submit">Remove</button>
+                    </form>
+                  <% } else { %><span class="hint">removed</span><% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-body">
+        <div class="section-divider" style="margin-top:0"></div>
+        <h4 style="margin-bottom:8px">Add a developer or writer</h4>
+        <p class="hint" style="margin-top:0">
+          A name and an email is all that is needed. They never get a login — email is how they receive work, so the
+          address is required.
+        </p>
+        <form method="POST" action="/team/people">
+          <div class="form-row">
+            <div>
+              <label for="p-name">Name</label>
+              <input type="text" id="p-name" name="name" required placeholder="e.g. Sara (frontend dev)">
+            </div>
+            <div>
+              <label for="p-email">Email</label>
+              <input type="email" id="p-email" name="email" required placeholder="sara@example.com">
+            </div>
+            <div>
+              <label for="p-role">They are a</label>
+              <select id="p-role" name="role">
+                <option value="dev">Developer — implements fixes</option>
+                <option value="writer">Writer — produces content</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn" type="submit">Add person</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Recent assignments</h2>
+        <span class="sub">Who got what, and at which address</span>
+      </div>
+      <% if (!recentAssignments.length) { %>
+        <div class="empty-state">No tasks have been assigned yet.</div>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th class="wrap">Task</th><th>Assigned to</th><th class="wrap">Email used</th>
+              <th>By</th><th>When</th><th>Email</th>
+            </tr></thead>
+            <tbody>
+              <% recentAssignments.forEach(function(a){ %>
+                <tr>
+                  <td class="wrap"><a href="/tasks/<%= a.id %>"><%= a.title %></a>
+                    <% if (a.brand_name) { %><div class="sub-line"><%= a.brand_name %></div><% } %>
+                  </td>
+                  <td class="wrap"><%= a.assignee %></td>
+                  <td class="wrap"><%= a.assignee_email || '—' %></td>
+                  <td class="wrap"><%= a.assigned_by_name || a.assigned_by_email || '—' %></td>
+                  <td class="narrow"><%= a.assigned_at ? fmtDateTime(a.assigned_at) : '—' %></td>
+                  <td>
+                    <% if (a.last_sent === 1) { %><span class="badge good">sent</span>
+                    <% } else if (a.last_sent === 0) { %><span class="badge critical">failed</span>
+                    <% } else { %><span class="badge neutral">not sent</span><% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <div class="card-head"><h3>Invite people</h3></div>
+      <div class="card-body">
+        <p class="hint" style="margin-top:0">
+          Share this link. Whoever signs up with it joins <strong><%= team ? team.name : 'your team' %></strong>
+          as pending, and appears above for you to approve.
+        </p>
+        <label for="invite-url">Invite link</label>
+        <input type="text" id="invite-url" value="<%= signupUrl %>" readonly
+               onclick="this.select()" style="font-family:var(--mono);font-size:11.5px">
+        <div class="hint">Invite code: <code><%= team ? team.invite_code : '—' %></code></div>
+        <form method="POST" action="/team/invite/rotate" style="margin-top:12px"
+              onsubmit="return confirm('Generate a new code? The current link will stop working.')">
+          <button class="btn secondary sm block" type="submit">Generate a new code</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Who can do what</h3></div>
+      <div class="card-body">
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr><th>Action</th><th>Admin</th><th>SEO</th><th>Dev / Writer</th></tr></thead>
+            <tbody>
+              <tr><td>Sign in at all</td><td>✓</td><td>✓</td><td>—</td></tr>
+              <tr><td>See brands &amp; data</td><td>✓</td><td>✓</td><td>—</td></tr>
+              <tr><td>Assign tasks</td><td>✓</td><td>if allowed</td><td>—</td></tr>
+              <tr><td>Update tasks</td><td>✓</td><td>✓</td><td>—</td></tr>
+              <tr><td>Approve SEO sign-off</td><td>✓</td><td>✓</td><td>—</td></tr>
+              <tr><td>Run audits &amp; syncs</td><td>✓</td><td>✓</td><td>—</td></tr>
+              <tr><td>Manage the workspace</td><td>✓</td><td>—</td><td>—</td></tr>
+              <tr><td>Connect Google</td><td>✓</td><td>—</td><td>—</td></tr>
+              <tr><td>Receive tasks by email</td><td>✓</td><td>✓</td><td>✓</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="hint">
+          Everyone with an account shares the same brands, tasks and Google connection — the workspace belongs to
+          the team, not to whoever created it. Developers and writers hold no account, so a client's data is never
+          exposed to someone outside the SEO team.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

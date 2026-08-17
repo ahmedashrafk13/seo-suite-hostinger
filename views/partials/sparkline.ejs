@@ -1,0 +1,105 @@
+<%
+/* Inline sparkline. Expects `points` (array of numbers), optional `dates`
+   (array of ISO YYYY-MM-DD strings, same length as `points`) and optional
+   `sparkColor`. Drawn as a normalised polyline so it works at any container
+   width. When `dates` is supplied, hovering the SVG shows a tooltip with
+   that day's date + value and highlights the nearest point with a dot. */
+const vals = (typeof points !== 'undefined' && points ? points : []).map((n) => Number(n) || 0);
+const sparkDates = (typeof dates !== 'undefined' && dates ? dates : []);
+const col = typeof sparkColor !== 'undefined' && sparkColor ? sparkColor : '#1c64f2';
+const W = 100, H = 30;
+const uid = `spk${Math.random().toString(36).slice(2, 9)}`;
+if (vals.length >= 2) {
+  const max = Math.max(...vals);
+  const min = Math.min(...vals);
+  const range = max - min || 1;
+  const step = W / (vals.length - 1);
+  const pts = vals.map((v, i) => {
+    const x = (i * step);
+    const y = (H - ((v - min) / range) * (H - 3) - 1.5);
+    return { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) };
+  });
+  const coords = pts.map((p) => `${p.x},${p.y}`);
+%>
+<div class="spark-wrap" id="<%= uid %>" style="position:relative">
+  <svg class="spark" viewBox="0 0 <%= W %> <%= H %>" preserveAspectRatio="none">
+    <polyline points="<%= coords.join(' ') %>" fill="none" stroke="<%= col %>" stroke-width="1.4"
+              vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>
+    <polygon points="0,<%= H %> <%= coords.join(' ') %> <%= W %>,<%= H %>" fill="<%= col %>" opacity="0.09"/>
+    <circle class="spark-dot" r="2.2" fill="<%= col %>" stroke="var(--surface, #fff)" stroke-width="1"
+            style="opacity:0;pointer-events:none"></circle>
+    <rect class="spark-hitarea" x="0" y="0" width="<%= W %>" height="<%= H %>" fill="transparent"></rect>
+  </svg>
+  <div class="spark-tooltip" style="position:absolute;display:none;pointer-events:none;z-index:20;
+    background:var(--surface-2, #1f2937);color:var(--text, #fff);font-size:11px;line-height:1.35;
+    padding:4px 7px;border-radius:5px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.18);
+    transform:translate(-50%,-100%);top:0;left:0"></div>
+</div>
+<script>
+(function () {
+  var root = document.getElementById('<%= uid %>');
+  if (!root) return;
+  var svg = root.querySelector('svg.spark');
+  var dot = root.querySelector('.spark-dot');
+  var tip = root.querySelector('.spark-tooltip');
+  var hit = root.querySelector('.spark-hitarea');
+  var pts = <%- JSON.stringify(pts) %>;
+  var vals = <%- JSON.stringify(vals) %>;
+  var dates = <%- JSON.stringify(sparkDates) %>;
+  var W = <%= W %>, H = <%= H %>;
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso + 'T00:00:00Z');
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  }
+  function fmtVal(v) { return Math.round(v).toLocaleString('en-US'); }
+
+  function nearestIndex(px) {
+    var step = W / (pts.length - 1);
+    var i = Math.round(px / step);
+    if (i < 0) i = 0;
+    if (i > pts.length - 1) i = pts.length - 1;
+    return i;
+  }
+
+  function show(clientX) {
+    var rect = svg.getBoundingClientRect();
+    var relX = clientX - rect.left;
+    var px = (relX / rect.width) * W;
+    var i = nearestIndex(px);
+    var p = pts[i];
+    if (!p) return;
+
+    dot.setAttribute('cx', p.x);
+    dot.setAttribute('cy', p.y);
+    dot.style.opacity = '1';
+
+    var label = dates[i] ? fmtDate(dates[i]) : ('Point ' + (i + 1));
+    tip.innerHTML = '<strong>' + fmtVal(vals[i]) + '</strong> clicks<br>' + label;
+    tip.style.display = 'block';
+
+    var leftPct = (p.x / W) * 100;
+    var topPct = (p.y / H) * 100;
+    tip.style.left = leftPct + '%';
+    tip.style.top = topPct + '%';
+  }
+
+  function hide() {
+    dot.style.opacity = '0';
+    tip.style.display = 'none';
+  }
+
+  hit.addEventListener('mousemove', function (e) { show(e.clientX); });
+  hit.addEventListener('mouseenter', function (e) { show(e.clientX); });
+  hit.addEventListener('mouseleave', hide);
+  hit.addEventListener('touchstart', function (e) {
+    if (e.touches && e.touches[0]) show(e.touches[0].clientX);
+  }, { passive: true });
+  hit.addEventListener('touchend', hide);
+})();
+</script>
+<% } else { %>
+<div style="height:38px;display:flex;align-items:center;font-size:11.5px;color:var(--text-3)">Not enough data yet</div>
+<% } %>

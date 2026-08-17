@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+    <div class="card">
+      <div class="card-head"><h2 class="mt-0">Generate a weekly report</h2></div>
+      <div class="card-body">
+        <p class="muted">Builds a standard weekly report from the consolidated Search Console, analytics, technical audit and internal linking data already on file for the brand — no live API call at read time.</p>
+        <form method="POST" action="/reports/generate">
+          <div class="form-row">
+            <div>
+              <label for="brand_id">Brand</label>
+              <select id="brand_id" name="brand_id">
+                <option value="">All active brands</option>
+                <% brands.forEach(function(b){ %>
+                  <option value="<%= b.id %>" <%= brandId === b.id ? 'selected' : '' %>><%= b.name %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div>
+              <label for="week_end">Week ending (optional)</label>
+              <input type="date" id="week_end" name="week_end">
+            </div>
+          </div>
+          <label class="check">
+            <input type="checkbox" name="full_data" value="1">
+            <span>Include the full Search Console &amp; GA4 data appendix
+              <span class="check-hint">Attaches every dimension the suite syncs for the report week — queries, pages,
+                query&nbsp;→&nbsp;page, countries, devices, search appearance, sitemaps, indexation, and GA4 channels,
+                landing pages, tech, geo (country and city), acquisition and events — plus Core Web Vitals and uptime.
+                Makes the report a complete hand-over and enables a full Excel export.</span>
+            </span>
+          </label>
+          <button class="btn" type="submit">Generate report</button>
+        </form>
+        <p class="hint">Reports also generate automatically on schedule: <code><%= reportCron %></code>.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3 class="mt-0">Weekly reports</h3>
+        <div class="btn-row">
+          <a class="btn <%= !brandId ? '' : 'secondary' %> sm" href="/reports">All brands</a>
+          <% brands.forEach(function(b){ %>
+            <a class="btn <%= brandId === b.id ? '' : 'secondary' %> sm" href="/reports?brand=<%= b.id %>"><%= b.name %></a>
+          <% }) %>
+        </div>
+      </div>
+      <% if (reports.length === 0) { %>
+        <div class="empty-state"><div class="icon">&#9776;</div>No reports yet. Generate one above.</div>
+      <% } else { %>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Brand</th><th>Week</th><th>Generated</th><th></th></tr></thead>
+          <tbody>
+          <% reports.forEach(function(r){ %>
+            <tr>
+              <td><%= r.brand_name %></td>
+              <td><%= r.period_start %> &rarr; <%= r.period_end %></td>
+              <td><%= fmtDateTime(r.generated_at) %></td>
+              <td style="white-space:nowrap">
+                <a class="btn secondary sm" href="/reports/<%= r.id %>">View</a>
+                <a class="btn secondary sm" href="/reports/<%= r.id %>/print" target="_blank">Print</a>
+                <a class="btn secondary sm" href="/reports/<%= r.id %>/xlsx">Excel</a>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+      <% } %>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-head"><h3>Technical audits</h3><a class="btn ghost sm" href="/audit">All audits</a></div>
+        <% if (audits.length === 0) { %>
+          <div class="empty-state">No completed audits yet.</div>
+        <% } else { %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Domain</th><th>Brand</th><th>Status</th><th>Created</th></tr></thead>
+            <tbody>
+            <% audits.forEach(function(a){ %>
+              <tr>
+                <td><a href="/audit/<%= a.id %>"><%= a.domain %></a></td>
+                <td><%= a.brand_name || '—' %></td>
+                <td><span class="badge <%= statusBadge(a.status) %>"><%= a.status %></span></td>
+                <td><%= fmtDateTime(a.created_at) %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Internal linking runs</h3><a class="btn ghost sm" href="/linking">All runs</a></div>
+        <% if (linkings.length === 0) { %>
+          <div class="empty-state">No completed linking runs yet.</div>
+        <% } else { %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Site</th><th>Brand</th><th>Status</th><th>Created</th><th></th></tr></thead>
+            <tbody>
+            <% linkings.forEach(function(l){ %>
+              <tr>
+                <td><a href="/linking/<%= l.id %>"><%= l.site_url %></a></td>
+                <td><%= l.brand_name || '—' %></td>
+                <td><span class="badge <%= statusBadge(l.status) %>"><%= l.status %></span></td>
+                <td><%= fmtDateTime(l.created_at) %></td>
+                <td><% if (l.docx_path) { %><a href="/linking/<%= l.id %>/report">.docx</a><% } else { %>—<% } %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+  </div>
+  </div>
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<%
+// Mirrors the structure of Google's own PageSpeed Insights report:
+//   field data → category gauges → lab metrics → filmstrip → insights →
+//   diagnostics → passed audits → the other three categories.
+var R = report;
+function gaugeDash(score) {
+  // 2πr for r=28 → the circle is drawn as a stroke-dasharray fraction.
+  var c = 2 * Math.PI * 28;
+  return (score == null ? 0 : (score / 100) * c).toFixed(1) + ' ' + c.toFixed(1);
+}
+%>
+
+<div class="psi-head">
+  <div class="psi-brandbar">
+    <svg class="psi-logo" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="13" r="8.4" fill="none" stroke="currentColor" stroke-width="1.7"/>
+      <path d="M12 13l4.2-4.4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+      <path d="M4.6 6.2A10.4 10.4 0 0 1 12 3c2.8 0 5.4 1.1 7.4 3.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+    </svg>
+    <h2>PageSpeed Insights</h2>
+    <% if (row) { %>
+      <span class="sub">Report from <%= fmtDateTime(row.created_at) %></span>
+    <% } %>
+  </div>
+
+  <form method="POST" action="/pagespeed/run" class="psi-form" id="psi-form">
+    <label for="psi-url" class="sr-only">URL to analyse</label>
+    <input type="text" id="psi-url" name="url" value="<%= url %>" placeholder="Enter a web page URL" required>
+    <% if (brands.length) { %>
+      <label for="psi-brand" class="sr-only">Attach to brand</label>
+      <select id="psi-brand" name="brand_id" title="Attaching a brand records the result for Core Web Vitals alerts">
+        <option value="">No brand</option>
+        <% brands.forEach(function(b){ %>
+          <option value="<%= b.id %>" <%= (row && row.brand_id === b.id) ? 'selected' : '' %>><%= b.name %></option>
+        <% }) %>
+      </select>
+    <% } %>
+    <input type="hidden" name="strategy" id="psi-strategy" value="<%= strategy %>">
+    <button class="btn" type="submit" id="psi-submit">Analyze</button>
+  </form>
+
+  <div class="psi-tabs" role="tablist">
+    <% ['mobile','desktop'].forEach(function(s){ %>
+      <button type="button" role="tab" aria-selected="<%= strategy === s ? 'true' : 'false' %>"
+              class="psi-tab <%= strategy === s ? 'active' : '' %>" data-strategy="<%= s %>">
+        <% if (s === 'mobile') { %>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 18.8h2.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <% } else { %>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="12.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M1.5 20.5h21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <% } %>
+        <%= s.charAt(0).toUpperCase() + s.slice(1) %>
+      </button>
+    <% }) %>
+  </div>
+</div>
+
+<% if (!connected && !hasApiKey) { %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body">
+      <strong>Not authenticated for PageSpeed.</strong>
+      The PageSpeed Insights API rejects API keys and expects an OAuth principal, so this uses the same Google
+      connection as Search Console and GA4 — no extra scope required. Without it, requests fall back to Google's
+      shared anonymous pool, which is small and usually exhausted.
+      <div style="margin-top:9px"><a class="btn sm" href="/connect">Connect Google</a></div>
+    </div>
+  </div>
+<% } %>
+
+<% if (!R) { %>
+  <div class="card">
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon">&#9673;</div>
+        <h3>Analyse a page</h3>
+        <p>Runs the real PageSpeed Insights API — the same Lighthouse audit and Chrome UX Report field data that
+          pagespeed.web.dev shows, for mobile and desktop. A run takes 20–60 seconds.</p>
+      </div>
+    </div>
+  </div>
+<% } else { %>
+
+  <!-- ------------------------------------------------ field data (CrUX) -->
+  <div class="card">
+    <div class="card-head">
+      <h3>Discover what your real users are experiencing</h3>
+      <% if (!R.field.available) { %><span class="badge neutral">No Data</span><% } else if (R.field.overall) { %>
+        <span class="badge <%= R.field.overall === 'FAST' ? 'good' : (R.field.overall === 'AVERAGE' ? 'medium' : 'critical') %>">
+          <%= R.field.overall === 'FAST' ? 'Passed' : 'Failed' %> Core Web Vitals assessment
+        </span>
+      <% } %>
+    </div>
+    <div class="card-body">
+      <% if (!R.field.available) { %>
+        <p class="hint" style="margin:0">
+          The Chrome UX Report does not have enough real-user data for this URL over the last 28 days.
+          <% if (R.originField.available) { %>
+            Origin-level data is shown below instead.
+          <% } else { %>
+            This is normal for lower-traffic pages — the lab results below still apply.
+          <% } %>
+        </p>
+      <% } %>
+
+      <% ['field','originField'].forEach(function(scope){ var F = R[scope]; if (!F.available) return; %>
+        <div class="psi-field-scope">
+          <div class="psi-field-label">
+            <%= scope === 'field' ? 'This URL' : 'Origin — all pages on this domain' %>
+            <span class="hint" style="display:inline;margin-left:6px">75th percentile, last 28 days of real Chrome traffic</span>
+          </div>
+          <div class="psi-field-grid">
+            <% F.metrics.forEach(function(m){ %>
+              <div class="psi-field-metric">
+                <div class="pfm-head">
+                  <span class="metric-mark <%= m.band %>"></span>
+                  <span class="pfm-name"><%= m.label %></span>
+                  <span class="pfm-value <%= m.band %>"><%= m.value %></span>
+                </div>
+                <div class="pfm-bar" role="img"
+                     aria-label="<%= m.good %>% good, <%= m.needsImprovement %>% needs improvement, <%= m.poor %>% poor">
+                  <span class="seg good" style="width:<%= m.good %>%"></span>
+                  <span class="seg avg" style="width:<%= m.needsImprovement %>%"></span>
+                  <span class="seg poor" style="width:<%= m.poor %>%"></span>
+                </div>
+                <div class="pfm-legend">
+                  <span><i class="dot good"></i><%= m.good %>%</span>
+                  <span><i class="dot avg"></i><%= m.needsImprovement %>%</span>
+                  <span><i class="dot poor"></i><%= m.poor %>%</span>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+
+  <!-- --------------------------------------------------- category gauges -->
+  <div class="card">
+    <div class="card-head"><h3>Diagnose performance issues</h3></div>
+    <div class="card-body">
+      <div class="psi-gauges">
+        <% R.categories.forEach(function(c){ %>
+          <a class="psi-gauge <%= c.band %>" href="#cat-<%= c.id %>">
+            <svg viewBox="0 0 64 64" aria-hidden="true">
+              <circle class="track" cx="32" cy="32" r="28" fill="none" stroke-width="4"/>
+              <circle class="value" cx="32" cy="32" r="28" fill="none" stroke-width="4"
+                      stroke-dasharray="<%= gaugeDash(c.score) %>" stroke-linecap="round"
+                      transform="rotate(-90 32 32)"/>
+            </svg>
+            <span class="g-num"><%= c.score == null ? '—' : c.score %></span>
+            <span class="g-label"><%= c.title %></span>
+          </a>
+        <% }) %>
+      </div>
+      <div class="psi-scale">
+        <span><i class="tri poor"></i>0–49</span>
+        <span><i class="sq avg"></i>50–89</span>
+        <span><i class="dot good"></i>90–100</span>
+        <span class="hint" style="margin:0 0 0 auto">Values are estimated and may vary. The
+          <a href="https://developer.chrome.com/docs/lighthouse/performance/performance-scoring/" target="_blank" rel="noopener">performance score is calculated</a>
+          directly from these metrics.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------------------------------------------------- lab metrics -->
+  <div class="card">
+    <div class="card-head">
+      <h3>Metrics</h3>
+      <span class="sub">Lab data — a single simulated load, not real users</span>
+    </div>
+    <div class="card-body">
+      <div class="psi-metrics">
+        <% R.metrics.forEach(function(m){ %>
+          <div class="psi-metric">
+            <div class="pm-head">
+              <span class="metric-mark <%= m.band %>"></span>
+              <span class="pm-name"><%= m.title %></span>
+            </div>
+            <div class="pm-value <%= m.band %>"><%= m.displayValue %></div>
+          </div>
+        <% }) %>
+      </div>
+
+      <div class="psi-env">
+        <span><strong>Captured at</strong> <%= fmtDateTime(R.fetchTime) %></span>
+        <span><strong><%= R.emulated %></strong> with Lighthouse <%= R.lighthouseVersion %></span>
+        <span><strong><%= R.throttling %></strong></span>
+        <span>Single page session · initial page load</span>
+      </div>
+
+      <% if (R.filmstrip.length) { %>
+        <div class="psi-filmstrip">
+          <% R.filmstrip.forEach(function(f){ %>
+            <figure>
+              <img src="<%= f.data %>" alt="Page render at <%= (f.timing/1000).toFixed(1) %> seconds" loading="lazy">
+              <figcaption><%= (f.timing / 1000).toFixed(1) %>s</figcaption>
+            </figure>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- --------------------------------------------------------- insights -->
+  <%
+  function auditBlock(a, sev) {
+  %>
+    <details class="psi-audit">
+      <summary>
+        <span class="metric-mark <%= a.band === 'good' ? 'good' : (a.band === 'average' ? 'average' : 'poor') %>"></span>
+        <span class="pa-title"><%= a.title %></span>
+        <% if (a.savingsLabel) { %><span class="pa-savings"><%= a.savingsLabel %></span>
+        <% } else if (a.displayValue) { %><span class="pa-display"><%= a.displayValue %></span><% } %>
+      </summary>
+      <div class="psi-audit-body">
+        <p class="pa-desc"><%- String(a.description || '')
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+          .replace(/`([^`]+)`/g, '<code>$1</code>') %></p>
+
+        <% if (a.node) { %>
+          <div class="pa-node"><span class="chip">Element</span> <%= a.node %></div>
+        <% } %>
+
+        <% if (a.checklist) { %>
+          <ul class="pa-checklist">
+            <% a.checklist.forEach(function(c){ %>
+              <li class="<%= c.pass ? 'pass' : 'fail' %>"><%= c.label %></li>
+            <% }) %>
+          </ul>
+        <% } %>
+
+        <% if (a.table) { %>
+          <div class="table-wrap"><table class="data compact">
+            <thead><tr>
+              <% a.table.headings.forEach(function(h){ %><th class="<%= h.numeric ? 'num' : '' %>"><%= h.label %></th><% }) %>
+            </tr></thead>
+            <tbody>
+              <% a.table.rows.forEach(function(r){ %>
+                <tr><% r.forEach(function(cell){ %><td class="<%= cell.numeric ? 'num' : 'url wrap' %>"><%= cell.text %></td><% }) %></tr>
+              <% }) %>
+            </tbody>
+          </table></div>
+          <% if (a.table.truncated) { %><p class="hint"><%= a.table.truncated %> more row<%= a.table.truncated === 1 ? '' : 's' %> not shown.</p><% } %>
+        <% } %>
+
+        <% if (a.networkTree) { %>
+          <% if (a.networkTree.longest) { %>
+            <p class="hint" style="margin-top:0">Longest critical-path chain: <strong><%= a.networkTree.longest %></strong></p>
+          <% } %>
+          <div class="table-wrap"><table class="data compact">
+            <thead><tr><th>Request</th><th class="num">Transfer size</th><th class="num">Finished at</th></tr></thead>
+            <tbody>
+              <% a.networkTree.rows.forEach(function(r){ %>
+                <tr><td class="url wrap"><%= r.url %></td><td class="num"><%= r.size %></td><td class="num"><%= r.time %></td></tr>
+              <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+      </div>
+    </details>
+  <% } %>
+
+  <div class="card" id="cat-performance">
+    <div class="card-head">
+      <h3>Insights</h3>
+      <span class="sub">What to fix, most costly first</span>
+    </div>
+    <div class="card-body">
+      <% if (!R.insights.length) { %>
+        <div class="empty-state">No failing performance insights — everything Lighthouse checks here passed.</div>
+      <% } %>
+      <% R.insights.forEach(function(a){ auditBlock(a); }) %>
+    </div>
+  </div>
+
+  <% if (R.diagnostics.length) { %>
+    <div class="card">
+      <div class="card-head">
+        <h3>Diagnostics</h3>
+        <span class="sub">More about the performance of this application</span>
+      </div>
+      <div class="card-body">
+        <% R.diagnostics.forEach(function(a){ auditBlock(a); }) %>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (R.passed.length) { %>
+    <div class="card">
+      <div class="card-body">
+        <details class="disclosure">
+          <summary>Passed audits (<%= R.passed.length %>)</summary>
+          <% R.passed.forEach(function(a){ auditBlock(a); }) %>
+        </details>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- --------------------------------------- accessibility / BP / SEO -->
+  <% R.otherCategories.forEach(function(c){ %>
+    <div class="card" id="cat-<%= c.id %>">
+      <div class="card-head">
+        <h3><%= c.title %></h3>
+        <span class="badge <%= c.band === 'good' ? 'good' : (c.band === 'average' ? 'medium' : 'critical') %> lg">
+          <%= c.score == null ? '—' : Math.round(c.score * 100) %>
+        </span>
+        <span class="sub"><%= c.passedCount %> audit<%= c.passedCount === 1 ? '' : 's' %> passed</span>
+      </div>
+      <div class="card-body">
+        <% if (!c.failing.length) { %>
+          <div class="empty-state">Nothing failing in this category.</div>
+        <% } %>
+        <% c.failing.forEach(function(a){ auditBlock(a); }) %>
+      </div>
+    </div>
+  <% }) %>
+
+  <div class="card">
+    <div class="card-body" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span class="hint" style="margin:0">
+        Report <%= row ? '#' + row.id : '' %> · authenticated via
+        <strong><%= row && row.credential === 'oauth' ? 'your Google connection' : (row && row.credential === 'api-key' ? 'PSI_API_KEY' : 'anonymous quota') %></strong>
+        · <%= R.finalUrl || R.requestedUrl %>
+      </span>
+      <span class="spacer" style="flex:1"></span>
+      <% if (row) { %>
+        <form method="POST" action="/pagespeed/<%= row.id %>/delete"
+              onsubmit="return confirm('Delete this report?')">
+          <button class="btn danger-ghost sm" type="submit">Delete report</button>
+        </form>
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
+<% if (history.length) { %>
+  <div class="card">
+    <div class="card-head"><h3>Recent reports</h3></div>
+    <div class="table-wrap">
+      <table class="data compact">
+        <thead><tr>
+          <th>URL</th><th>Device</th><th>Brand</th>
+          <th class="num">Perf</th><th class="num">A11y</th><th class="num">BP</th><th class="num">SEO</th>
+          <th>Run</th>
+        </tr></thead>
+        <tbody>
+          <% history.forEach(function(h){ %>
+            <tr>
+              <%
+                // The full URL, not shortUrl() — that strips the origin, and
+                // "/" tells you nothing when reports span several sites.
+                var shown = h.url.replace(/^https?:\/\//, '');
+                if (shown.length > 58) shown = shown.slice(0, 58) + '…';
+              %>
+              <td class="url wrap"><a href="/pagespeed/<%= h.id %>" title="<%= h.url %>"><%= shown %></a></td>
+              <td class="narrow" style="text-transform:capitalize"><%= h.strategy %></td>
+              <td class="wrap"><%= h.brand_name || '—' %></td>
+              <% ['performance','accessibility','best_practices','seo'].forEach(function(k){ var v = h[k]; %>
+                <td class="num">
+                  <% if (v == null) { %>—<% } else { %>
+                    <span class="score-pill <%= v >= 90 ? 'good' : (v >= 50 ? 'average' : 'poor') %>"><%= v %></span>
+                  <% } %>
+                </td>
+              <% }) %>
+              <td class="narrow"><%= fmtDateTime(h.created_at) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>
+
+<script>
+  // Device tabs re-submit the form for that strategy when a URL is present,
+  // and otherwise just switch which strategy the next run will use — the same
+  // behaviour as PSI's own Mobile/Desktop toggle.
+  (function () {
+    var form = document.getElementById('psi-form');
+    var field = document.getElementById('psi-strategy');
+    var urlInput = document.getElementById('psi-url');
+    Array.prototype.forEach.call(document.querySelectorAll('.psi-tab'), function (tab) {
+      tab.addEventListener('click', function () {
+        field.value = tab.dataset.strategy;
+        Array.prototype.forEach.call(document.querySelectorAll('.psi-tab'), function (t) {
+          t.classList.toggle('active', t === tab);
+          t.setAttribute('aria-selected', String(t === tab));
+        });
+        if (urlInput.value.trim()) form.submit();
+      });
+    });
+
+    // A Lighthouse run takes 20-60s. Without a visible pending state the page
+    // looks frozen and people submit again, doubling the quota spend.
+    form.addEventListener('submit', function () {
+      var btn = document.getElementById('psi-submit');
+      btn.classList.add('is-loading');
+      btn.textContent = 'Analyzing';
+    });
+  })();
+</script>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

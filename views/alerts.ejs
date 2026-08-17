@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<% if (!smtpConfigured) { %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body">SMTP is not configured — email alerts are logged to the server console instead of sent. Configure it in Settings to deliver real emails.</div>
+  </div>
+<% } %>
+
+<% if (!brands.length) { %>
+  <div class="notice info">
+    <span class="notice-icon">&#9673;</span>
+    <div class="notice-body">
+      <strong>Add a brand first.</strong> Alerts are configured per brand once it has Search Console or GA4 data.
+      <div style="margin-top:9px"><a class="btn sm" href="/brands">Add a brand</a></div>
+    </div>
+  </div>
+<% } else { %>
+
+  <div class="toolbar">
+    <form method="GET" action="/alerts">
+      <label for="brand" style="margin:0;font-size:12.5px;color:var(--text-2)">Brand</label>
+      <select id="brand" name="brand" onchange="this.form.submit()">
+        <% brands.forEach(function(b){ %>
+          <option value="<%= b.id %>" <%= brand && brand.id === b.id ? 'selected' : '' %>><%= b.name %></option>
+        <% }) %>
+      </select>
+      <noscript><button type="submit" class="btn secondary sm">Apply</button></noscript>
+    </form>
+    <div class="spacer"></div>
+    <% if (brand) { %>
+      <span style="font-size:12px;color:var(--text-3)"><%= counts.enabled %> of <%= counts.total %> alerts on</span>
+    <% } %>
+  </div>
+
+  <% if (brand) { %>
+    <div class="card">
+      <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <form method="POST" action="/alerts/apply-defaults">
+          <input type="hidden" name="brand_id" value="<%= brand.id %>">
+          <button type="submit" class="btn secondary sm">Apply recommended defaults</button>
+        </form>
+        <form method="POST" action="/alerts/enable-all">
+          <input type="hidden" name="brand_id" value="<%= brand.id %>">
+          <button type="submit" class="btn ghost sm">Enable all available</button>
+        </form>
+        <form method="POST" action="/alerts/disable-all">
+          <input type="hidden" name="brand_id" value="<%= brand.id %>">
+          <button type="submit" class="btn ghost sm">Disable all</button>
+        </form>
+        <form method="POST" action="/alerts/run-now">
+          <input type="hidden" name="brand_id" value="<%= brand.id %>">
+          <button type="submit" class="btn sm">Check now</button>
+        </form>
+        <div class="spacer"></div>
+        <details class="plain" style="position:relative">
+          <summary>Send a test notification</summary>
+          <form method="POST" action="/alerts/test-notification" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input type="hidden" name="brand_id" value="<%= brand.id %>">
+            <select name="channel" style="width:auto">
+              <% catalogMeta.channels.forEach(function(c){ %><option value="<%= c.value %>"><%= c.label %></option><% }) %>
+            </select>
+            <input type="text" name="recipients" placeholder="recipient (email/webhook)" value="<%= brand.notify_email || '' %>" style="width:220px">
+            <button type="submit" class="btn secondary sm">Send test</button>
+          </form>
+        </details>
+      </div>
+    </div>
+
+    <% groups.forEach(function(g){ %>
+      <div class="card">
+        <div class="card-head"><h3><%= g.group %></h3></div>
+        <div class="card-body" style="padding:0;display:flex;flex-direction:column;gap:8px">
+          <% g.items.forEach(function(it){ %>
+            <details class="alert-item <%= it.enabled ? 'on' : '' %> <%= it.available ? '' : 'unavailable' %>" id="alert-<%= it.def.key %>">
+              <summary class="alert-head">
+                <div class="ah-main">
+                  <div class="ah-title">
+                    <span class="dot-sev <%= it.severity %>"></span>
+                    <%= it.def.label %>
+                    <% if (!it.available) { %><span class="badge neutral">needs <%= it.def.requires %> data</span><% } %>
+                    <% if (it.firedCount) { %><span class="badge accent"><%= it.firedCount %> fired</span><% } %>
+                  </div>
+                  <div class="ah-desc"><%= it.def.description %></div>
+                </div>
+                <div class="ah-right">
+                  <form method="POST" action="/alerts/toggle" onclick="event.stopPropagation()">
+                    <input type="hidden" name="brand_id" value="<%= brand.id %>">
+                    <input type="hidden" name="alert_key" value="<%= it.def.key %>">
+                    <label class="switch" onclick="event.stopPropagation()">
+                      <input type="checkbox" <%= it.enabled ? 'checked' : '' %> <%= it.available ? '' : 'disabled' %> onchange="this.form.submit()">
+                      <span class="slider"></span>
+                    </label>
+                  </form>
+                </div>
+              </summary>
+              <div class="alert-body">
+                <form method="POST" action="/alerts/save">
+                  <input type="hidden" name="brand_id" value="<%= brand.id %>">
+                  <input type="hidden" name="alert_key" value="<%= it.def.key %>">
+                  <input type="hidden" name="enabled" value="<%= it.enabled ? 'on' : '' %>">
+
+                  <% if ((it.def.params || []).length) { %>
+                    <div class="field-row">
+                      <% it.def.params.forEach(function(p){ %>
+                        <div class="field">
+                          <label for="p_<%= it.def.key %>_<%= p.key %>"><%= p.label %><%= p.unit ? ` (${p.unit})` : '' %></label>
+                          <% if (p.type === 'select') { %>
+                            <select id="p_<%= it.def.key %>_<%= p.key %>" name="param_<%= p.key %>">
+                              <% (p.options || []).forEach(function(o){ %>
+                                <option value="<%= o.value %>" <%= String(it.values[p.key]) === String(o.value) ? 'selected' : '' %>><%= o.label %></option>
+                              <% }) %>
+                            </select>
+                          <% } else { %>
+                            <input type="number" id="p_<%= it.def.key %>_<%= p.key %>" name="param_<%= p.key %>"
+                                   value="<%= it.values[p.key] %>" step="<%= p.step || 1 %>">
+                          <% } %>
+                          <% if (p.help) { %><div class="hint"><%= p.help %></div><% } %>
+                        </div>
+                      <% }) %>
+                    </div>
+                  <% } %>
+
+                  <div class="field-row">
+                    <div class="field">
+                      <label for="freq_<%= it.def.key %>">Check frequency</label>
+                      <select id="freq_<%= it.def.key %>" name="frequency">
+                        <% catalogMeta.frequencies.forEach(function(f){ %>
+                          <option value="<%= f.value %>" <%= it.frequency === f.value ? 'selected' : '' %>><%= f.label %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="sev_<%= it.def.key %>">Severity</label>
+                      <select id="sev_<%= it.def.key %>" name="severity">
+                        <% ['critical','high','medium','low','info'].forEach(function(s){ %>
+                          <option value="<%= s %>" <%= it.severity === s ? 'selected' : '' %>><%= s %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="field">
+                    <label>Notify via</label>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap">
+                      <% catalogMeta.channels.forEach(function(c){ %>
+                        <label class="check" style="display:inline-flex;width:auto">
+                          <input type="checkbox" name="channels" value="<%= c.value %>" <%= it.channels.includes(c.value) ? 'checked' : '' %>>
+                          <span><%= c.label %></span>
+                        </label>
+                      <% }) %>
+                    </div>
+                  </div>
+
+                  <div class="field">
+                    <label for="recip_<%= it.def.key %>">Recipients</label>
+                    <input type="text" id="recip_<%= it.def.key %>" name="recipients" value="<%= it.recipients %>" placeholder="you@agency.com, lead@agency.com">
+                  </div>
+
+                  <div class="check">
+                    <input type="checkbox" id="task_<%= it.def.key %>" name="create_task" <%= it.createTask ? 'checked' : '' %>>
+                    <label for="task_<%= it.def.key %>">Create a backlog task automatically when this fires</label>
+                  </div>
+
+                  <div class="btn-row" style="margin-top:10px">
+                    <button type="submit" class="btn secondary sm">Save</button>
+                    <span style="font-size:11.5px;color:var(--text-3)">
+                      <% if (it.lastFired) { %>Last fired <%= fmtDateTime(it.lastFired) %><% } else { %>Never fired<% } %>
+                      <% if (it.lastChecked) { %> · last checked <%= fmtDateTime(it.lastChecked) %><% } %>
+                    </span>
+                  </div>
+                </form>
+              </div>
+            </details>
+          <% }) %>
+        </div>
+      </div>
+    <% }) %>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Recent events</h3>
+        <a class="btn ghost sm" href="/alerts/history?brand=<%= brand.id %>">Full history</a>
+      </div>
+      <% if (!events.length) { %>
+        <div class="card-body"><p style="font-size:13px;color:var(--text-2);margin:0">Nothing has fired yet for this brand.</p></div>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr><th></th><th>Alert</th><th>When</th><th></th></tr></thead>
+            <tbody>
+              <% events.forEach(function(e){ %>
+                <tr>
+                  <td><span class="dot-sev <%= e.severity %>"></span></td>
+                  <td><a href="/alerts/event/<%= e.id %>"><%= e.title %></a></td>
+                  <td><%= fmtDateTime(e.created_at) %></td>
+                  <td><% if (!e.acknowledged_at) { %><span class="badge accent">new</span><% } %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  <% } %>
+<% } %>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

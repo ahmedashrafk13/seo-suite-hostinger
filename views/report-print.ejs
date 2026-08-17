@@ -1,0 +1,323 @@
+<%
+function pct(v) { return v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`; }
+function n(v) { return Math.round(Number(v) || 0).toLocaleString('en-US'); }
+function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
+%>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= row.brand_name %> · <%= d.period.startDate %> weekly report</title>
+<style>
+  :root {
+    /* Matches public/css/style.css :root tokens so printed reports share the
+       app's brand palette instead of a drifted one-off set. */
+    --text: #0f172a; --text-2: #475569; --border: #e5e9f0;
+    --accent: #2563eb; --accent-hover: #1d4ed8;
+    --critical: #dc2626; --critical-soft: #fef2f2;
+    --high: #ea580c; --high-soft: #fff7ed;
+    --medium: #7d5900; --medium-soft: #fefce8;
+    --low: #2563eb; --low-soft: #eff6ff;
+    --good: #059669; --good-soft: #ecfdf5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text); max-width: 860px; margin: 0 auto; padding: 32px 24px 60px;
+    font-size: 14px; line-height: 1.55; background: #fff;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 28px 0 10px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .sub { color: var(--text-2); font-size: 13px; }
+  .print-bar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 18px; }
+  .print-bar button {
+    font: inherit; font-weight: 600; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--accent);
+    background: var(--accent); color: #fff; cursor: pointer;
+    transition: background .16s, border-color .16s, box-shadow .16s;
+  }
+  .print-bar button:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .print-bar button:active { transform: translateY(1px); }
+  .print-bar button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, .22); }
+  ul.headline { margin: 0; padding-left: 18px; }
+  ul.headline li { margin-bottom: 4px; }
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); margin: 12px 0; }
+  .stat { background: #fff; padding: 12px 14px; }
+  .stat .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); }
+  .stat .value { font-size: 20px; font-weight: 650; margin: 3px 0; }
+  .stat .meta { font-size: 11.5px; color: var(--text-2); }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 10px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-2); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid; }
+  .badge.critical { background: var(--critical-soft); color: var(--critical); border-color: #f6d4d5; }
+  .badge.high { background: var(--high-soft); color: var(--high); border-color: #f8ddc7; }
+  .badge.medium { background: var(--medium-soft); color: var(--medium); border-color: #f4e7bd; }
+  .badge.low { background: var(--low-soft); color: var(--low); border-color: #cfe3f8; }
+  .badge.good { background: var(--good-soft); color: var(--good); border-color: #c7e8d6; }
+  @media print {
+    .print-bar { display: none; }
+    body { padding: 0; max-width: none; }
+    h2 { break-after: avoid; }
+    table { break-inside: auto; }
+    tr { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+  <div class="print-bar"><button onclick="window.print()">Print / Save as PDF</button></div>
+
+  <h1><%= row.brand_name %> — Weekly SEO Report</h1>
+  <div class="sub"><%= d.period.startDate %> &rarr; <%= d.period.endDate %> &middot; generated <%= new Date(d.generatedAt).toISOString().slice(0, 16).replace('T', ' ') %> &middot; <%= row.site_url %></div>
+
+  <h2>Summary</h2>
+  <% if (d.headline && d.headline.length) { %>
+    <ul class="headline"><% d.headline.forEach(function(h){ %><li><%= h %></li><% }) %></ul>
+  <% } else { %>
+    <p>No summary available for this period.</p>
+  <% } %>
+
+  <h2>Search performance</h2>
+  <div class="stat-row">
+    <div class="stat"><div class="label">Clicks</div><div class="value"><%= n(d.search.clicks.recent) %></div><div class="meta"><%= pct(d.search.clicks.pct) %> vs prior week</div></div>
+    <div class="stat"><div class="label">Impressions</div><div class="value"><%= n(d.search.impressions.recent) %></div><div class="meta"><%= pct(d.search.impressions.pct) %> vs prior week</div></div>
+    <div class="stat"><div class="label">CTR</div><div class="value"><%= d.search.ctr.recent.toFixed(2) %>%</div><div class="meta"><%= pct(d.search.ctr.pct) %> vs prior week</div></div>
+    <div class="stat"><div class="label">Avg position</div><div class="value"><%= pos(d.search.position.recent) %></div><div class="meta"><%= d.search.position.improved ? 'improved' : 'worsened' %> vs prior week</div></div>
+  </div>
+
+  <% if (d.analytics.hasData) { %>
+  <h2>Conversions (GA4)</h2>
+  <div class="stat-row">
+    <div class="stat"><div class="label">Sessions</div><div class="value"><%= n(d.analytics.sessions.recent) %></div><div class="meta"><%= pct(d.analytics.sessions.pct) %> vs prior week</div></div>
+    <div class="stat"><div class="label">Conversions</div><div class="value"><%= n(d.analytics.conversions.recent) %></div><div class="meta"><%= pct(d.analytics.conversions.pct) %> vs prior week</div></div>
+    <div class="stat"><div class="label">Conv. rate</div><div class="value"><%= d.analytics.convRate.recent.toFixed(2) %>%</div><div class="meta"><%= pct(d.analytics.convRate.pct) %> vs prior week</div></div>
+    <div class="stat"><div class="label">Engagement rate</div><div class="value"><%= d.analytics.engagementRate.recent.toFixed(1) %>%</div><div class="meta"><%= pct(d.analytics.engagementRate.pct) %> vs prior week</div></div>
+  </div>
+  <% } %>
+
+  <% var gain = d.keywords.useImpressionFallback ? d.keywords.impressionGainers : d.keywords.gainers; %>
+  <% if (gain.length) { %>
+  <h2>Top gaining keywords</h2>
+  <table>
+    <thead><tr><th>Query</th><th class="num"><%= d.keywords.useImpressionFallback ? 'Impressions +' : 'Clicks +' %></th><th class="num">Position</th></tr></thead>
+    <tbody><% gain.forEach(function(q){ %><tr><td><%= q.entity %></td><td class="num"><%= n(d.keywords.useImpressionFallback ? q.impressionDelta : q.clickDelta) %></td><td class="num"><%= pos(q.recentPosition) %></td></tr><% }) %></tbody>
+  </table>
+  <% } %>
+
+  <% var decl = d.keywords.useImpressionFallback ? d.keywords.impressionDecliners : d.keywords.decliners; %>
+  <% if (decl.length) { %>
+  <h2>Top declining keywords</h2>
+  <table>
+    <thead><tr><th>Query</th><th class="num"><%= d.keywords.useImpressionFallback ? 'Impressions' : 'Clicks' %></th><th class="num">Position</th></tr></thead>
+    <tbody><% decl.forEach(function(q){ %><tr><td><%= q.entity %></td><td class="num"><%= n(d.keywords.useImpressionFallback ? q.impressionDelta : q.clickDelta) %></td><td class="num"><%= pos(q.recentPosition) %></td></tr><% }) %></tbody>
+  </table>
+  <% } %>
+
+  <% if (d.pages.topLanding.length) { %>
+  <h2>Top landing pages</h2>
+  <table>
+    <thead><tr><th>Page</th><th class="num">Clicks</th><th class="num">Impressions</th><th class="num">Position</th></tr></thead>
+    <tbody><% d.pages.topLanding.forEach(function(pg){ %><tr><td><%= pg.entity %></td><td class="num"><%= n(pg.recentClicks) %></td><td class="num"><%= n(pg.recentImpressions) %></td><td class="num"><%= pos(pg.recentPosition) %></td></tr><% }) %></tbody>
+  </table>
+  <% } %>
+
+  <% if (d.technical) { %>
+  <h2>Technical health</h2>
+  <p><span class="badge <%= d.technical.health >= 90 ? 'good' : (d.technical.health >= 70 ? 'medium' : 'critical') %>"><%= d.technical.health %>/100</span>
+    &nbsp; <%= n(d.technical.pagesCrawled) %> pages crawled</p>
+  <% if (d.technical.top.length) { %>
+  <table>
+    <thead><tr><th>Issue</th><th>Severity</th><th class="num">Affected</th></tr></thead>
+    <tbody><% d.technical.top.forEach(function(t){ %><tr><td><%= t.issue %></td><td><span class="badge <%= t.severity %>"><%= t.severity %></span></td><td class="num"><%= n(t.failed) %> <%= t.unit %></td></tr><% }) %></tbody>
+  </table>
+  <% } %>
+  <% } %>
+
+  <% if (d.linking) { %>
+  <h2>Internal linking</h2>
+  <p>Orphan pages: <strong><%= d.linking.orphanPages == null ? '—' : d.linking.orphanPages %></strong> &middot;
+     Under-linked: <strong><%= d.linking.underlinkedPages == null ? '—' : d.linking.underlinkedPages %></strong> &middot;
+     Cannibalisation pairs: <strong><%= d.linking.cannibalizationPairs == null ? '—' : d.linking.cannibalizationPairs %></strong></p>
+  <% } %>
+
+  <% if (d.work.completed.length || d.work.nextActions.length) { %>
+  <h2>Work completed &amp; next actions</h2>
+  <p><%= d.work.completed.length %> task<%= d.work.completed.length === 1 ? '' : 's' %> completed this week.
+    <% if (d.work.awaitingApproval.length) { %><%= d.work.awaitingApproval.length %> awaiting approval.<% } %></p>
+  <% if (d.work.nextActions.length) { %>
+  <table>
+    <thead><tr><th>Task</th><th>Severity</th><th>Source</th></tr></thead>
+    <tbody><% d.work.nextActions.slice(0, 12).forEach(function(t){ %><tr><td><%= t.title %></td><td><span class="badge <%= t.severity %>"><%= t.severity %></span></td><td><%= t.source %></td></tr><% }) %></tbody>
+  </table>
+  <% } %>
+  <% } %>
+
+  <% if (d.full) { %>
+    <%
+    var F = d.full;
+    function esc(s) { return String(s == null ? '' : s).replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }); }
+    function pctOf(v) { return ((Number(v) || 0) * 100).toFixed(2) + '%'; }
+    function mins(v) { var s = Math.round(Number(v) || 0); return s >= 60 ? (Math.floor(s / 60) + 'm ' + (s % 60) + 's') : (s + 's'); }
+    function gscBlock(title, rows, head) {
+      if (!rows || !rows.length) return '';
+      return '<h2>' + esc(title) + '</h2><table><thead><tr><th>' + esc(head) +
+        '</th><th class="num">Clicks</th><th class="num">Impressions</th><th class="num">CTR</th><th class="num">Position</th></tr></thead><tbody>' +
+        rows.map(function (r) {
+          return '<tr><td>' + esc(r.entity) + '</td><td class="num">' + n(r.clicks) + '</td><td class="num">' + n(r.impressions) +
+            '</td><td class="num">' + pctOf(r.ctr) + '</td><td class="num">' + pos(r.position) + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+    %>
+
+    <h2 style="page-break-before: always">Appendix — full Search Console &amp; GA4 data</h2>
+    <p class="sub">Everything synced for <%= d.period.startDate %> &rarr; <%= d.period.endDate %>. Long lists are capped;
+      the Excel export carries the same rows.</p>
+
+    <table>
+      <thead><tr><th>Search Console total</th><th class="num">Clicks</th><th class="num">Impressions</th><th class="num">CTR</th><th class="num">Position</th></tr></thead>
+      <tbody><tr><td>Week</td><td class="num"><%= n(F.gsc.totals.clicks) %></td><td class="num"><%= n(F.gsc.totals.impressions) %></td>
+        <td class="num"><%= (F.gsc.totals.ctr * 100).toFixed(2) %>%</td><td class="num"><%= pos(F.gsc.totals.position) %></td></tr></tbody>
+    </table>
+
+    <%- gscBlock('Queries', F.gsc.queries, 'Query') %>
+    <%- gscBlock('Pages', F.gsc.pages, 'Page') %>
+    <%- gscBlock('Countries', F.gsc.countries, 'Country') %>
+    <%- gscBlock('Devices', F.gsc.devices, 'Device') %>
+    <%- gscBlock('Search appearance', F.gsc.appearance, 'Search appearance') %>
+
+    <% if (F.gsc.queryPage.length) { %>
+    <h2>Query &rarr; page</h2>
+    <table>
+      <thead><tr><th>Query</th><th>Ranking URL</th><th class="num">Clicks</th><th class="num">Impressions</th><th class="num">Position</th></tr></thead>
+      <tbody><% F.gsc.queryPage.forEach(function(r){ %>
+        <tr><td><%= r.query %></td><td><%= r.page %></td><td class="num"><%= n(r.clicks) %></td>
+          <td class="num"><%= n(r.impressions) %></td><td class="num"><%= pos(r.position) %></td></tr>
+      <% }) %></tbody>
+    </table>
+    <% } %>
+
+    <% if (F.gsc.sitemaps.length) { %>
+    <h2>Sitemaps</h2>
+    <table>
+      <thead><tr><th>Sitemap</th><th class="num">Submitted</th><th class="num">Indexed</th><th class="num">Warnings</th><th class="num">Errors</th></tr></thead>
+      <tbody><% F.gsc.sitemaps.forEach(function(s){ %>
+        <tr><td><%= s.path %></td><td class="num"><%= s.submitted_count == null ? '—' : n(s.submitted_count) %></td>
+          <td class="num"><%= s.indexed_count == null ? '—' : n(s.indexed_count) %></td>
+          <td class="num"><%= s.warnings %></td><td class="num"><%= s.errors %></td></tr>
+      <% }) %></tbody>
+    </table>
+    <% } %>
+
+    <% if (F.gsc.indexing.totals.total) { %>
+    <h2>Page indexing (sampled)</h2>
+    <p><%= n(F.gsc.indexing.totals.indexed) %> indexed &middot; <%= n(F.gsc.indexing.totals.notIndexed) %> not indexed of
+      <%= n(F.gsc.indexing.totals.total) %> pages checked.</p>
+    <table>
+      <thead><tr><th>URL</th><th>Verdict</th><th>Coverage state</th></tr></thead>
+      <tbody><% F.gsc.indexing.rows.forEach(function(r){ %>
+        <tr><td><%= r.url %></td><td><%= r.error ? 'error' : (r.verdict || 'unknown') %></td><td><%= r.error || r.coverage_state || '—' %></td></tr>
+      <% }) %></tbody>
+    </table>
+    <% } %>
+
+    <% if (F.ga4.channels.length) { %>
+    <h2>GA4 — channels</h2>
+    <table>
+      <thead><tr><th>Channel</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Engagement</th>
+        <th class="num">Bounce</th><th class="num">Avg duration</th><th class="num">Conversions</th></tr></thead>
+      <tbody><% F.ga4.channels.forEach(function(c){ %>
+        <tr><td><%= c.channel %></td><td class="num"><%= n(c.sessions) %></td><td class="num"><%= n(c.users) %></td>
+          <td class="num"><%= (c.sessions > 0 ? (c.engaged_sessions / c.sessions) * 100 : 0).toFixed(1) %>%</td>
+          <td class="num"><%= ((c.bounce_rate || 0) * 100).toFixed(1) %>%</td>
+          <td class="num"><%= mins(c.avg_duration) %></td>
+          <td class="num"><%= n(c.conversions) %></td></tr>
+      <% }) %></tbody>
+    </table>
+    <% } %>
+
+    <% if (F.ga4.landingPages.length) { %>
+    <h2>GA4 — organic landing pages</h2>
+    <table>
+      <thead><tr><th>Landing page</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
+      <tbody><% F.ga4.landingPages.forEach(function(r){ %>
+        <tr><td><%= r.page_path %></td><td class="num"><%= n(r.sessions) %></td><td class="num"><%= n(r.users) %></td><td class="num"><%= n(r.conversions) %></td></tr>
+      <% }) %></tbody>
+    </table>
+    <% } %>
+
+    <% if (F.ga4.acquisition.length) { %>
+    <h2>GA4 — source / medium</h2>
+    <table>
+      <thead><tr><th>Source / medium</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">New users</th><th class="num">Conversions</th></tr></thead>
+      <tbody><% F.ga4.acquisition.forEach(function(r){ %>
+        <tr><td><%= r.source %> / <%= r.medium %></td><td class="num"><%= n(r.sessions) %></td><td class="num"><%= n(r.users) %></td>
+          <td class="num"><%= n(r.new_users) %></td><td class="num"><%= n(r.conversions) %></td></tr>
+      <% }) %></tbody>
+    </table>
+    <% } %>
+
+    <% if (F.ga4.countries.length) { %>
+    <h2>GA4 — countries</h2>
+    <table>
+      <thead><tr><th>Country</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
+      <tbody><% F.ga4.countries.forEach(function(r){ %>
+        <tr><td><%= r.country %></td><td class="num"><%= n(r.sessions) %></td><td class="num"><%= n(r.users) %></td><td class="num"><%= n(r.conversions) %></td></tr>
+      <% }) %></tbody>
+    </table>
+    <% } %>
+
+    <% if (F.ga4.cities.length) { %>
+    <h2>GA4 — cities</h2>
+    <table>
+      <thead><tr><th>City</th><th>Country</th><th class="num">Sessions</th><th class="num">Users</th></tr></thead>
+      <tbody><% F.ga4.cities.forEach(function(r){ %>
+        <tr><td><%= r.city %></td><td><%= r.country %></td><td class="num"><%= n(r.sessions) %></td><td class="num"><%= n(r.users) %></td></tr>
+      <% }) %></tbody>
+    </table>
+    <% } %>
+
+    <% if (F.ga4.devices.length || F.ga4.browsers.length) { %>
+    <h2>GA4 — devices &amp; browsers</h2>
+    <table>
+      <thead><tr><th>Segment</th><th>Value</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
+      <tbody>
+        <% F.ga4.devices.forEach(function(r){ %>
+          <tr><td>Device</td><td><%= r.device_category %></td><td class="num"><%= n(r.sessions) %></td><td class="num"><%= n(r.users) %></td><td class="num"><%= n(r.conversions) %></td></tr>
+        <% }) %>
+        <% F.ga4.browsers.forEach(function(r){ %>
+          <tr><td>Browser</td><td><%= r.browser %></td><td class="num"><%= n(r.sessions) %></td><td class="num"><%= n(r.users) %></td><td class="num"><%= n(r.conversions) %></td></tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+
+    <% if (F.ga4.events.length) { %>
+    <h2>GA4 — events</h2>
+    <table>
+      <thead><tr><th>Event name</th><th class="num">Count</th><th class="num">Users</th><th class="num">Value</th></tr></thead>
+      <tbody><% F.ga4.events.forEach(function(r){ %>
+        <tr><td><%= r.event_name %></td><td class="num"><%= n(r.event_count) %></td><td class="num"><%= n(r.total_users) %></td><td class="num"><%= n(r.event_value) %></td></tr>
+      <% }) %></tbody>
+    </table>
+    <% } %>
+
+    <% if (F.site.psi.length) { %>
+    <h2>Core Web Vitals</h2>
+    <table>
+      <thead><tr><th>Measured</th><th>Device</th><th class="num">Score</th><th class="num">LCP</th><th class="num">INP</th>
+        <th class="num">CLS</th><th class="num">FCP</th><th class="num">TTFB</th></tr></thead>
+      <tbody><% F.site.psi.forEach(function(p){ %>
+        <tr><td><%= String(p.captured_at).slice(0, 16).replace('T', ' ') %></td><td><%= p.strategy %></td>
+          <td class="num"><%= p.perf_score == null ? '—' : p.perf_score %></td>
+          <td class="num"><%= p.lcp == null ? '—' : n(p.lcp) + 'ms' %></td>
+          <td class="num"><%= p.inp == null ? '—' : n(p.inp) + 'ms' %></td>
+          <td class="num"><%= p.cls == null ? '—' : Number(p.cls).toFixed(3) %></td>
+          <td class="num"><%= p.fcp == null ? '—' : n(p.fcp) + 'ms' %></td>
+          <td class="num"><%= p.ttfb == null ? '—' : n(p.ttfb) + 'ms' %></td></tr>
+      <% }) %></tbody>
+    </table>
+    <% } %>
+  <% } %>
+</body>
+</html>

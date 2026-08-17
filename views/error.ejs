@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<% if (currentUser) { %><%- include('partials/sidebar') %><% } else { %><main class="main"><% } %>
+  <div class="topbar"><h1><%= title %></h1></div>
+  <div class="content narrow">
+    <div class="card">
+      <div class="card-body">
+        <div class="empty">
+          <div class="empty-icon">&#9888;</div>
+          <h3><%= title %></h3>
+          <p><%= message %></p>
+          <a class="btn secondary" href="<%= currentUser ? '/dashboard' : '/login' %>">
+            <%= currentUser ? 'Back to dashboard' : 'Go to sign in' %>
+          </a>
+        </div>
+        <% if (typeof stack !== 'undefined' && stack) { %>
+          <details class="plain" style="margin-top:16px">
+            <summary>Technical detail</summary>
+            <pre class="pre"><%= stack %></pre>
+          </details>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+<%- include('partials/foot') %>

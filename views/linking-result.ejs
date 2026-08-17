@@ -1,0 +1,184 @@
+<%
+function qs(overrides) {
+  var params = Object.assign({}, query, overrides || {});
+  var out = [];
+  Object.keys(params).forEach(function (k) {
+    var v = params[k];
+    if (v === null || v === undefined || v === '') return;
+    out.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
+  });
+  return out.join('&');
+}
+function fmtCell(row, col) {
+  var v = row[col.key];
+  if (v === undefined || v === null || v === '') return '—';
+  return v;
+}
+%>
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+    <div class="btn-row" style="margin-bottom:12px">
+      <a class="btn secondary sm" href="/linking">&larr; All linking runs</a>
+      <div class="spacer"></div>
+      <% if (inv.docxName) { %><a class="btn secondary sm" href="/linking/<%= run.id %>/report">Download .docx report</a><% } %>
+      <form method="POST" action="/linking/<%= run.id %>/create-tasks" style="display:inline">
+        <button type="submit" class="btn sm">Create tasks from findings</button>
+      </form>
+      <form method="POST" action="/linking/<%= run.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this linking run? This cannot be undone.')">
+        <button type="submit" class="btn danger-ghost sm">Delete</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><%= run.site_url %></h2>
+        <span class="sub"><%= run.brand_name || 'No brand' %> &middot; started <%= fmtDateTime(run.created_at) %><% if (run.used_gsc) { %> &middot; used Search Console data<% } %></span>
+      </div>
+      <div class="card-body">
+        <p style="margin:0 0 6px"><span class="badge <%= statusBadge(run.status) %>"><%= run.status %></span></p>
+
+        <% if (run.status === 'error' && run.error) { %>
+          <div class="notice error"><span class="notice-icon">&#9888;</span><div class="notice-body"><%= run.error %></div></div>
+        <% } %>
+
+        <% if (isRunning) { %>
+          <div class="notice info">
+            <span class="notice-icon">&#8987;</span>
+            <div class="notice-body">
+              <div>Crawl in progress&hellip; this page refreshes automatically.</div>
+              <div id="progress-lines" class="hint"></div>
+            </div>
+          </div>
+          <script>
+            (function poll() {
+              fetch('/linking/<%= run.id %>/status').then(function (r) { return r.json(); }).then(function (d) {
+                if (d.status && d.status !== 'running') { window.location.reload(); return; }
+                var el = document.getElementById('progress-lines');
+                if (el && d.progress) el.textContent = d.progress.join(' · ');
+                setTimeout(poll, 4000);
+              }).catch(function () { setTimeout(poll, 6000); });
+            })();
+          </script>
+        <% } %>
+
+        <% if (result && result.summary) { %>
+          <div class="grid cols-4">
+            <div class="stat"><span class="value"><%= fmtInt(result.summary.pages_crawled) %></span><span class="label">Pages crawled</span></div>
+            <div class="stat"><span class="value"><%= fmtInt(result.summary.recommendations_total) %></span><span class="label">Recommendations</span></div>
+            <div class="stat"><span class="value"><%= fmtInt(result.summary.orphan_pages) %></span><span class="label">Orphan pages</span></div>
+            <div class="stat"><span class="value"><%= fmtInt(result.summary.cannibalization_pairs) %></span><span class="label">Cannibalization pairs</span></div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (!inv.exists || !inv.files.length) { %>
+      <div class="card"><div class="card-body">
+        <div class="empty-state"><div class="icon">&#8646;</div><%= isRunning ? 'Results will appear here once the crawl finishes.' : 'No CSV output is available for this run.' %></div>
+      </div></div>
+    <% } else { %>
+      <div class="card">
+        <div class="tabs">
+          <% inv.files.forEach(function(f){ %>
+            <a class="tab <%= tabKey === f.key ? 'active' : '' %>" href="?<%= qs({ tab: f.key, page: 1 }) %>">
+              <%= f.label %> <span class="count"><%= f.rowCount %></span>
+            </a>
+          <% }) %>
+        </div>
+
+        <div class="card-body">
+          <% var activeDef = inv.files.find(function(f){ return f.key === tabKey; }); %>
+          <% if (activeDef && activeDef.description) { %><p class="hint" style="margin-top:0"><%= activeDef.description %></p><% } %>
+
+          <form method="GET" action="/linking/<%= run.id %>" style="margin-bottom:12px">
+            <input type="hidden" name="tab" value="<%= tabKey %>">
+            <div class="form-row">
+              <div>
+                <label for="q">Search</label>
+                <input type="text" id="q" name="q" value="<%= query.q || '' %>" placeholder="Search this table">
+              </div>
+            </div>
+            <button class="btn secondary sm" type="submit">Filter</button>
+            <% if (query.q) { %><a class="btn ghost sm" href="?<%= qs({ q: '', page: 1 }) %>">Clear</a><% } %>
+          </form>
+
+          <% if (!table) { %>
+            <div class="empty-state">This tab has no data.</div>
+          <% } else if (table.tooLarge) { %>
+            <div class="notice warn"><span class="notice-icon">&#9888;</span><div class="notice-body">This file is too large to display in the browser. Download it directly instead.</div></div>
+            <a class="btn secondary sm" href="/linking/<%= run.id %>/download/<%= table.def.file %>">Download <%= table.def.file %></a>
+          <% } else { %>
+            <div class="table-wrap"><table class="data">
+              <thead>
+                <tr>
+                  <% table.def.columns.forEach(function(col){ %>
+                    <th class="<%= col.number ? 'num' : '' %> <%= col.width === 'narrow' ? 'narrow' : '' %>">
+                      <a href="?<%= qs({ sort: col.key, dir: (table.sort === col.key && table.dir === 'asc') ? 'desc' : 'asc', page: 1 }) %>">
+                        <%= col.label %><% if (table.sort === col.key) { %> <%= table.dir === 'asc' ? '&#9650;' : '&#9660;' %><% } %>
+                      </a>
+                    </th>
+                  <% }) %>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!table.rows.length) { %>
+                  <tr><td colspan="<%= table.def.columns.length %>"><div class="empty-state">No rows match this filter.</div></td></tr>
+                <% } %>
+                <% table.rows.forEach(function(row){ %>
+                  <tr>
+                    <% table.def.columns.forEach(function(col){ %>
+                      <% var val = fmtCell(row, col); %>
+                      <td class="<%= col.number != null ? 'num' : '' %> <%= col.wide ? 'wide' : '' %> <%= col.url ? 'url' : '' %> <%= col.emphasis ? 'emphasis' : '' %> <%= col.width === 'narrow' ? 'narrow' : '' %>">
+                        <% if (col.url && val !== '—') { %>
+                          <a href="<%= val %>" target="_blank" rel="noopener"><%= shortUrl(val, 70) %></a>
+                        <% } else if (col.badge && val !== '—') { %>
+                          <span class="badge <%= String(val).toLowerCase() %>"><%= val %></span>
+                        <% } else { %>
+                          <%= val %>
+                        <% } %>
+                      </td>
+                    <% }) %>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table></div>
+
+            <div class="pagination">
+              <% if (table.page > 1) { %><a href="?<%= qs({ page: table.page - 1 }) %>">&larr; Prev</a><% } %>
+              <span>Page <%= table.page %> of <%= table.pages %> &middot; <%= fmtInt(table.total) %> rows</span>
+              <% if (table.page < table.pages) { %><a href="?<%= qs({ page: table.page + 1 }) %>">Next &rarr;</a><% } %>
+              <a class="btn ghost xs" href="/linking/<%= run.id %>/download/<%= table.def.file %>">Download <%= table.def.file %></a>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="card">
+      <div class="card-head"><h3>Tasks from this run</h3></div>
+      <% if (!relatedTasks.length) { %>
+        <div class="card-body"><div class="empty-state">No tasks created from this run yet.</div></div>
+      <% } else { %>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Title</th><th>Severity</th><th>Status</th><th>Assignee</th></tr></thead>
+          <tbody>
+          <% relatedTasks.forEach(function(t){ %>
+            <tr>
+              <td><a href="/tasks/<%= t.id %>"><%= t.title %></a></td>
+              <td><span class="badge <%= t.severity %>"><%= t.severity %></span></td>
+              <td><%= String(t.status).replace('_',' ') %></td>
+              <td><%= t.assignee || '—' %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+      <% } %>
+    </div>
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

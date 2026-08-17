@@ -1,0 +1,123 @@
+<%
+var STATUS_BADGE = { automated: 'good', assisted: 'accent', manual: 'medium', policy_manual: 'neutral' };
+var VALUE_BADGE = { high: 'good', medium: 'medium', low: 'neutral' };
+%>
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<div class="toolbar">
+  <div class="spacer"></div>
+  <a class="btn secondary sm" href="/workflow/export.md">Download Markdown export</a>
+</div>
+
+<div class="stat-row">
+  <div class="stat">
+    <div class="label">Processes mapped</div>
+    <div class="value"><%= summary.totalTasks %></div>
+  </div>
+  <div class="stat">
+    <div class="label">Fully automated</div>
+    <div class="value"><%= summary.automated %></div>
+  </div>
+  <div class="stat">
+    <div class="label">Assisted</div>
+    <div class="value"><%= summary.assisted %></div>
+    <div class="meta">automated analysis, human decision</div>
+  </div>
+  <div class="stat">
+    <div class="label">Still manual</div>
+    <div class="value"><%= summary.manual %></div>
+  </div>
+  <div class="stat">
+    <div class="label">Effort removed</div>
+    <div class="value">~<%= summary.hoursSavedPerMonthPerBrand %>h</div>
+    <div class="meta">per month, per brand &middot; of ~<%= summary.estimatedManualHoursPerMonthPerBrand %>h manual baseline</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>Current process map</h2>
+    <span class="sub"><%= tasks.length %> processes</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    <% tasks.forEach(function(t){ %>
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">
+          <h3 style="margin:0;font-size:14.5px"><%= t.task %></h3>
+          <span class="badge <%= STATUS_BADGE[t.status] || 'neutral' %>"><%= t.status.replace('_', ' ') %></span>
+        </div>
+        <p style="color:var(--text-2);font-size:13px;margin:6px 0"><%= t.description %></p>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-2);margin-bottom:6px">
+          <span><strong style="color:var(--text)"><%= frequencies[t.frequency] || t.frequency %></strong></span>
+          <span><%= t.timePerRun %></span>
+          <span><%= t.people.join(', ') %></span>
+          <span><%= t.tools.join(', ') %></span>
+        </div>
+        <% if (t.automatedBy) { %>
+          <div class="notice success" style="margin:8px 0 0;padding:8px 12px">
+            <span class="notice-icon">&#10003;</span>
+            <div class="notice-body"><strong>Automated by:</strong> <%= t.automatedBy %></div>
+          </div>
+        <% } %>
+        <% if (t.backlogNote) { %>
+          <div class="notice warn" style="margin:8px 0 0;padding:8px 12px">
+            <span class="notice-icon">&#9888;</span>
+            <div class="notice-body"><strong>Backlog note:</strong> <%= t.backlogNote %></div>
+          </div>
+        <% } %>
+      </div>
+    <% }) %>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Approval boundary</h2></div>
+  <div class="card-body">
+    <p style="color:var(--text-2);font-size:13px;margin:0 0 10px">
+      The automation identifies, analyses, recommends, reports and creates tasks. These changes remain
+      subject to SEO-team approval, and this is enforced in code — a task touching any of them cannot be
+      marked done until it is explicitly approved.
+    </p>
+    <table class="data compact">
+      <thead><tr><th>Change</th><th>Why it stays manual</th></tr></thead>
+      <tbody>
+        <% approvalBoundary.forEach(function(a){ %>
+          <tr><td><strong><%= a.action %></strong></td><td><%= a.why %></td></tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>Prioritised automation backlog</h2>
+    <span class="sub"><%= summary.backlogDone %> done &middot; <%= summary.backlogNext %> next &middot; <%= summary.backlogLater %> later</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    <% backlog.forEach(function(b){ %>
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">
+          <h3 style="margin:0;font-size:14px">#<%= b.rank %> &middot; <%= b.item %></h3>
+          <div style="display:flex;gap:6px">
+            <span class="badge <%= VALUE_BADGE[b.value] || 'neutral' %>">value: <%= b.value %></span>
+            <span class="badge neutral">effort: <%= b.effort %></span>
+            <span class="badge <%= b.status === 'done' ? 'good' : (b.status === 'next' ? 'accent' : 'neutral') %>"><%= b.status %></span>
+          </div>
+        </div>
+        <p style="color:var(--text-2);font-size:13px;margin:6px 0"><%= b.rationale %></p>
+        <% if (b.delivered) { %><div style="font-size:12.5px"><strong>Delivered:</strong> <%= b.delivered %></div><% } %>
+        <% if (b.blockers) { %><div style="font-size:12.5px;color:var(--text-2)"><strong>Blocked on:</strong> <%= b.blockers %></div><% } %>
+      </div>
+    <% }) %>
+  </div>
+</div>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

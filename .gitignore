@@ -1,0 +1,34 @@
+node_modules/
+
+# Secrets — never commit
+.env
+.env.local
+
+# The SQLite database holds Google OAuth refresh tokens, so the whole data
+# directory stays local (including the -wal/-shm sidecars, which can contain
+# not-yet-checkpointed pages of that same data).
+data/
+
+# Generated artifacts: crawl output, audit documents, linking CSVs, temp files
+reports/
+tmp/
+*.log
+
+# Vendored Python tools (tools/webtechstackdetector, tools/internal-linking-agent):
+# keep their source, exclude anything a local `pip install` or a manual run
+# would create alongside it.
+tools/**/.venv/
+tools/**/__pycache__/
+tools/**/*.pyc
+tools/**/reports/
+tools/**/*.docx
+tools/**/*.rtf
+tools/**/.idea/
+
+# The WebAssembly SQLite engine holds its file lock as a directory next to the
+# database; it is transient state, never source.
+data/*.lock/
+
+# Node ports of the vendored crawlers write their own reports/ when run
+# directly from the command line with no --out.
+tools/node/linking/reports/

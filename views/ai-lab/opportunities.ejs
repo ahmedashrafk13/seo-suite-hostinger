@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+    <div class="toolbar">
+      <a class="btn ghost sm" href="/ai-lab">&larr; AI Lab</a>
+      <div class="spacer"></div>
+      <a class="btn secondary sm" href="/tasks/opportunities/<%= brand.id %>" target="_blank" rel="noopener">View real opportunities page &rarr;</a>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>AI Opportunity Recommendations (Beta) — <%= brand.name %></h3>
+        <form method="POST" action="/ai-lab/<%= brand.id %>/opportunities/generate">
+          <button class="btn sm" type="submit"><%= row ? 'Regenerate (new billed call)' : 'Generate with AI' %></button>
+          <% if (row) { %><input type="hidden" name="force" value="1"><% } %>
+        </form>
+      </div>
+      <div class="card-body">
+        <% if (!findings.length) { %>
+          <div class="empty-state">No opportunities found yet for this brand — nothing to compare.</div>
+        <% } else if (!row) { %>
+          <div class="empty-state">Not generated yet. <%= findings.length %> findings ready to send in a single batched call.</div>
+        <% } else { %>
+          <p class="hint">Generated <%= fmtDateTime(row.created_at) %> · <%= fmtInt(row.prompt_tokens) %> prompt / <%= fmtInt(row.completion_tokens) %> completion tokens · $<%= Number(row.cost_usd).toFixed(4) %></p>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Type</th><th>Page / Query</th><th>Existing recommendation</th><th>AI recommendation</th></tr></thead>
+            <tbody>
+            <% findings.forEach(function(f){ %>
+              <tr>
+                <td><%= f.type %></td>
+                <td><%= f.page || f.query || '—' %></td>
+                <td><%= f.existingRecommendation %></td>
+                <td><%= (row.notes && row.notes[f.id]) || '—' %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+      </div>
+    </div>
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

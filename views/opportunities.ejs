@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Brand</h3>
+      </div>
+      <div class="card-body">
+        <div class="btn-row">
+          <% brands.forEach(function(b){ %>
+            <a class="btn <%= b.id === brand.id ? '' : 'secondary' %> sm" href="/tasks/opportunities/<%= b.id %>"><%= b.name %></a>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="label">Total opportunities</div><div class="value"><%= result.total %></div></div>
+      <% Object.keys(result.counts).forEach(function(k){ %>
+        <div class="stat"><div class="label"><%= k.replace('_',' ') %></div><div class="value"><%= result.counts[k] %></div></div>
+      <% }) %>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Promote to backlog</h3></div>
+      <div class="card-body">
+        <form method="POST" action="/tasks/opportunities/<%= brand.id %>/promote">
+          <div class="form-row">
+            <div>
+              <label>Types to include</label>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <% Object.keys(result.counts).forEach(function(k){ %>
+                  <div class="checkbox-row">
+                    <input type="checkbox" id="type-<%= k %>" name="types" value="<%= k %>" <%= result.counts[k] ? '' : 'disabled' %>>
+                    <label for="type-<%= k %>" style="margin:0"><%= k.replace('_',' ') %> (<%= result.counts[k] %>)</label>
+                  </div>
+                <% }) %>
+              </div>
+              <p class="hint">Leave all unchecked to promote across every type.</p>
+            </div>
+            <div>
+              <label for="limit">Max tasks to create</label>
+              <input type="number" id="limit" name="limit" value="40" min="1" max="100">
+            </div>
+          </div>
+          <button class="btn" type="submit">Promote selected to tasks</button>
+        </form>
+      </div>
+    </div>
+
+    <% if (!result.opportunities.length) { %>
+      <div class="card"><div class="card-body">
+        <div class="empty-state"><div class="icon">&#9650;</div>No opportunities found yet. This needs Search Console data connected and synced for this brand.</div>
+      </div></div>
+    <% } else { %>
+      <% Object.keys(result.groups).forEach(function(type){ var items = result.groups[type]; if (!items.length) return; %>
+        <div class="card">
+          <div class="card-head">
+            <h3><%= items[0].typeLabel %></h3>
+            <span class="sub"><%= items.length %> found</span>
+          </div>
+          <div class="card-body">
+            <div class="table-wrap"><table class="data">
+              <thead><tr><th>Title</th><th>Severity</th><th>Estimated gain</th><th>Score</th><th>Page / Query</th></tr></thead>
+              <tbody>
+              <% items.forEach(function(o){ %>
+                <tr>
+                  <td>
+                    <div><%= o.title %></div>
+                    <div class="hint"><%= o.summary %></div>
+                  </td>
+                  <td><span class="badge <%= o.severity %>"><%= o.severity %></span></td>
+                  <td><%= o.estimatedGain %></td>
+                  <td><%= o.score %></td>
+                  <td><%= o.page || o.query || '—' %></td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table></div>
+          </div>
+        </div>
+      <% }) %>
+    <% } %>
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

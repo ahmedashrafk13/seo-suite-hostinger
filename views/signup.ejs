@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="brand-mark"><span class="dot"></span> SEO Automation Suite</div>
+    <p class="sub">
+      <% if (inviteCode) { %>Join your team.<% } else { %>Create your workspace.<% } %>
+    </p>
+
+    <% if (error) { %>
+      <div class="notice error"><span class="notice-icon">&#9888;</span><div class="notice-body"><%= error %></div></div>
+    <% } %>
+
+    <% if (inviteCode) { %>
+      <div class="notice info">
+        <span class="notice-icon">&#9673;</span>
+        <div class="notice-body">
+          You are joining an existing team. A team admin has to approve your account before you can see any data.
+        </div>
+      </div>
+    <% } %>
+
+    <form method="POST" action="/signup">
+      <div class="field">
+        <label for="name">Your name</label>
+        <input type="text" id="name" name="name" autocomplete="name">
+      </div>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password">
+        <div class="hint">At least 8 characters.</div>
+      </div>
+      <div class="field">
+        <label for="invite_code">Invite code <%= requiresInvite ? '' : '(optional)' %></label>
+        <input type="text" id="invite_code" name="invite_code" value="<%= inviteCode %>"
+               <%= requiresInvite ? 'required' : '' %> placeholder="e.g. team-1a2b3c"
+               style="font-family:var(--mono)">
+        <div class="hint">
+          <% if (requiresInvite) { %>
+            Ask your team admin for the code — it is on their Team page.
+          <% } else { %>
+            Have one from your team admin? Enter it to join their workspace. Leave blank to start your own.
+          <% } %>
+        </div>
+      </div>
+      <button type="submit" class="btn block">Create account</button>
+    </form>
+
+    <div class="auth-foot">Already have an account? <a href="/login">Sign in</a></div>
+  </div>
+</div>
+<%- include('partials/foot') %>

@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+    <div class="toolbar">
+      <a class="btn ghost sm" href="/keywords/briefs">&larr; All briefs</a>
+      <div class="spacer"></div>
+      <form method="POST" action="/keywords/brief/<%= row.id %>/delete" style="display:inline"
+            onsubmit="return confirm('Delete this content brief? This cannot be undone.')">
+        <button type="submit" class="btn danger-ghost sm">Delete</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700">Content brief</div>
+          <h2 style="margin-top:4px"><%= d.cluster.primaryKeyword %></h2>
+        </div>
+        <span class="sub"><%= d.brand.name %> &middot; generated <%= fmtDateTime(row.created_at) %></span>
+      </div>
+      <div class="card-body">
+        <div class="stat-row">
+          <div class="stat">
+            <div class="label">Search intent</div>
+            <div class="value sm"><%= d.searchIntent.intent %></div>
+            <div class="meta"><%= d.searchIntent.confidence %> confidence</div>
+          </div>
+          <div class="stat">
+            <div class="label">Suggested page type</div>
+            <div class="value sm"><%= d.searchIntent.suggestedPageType %></div>
+          </div>
+          <div class="stat">
+            <div class="label">Recommendation</div>
+            <div class="value sm"><%= d.cluster.recommendation %></div>
+          </div>
+          <div class="stat">
+            <div class="label">Word count target</div>
+            <div class="value sm"><%= d.wordCountRange ? (fmtInt(d.wordCountRange.low) + '–' + fmtInt(d.wordCountRange.high)) : 'Not enough data' %></div>
+            <% if (d.wordCountRange) { %><div class="meta">based on <%= d.wordCountRange.sampleSize %> of your own pages</div><% } %>
+          </div>
+        </div>
+        <% if (d.cluster.recommendationReason) { %>
+          <p style="font-size:13px;color:var(--text-2);margin-top:4px"><%= d.cluster.recommendationReason %></p>
+        <% } %>
+        <% if (d.cluster.existingPage) { %>
+          <p style="font-size:12.5px;margin-top:4px">Existing page: <a href="<%= d.cluster.existingPage %>" target="_blank" rel="noopener"><%= d.cluster.existingPage %></a></p>
+        <% } %>
+      </div>
+    </div>
+
+    <%# Warnings first: a brief whose search intent was a weak guess drives its
+        page type, title shape and headings off that guess, and the reader has
+        to know that before using any of them. %>
+    <% if ((d.warnings || []).length) { %>
+      <div class="card" style="border-left:3px solid #b45309">
+        <div class="card-head"><h3>Check before using this brief</h3></div>
+        <div class="card-body">
+          <ul style="margin:0;padding-left:18px;line-height:1.7">
+            <% d.warnings.forEach(function(w){ %>
+              <li>
+                <span class="badge <%= w.severity === 'high' ? 'bad' : (w.severity === 'medium' ? 'warn' : 'neutral') %>"><%= w.severity %></span>
+                <%= w.message %>
+              </li>
+            <% }) %>
+          </ul>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-head">
+          <h3>Recommended title</h3>
+          <% if ((d.fieldSources || {}).recommendedTitle === 'template') { %><span class="badge neutral" title="Filled from a wording template, not from live search data">Template suggestion</span><% } %>
+        </div>
+        <div class="card-body">
+          <p style="font-size:16px;font-weight:650;margin:0"><%= d.recommendedTitle %></p>
+          <% var tc = d.recommendedTitleCheck; %>
+          <% if (tc) { %>
+            <p class="meta" style="margin-top:4px">
+              <span class="badge <%= tc.status === 'ok' ? 'good' : 'warn' %>"><%= tc.length %> chars</span>
+              <%= tc.note %>
+            </p>
+          <% } %>
+          <% var tb = d.recommendedTitleBasis; %>
+          <% if (tb && tb.method === 'brand-history') { %>
+            <p class="meta" style="margin-top:4px">Pattern reused from your own top-performing page: <a href="<%= tb.basedOn %>" target="_blank" rel="noopener"><%= tb.basedOn %></a></p>
+          <% } else if (tb && tb.method === 'query') { %>
+            <p class="meta" style="margin-top:4px">Based on a real Search Console query: "<%= tb.basedOn %>"</p>
+          <% } %>
+        </div>
+      </div>
+
+      <%# Only rendered for briefs generated after this field existed. Older
+          stored briefs simply omit the card rather than showing a blank one. %>
+      <% if (d.recommendedMetaDescription) { %>
+      <div class="card">
+        <div class="card-head">
+          <h3>Recommended meta description</h3>
+          <span class="badge neutral" title="Built from a wording template — edit before publishing">Template suggestion</span>
+        </div>
+        <div class="card-body">
+          <p style="margin:0"><%= d.recommendedMetaDescription %></p>
+          <% var mc = d.recommendedMetaDescriptionCheck; %>
+          <% if (mc) { %>
+            <p class="meta" style="margin-top:4px">
+              <span class="badge <%= mc.status === 'ok' ? 'good' : 'warn' %>"><%= mc.length %> chars</span>
+              <%= mc.note %>
+            </p>
+          <% } %>
+        </div>
+      </div>
+      <% } %>
+      <div class="card">
+        <div class="card-head"><h3>Call to action</h3></div>
+        <div class="card-body">
+          <% if (d.callToAction.text) { %>
+            <p style="font-size:16px;font-weight:650;margin:0"><%= d.callToAction.text %></p>
+          <% } else { %>
+            <p class="hint" style="margin:0">
+              No CTA configured for this brand yet.
+              <a href="/brands/<%= d.brand.id %>">Set one in brand settings</a> — free, one-time, reused by every future brief.
+            </p>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Suggested headings</h3>
+        <% if ((d.fieldSources || {}).suggestedHeadings === 'template') { %><span class="badge neutral" title="Filled from a wording template, not from live search data">Template suggestion</span><% } %>
+      </div>
+      <div class="card-body">
+        <% var hb = d.suggestedHeadingsBasis || {}; %>
+        <% if (hb.bodyMethod === 'sub-topic') { %>
+          <p class="hint" style="margin:0 0 8px">Body sections come from distinct sub-topics within this cluster, so each heading covers different ground rather than restating the same keyword.</p>
+        <% } %>
+        <ol style="margin:0;padding-left:20px;line-height:1.9">
+          <% d.suggestedHeadings.forEach(function(h){ %><li><%= h %></li><% }) %>
+        </ol>
+      </div>
+    </div>
+
+    <%# Sub-topics are what make a large cluster writable: each one is a real
+        section, or a candidate page in its own right if the topic is a hub. %>
+    <% if ((d.subTopics || []).length >= 2) { %>
+    <div class="card">
+      <div class="card-head">
+        <h3>Sub-topics in this cluster</h3>
+        <% if (d.isHubTopic) { %><span class="badge neutral" title="This cluster covers several distinct sub-topics — consider a hub page with child pages">Hub topic</span><% } %>
+      </div>
+      <div class="card-body">
+        <p class="hint" style="margin:0 0 8px">Each of these groups keywords that are distinct from the others. Use them as sections — or, if the cluster is large, as separate pages under a hub.</p>
+        <table class="table sm">
+          <thead><tr><th>Sub-topic</th><th class="num">Keywords</th><th class="num">Impressions</th></tr></thead>
+          <tbody>
+            <% d.subTopics.forEach(function(s){ %>
+              <tr>
+                <td><%= s.label %></td>
+                <td class="num"><%= fmtInt(s.keywordCount) %></td>
+                <td class="num"><%= fmtInt(s.impressions) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <% } %>
+
+    <div class="card">
+      <div class="card-head"><h3>Supporting keywords</h3></div>
+      <div class="card-body">
+        <% if (!d.supportingKeywords.length) { %>
+          <p class="hint" style="margin:0">This cluster has no supporting keywords — the primary keyword stands alone.</p>
+        <% } else { %>
+          <div class="btn-row">
+            <% d.supportingKeywords.forEach(function(k){ %><span class="badge neutral"><%= k %></span><% }) %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Internal link suggestions</h3>
+        <span class="sub">
+          <%= d.internalLinks.mode === 'existing-page-recommendations' ? 'From the internal-linking agent\'s own recommendations for this page' : (d.internalLinks.mode === 'topical-overlap' ? 'Pages on your site most topically related to this brief' : '') %>
+        </span>
+      </div>
+      <div class="card-body">
+        <% if (!d.internalLinks.links.length) { %>
+          <p class="hint" style="margin:0">
+            No internal-link suggestions yet — run an internal linking crawl for this brand first
+            (<a href="/linking">Internal linking</a>), then regenerate this brief.
+          </p>
+        <% } else { %>
+          <div class="table-wrap">
+            <table class="data compact">
+              <thead><tr><th>Link from</th><th>Suggested anchor</th><th>Why</th></tr></thead>
+              <tbody>
+                <% d.internalLinks.links.forEach(function(l){ %>
+                  <tr>
+                    <td class="url wide"><%= shortUrl(l.from, 60) %></td>
+                    <td><%= l.anchor || '—' %></td>
+                    <td class="hint"><%= l.reason || '—' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Relevant products / services</h3></div>
+      <div class="card-body">
+        <% if (!d.relevantServices.configured) { %>
+          <p class="hint" style="margin:0">
+            No services list configured for this brand yet.
+            <a href="/brands/<%= d.brand.id %>">Add one in brand settings</a> — free, one-time, reused by every future brief.
+          </p>
+        <% } else if (!d.relevantServices.matched.length) { %>
+          <p class="hint" style="margin:0">None of this brand's configured services matched this topic closely enough to recommend one.</p>
+        <% } else { %>
+          <div class="btn-row">
+            <% d.relevantServices.matched.forEach(function(s){ %><span class="badge accent"><%= s %></span><% }) %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-head">
+          <h3>Questions to answer</h3>
+          <span class="badge medium">AI — coming soon</span>
+        </div>
+        <div class="card-body">
+          <p class="hint" style="margin:0 0 8px"><%= d.questionsToAnswer.reason %></p>
+          <a class="btn ghost sm" href="/ai-suggestions">See what's planned &rarr;</a>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h3>Competitor coverage summary</h3>
+          <span class="badge medium">AI — coming soon</span>
+        </div>
+        <div class="card-body">
+          <p class="hint" style="margin:0 0 8px"><%= d.competitorCoverage.reason %></p>
+          <a class="btn ghost sm" href="/ai-suggestions">See what's planned &rarr;</a>
+        </div>
+      </div>
+    </div>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

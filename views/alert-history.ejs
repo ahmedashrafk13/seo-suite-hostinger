@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Alert history</h2>
+        <span class="sub"><%= events.length %> event<%= events.length === 1 ? '' : 's' %></span>
+      </div>
+      <div class="card-body">
+        <form method="GET" action="/alerts/history">
+          <div class="form-row">
+            <div>
+              <label for="f-brand">Brand</label>
+              <select id="f-brand" name="brand">
+                <option value="">All brands</option>
+                <% brands.forEach(function(b){ %>
+                  <option value="<%= b.id %>" <%= String(brandId) === String(b.id) ? 'selected' : '' %>><%= b.name %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div>
+              <label for="f-key">Alert type</label>
+              <select id="f-key" name="key">
+                <option value="">Any alert type</option>
+                <% catalogAll.forEach(function(def){ %>
+                  <option value="<%= def.key %>" <%= alertKey === def.key ? 'selected' : '' %>><%= def.label %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+          <button class="btn secondary sm" type="submit">Filter</button>
+          <% if (brandId || alertKey) { %><a class="btn ghost sm" href="/alerts/history">Clear</a><% } %>
+        </form>
+
+        <div class="section-divider"></div>
+
+        <% if (!events.length) { %>
+          <div class="empty-state"><div class="icon">&#9888;</div>No alert events match these filters.</div>
+        <% } else { %>
+          <div class="table-wrap">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>Fired</th>
+                  <th>Severity</th>
+                  <th>Brand</th>
+                  <th>Alert</th>
+                  <th>Title</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% events.forEach(function(e){ %>
+                  <tr>
+                    <td class="narrow"><a href="/alerts/event/<%= e.id %>"><%= e.created_at %></a></td>
+                    <td><span class="badge <%= e.severity %>"><%= e.severity %></span></td>
+                    <td><%= e.brand_name || '—' %></td>
+                    <td class="mono"><%= e.alert_key %></td>
+                    <td class="wide"><a href="/alerts/event/<%= e.id %>"><%= e.title %></a></td>
+                    <td><%- e.acknowledged_at ? '<span class="badge good">Acknowledged</span>' : '<span class="badge medium">Open</span>' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+  </div>
+  </div>
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

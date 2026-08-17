@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+    <div class="toolbar">
+      <div class="spacer"></div>
+      <a class="btn secondary sm" href="/keywords/briefs">Content briefs</a>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Cluster keywords</h2>
+        <span class="sub">Paste or upload a keyword list, or pull straight from a brand's Search Console queries</span>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="/keywords/run">
+          <div class="form-row">
+            <div>
+              <label for="brand_id">Brand</label>
+              <select id="brand_id" name="brand_id">
+                <option value="">— none (paste-only) —</option>
+                <% brands.forEach(function(b){ %>
+                  <option value="<%= b.id %>"><%= b.name %><%= b.gscQueries ? (' (' + b.gscQueries + ' GSC queries)') : '' %></option>
+                <% }) %>
+              </select>
+              <div class="hint">Picking a brand also lets clustering match keywords against pages that already rank for them.</div>
+            </div>
+            <div>
+              <label for="name">Run name</label>
+              <input type="text" id="name" name="name" placeholder="optional — defaults to a generated name">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div>
+              <label for="source">Source</label>
+              <select id="source" name="source">
+                <option value="manual">Paste / upload keywords</option>
+                <option value="gsc">Pull from this brand's Search Console</option>
+              </select>
+            </div>
+            <div>
+              <label for="min_similarity">Cluster tightness</label>
+              <input type="number" id="min_similarity" name="min_similarity" min="0.1" max="0.9" step="0.05" value="0.4">
+              <div class="hint">Higher = stricter clusters (0.1–0.9). Default 0.4.</div>
+            </div>
+          </div>
+
+          <label for="keywords">Keywords (one per line, or paste a CSV with a "keyword" column)</label>
+          <textarea id="keywords" name="keywords" rows="8" placeholder="web design cost&#10;how much does a website cost&#10;best web design agency"></textarea>
+          <div class="hint">Optional CSV columns: impressions, clicks, position. Ignored when pulling from Search Console.</div>
+
+          <div class="section-divider"></div>
+
+          <h4 class="mt-0">Search Console pull settings</h4>
+          <div class="form-row">
+            <div>
+              <label for="days">Window</label>
+              <input type="number" id="days" name="days" min="7" max="480" value="90"> days
+            </div>
+            <div>
+              <label for="min_impressions">Minimum impressions</label>
+              <input type="number" id="min_impressions" name="min_impressions" min="1" value="20">
+            </div>
+            <div>
+              <label for="limit">Max keywords</label>
+              <input type="number" id="limit" name="limit" min="10" max="5000" value="1500">
+            </div>
+          </div>
+
+          <button class="btn" type="submit">Run clustering</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Recent runs</h3></div>
+      <div class="card-body" style="padding:0">
+        <% if (!runs.length) { %>
+          <div class="empty-state" style="padding:16px"><div class="icon">&#9782;</div>No clustering runs yet.</div>
+        <% } else { %>
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th>Run</th><th>Brand</th><th>Source</th><th class="num">Keywords</th><th class="num">Clusters</th><th>Created</th></tr></thead>
+              <tbody>
+                <% runs.forEach(function(r){ %>
+                  <tr>
+                    <td><a href="/keywords/<%= r.id %>"><%= r.name || ('Run #' + r.id) %></a></td>
+                    <td><%= r.brand_name || '—' %></td>
+                    <td><%= r.source === 'gsc' ? 'Search Console' : 'Pasted' %></td>
+                    <td class="num"><%= r.keyword_count %></td>
+                    <td class="num"><%= r.cluster_count %></td>
+                    <td class="narrow"><%= r.created_at %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+  </div>
+  </div>
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

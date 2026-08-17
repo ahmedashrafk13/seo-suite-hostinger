@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="brand-mark"><span class="dot"></span> SEO Suite</div>
+    <p class="sub">Your account is waiting for approval</p>
+
+    <div class="notice info" style="margin-bottom:16px">
+      <span class="notice-icon">&#9673;</span>
+      <div class="notice-body">
+        You have joined <strong><%= team ? team.name : 'the team' %></strong>. An admin needs to approve your
+        account before you can see any client data.
+      </div>
+    </div>
+
+    <% if (admins.length) { %>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:6px">Ask one of these admins to approve you:</p>
+      <ul style="margin:0 0 16px;padding-left:18px;font-size:13px">
+        <% admins.forEach(function(a){ %>
+          <li><%= a.name || a.email %> — <a href="mailto:<%= a.email %>"><%= a.email %></a></li>
+        <% }) %>
+      </ul>
+    <% } %>
+
+    <p class="hint">Once approved, refresh this page or sign in again to reach the dashboard.</p>
+
+    <div class="btn-row" style="margin-top:16px">
+      <a class="btn secondary sm" href="/pending">Check again</a>
+      <form method="POST" action="/logout" style="display:inline">
+        <button type="submit" class="btn ghost sm">Log out</button>
+      </form>
+    </div>
+  </div>
+</div>
+<%- include('partials/foot') %>

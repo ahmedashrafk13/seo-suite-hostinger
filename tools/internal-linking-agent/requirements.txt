@@ -1,0 +1,29 @@
+# Core - required to run the tool at all.
+httpx
+numpy
+beautifulsoup4
+lxml
+
+# The Word report is the deliverable, so this is core, not an extra. Missing, the
+# tool refuses to start and prints the install command rather than crashing after
+# a long crawl.
+python-docx
+
+# The five report deliverables (recommendations, orphans, broken links,
+# non-editorial pages, cannibalisation) are styled .xlsx workbooks, not CSV.
+openpyxl
+
+# --- Optional extras below --------------------------------------------------
+# Nothing above this line is required for these. The tool degrades gracefully
+# (a logged notice, never a crash) if either is missing.
+
+# --render (Playwright headless-Chromium rendering fallback for thin/JS pages
+# and HTTP-403 WAF retries). After installing the package, also run:
+#     python -m playwright install chromium
+playwright
+
+# Automatic spaCy NER anchor rejection (rejects candidate anchors that overlap
+# a company/person/product/work-of-art name). After installing the package,
+# also run:
+#     python -m spacy download en_core_web_sm
+spacy

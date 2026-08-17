@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<% if (!connected) { %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body">
+      <strong>Google is not connected.</strong> You can still add a brand, but no data will be pulled
+      until you <a href="/connect">connect Google</a>.
+    </div>
+  </div>
+<% } %>
+<% if (fetchError) { %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body">Could not load your Google property list — <%= fetchError %></div>
+  </div>
+<% } %>
+
+<%
+// How many verified Search Console properties are not yet set up here. A
+// multi-client account should never quietly show one site because the rest
+// were never added.
+var siteCount = sites ? sites.length : 0;
+var missing = 0;
+if (sites) {
+  var have = {};
+  brands.forEach(function(b){
+    [b.site_url, b.gsc_property].filter(Boolean).forEach(function(v){
+      try { have[new URL(String(v).replace(/^sc-domain:/, 'https://')).hostname.replace(/^www\./,'')] = 1; } catch (e) {}
+    });
+  });
+  sites.forEach(function(s){
+    try {
+      var h = new URL(String(s.siteUrl).replace(/^sc-domain:/, 'https://')).hostname.replace(/^www\./,'');
+      if (!have[h] && s.permissionLevel !== 'siteUnverifiedUser') missing += 1;
+    } catch (e) {}
+  });
+}
+%>
+<% if (connected && missing > 0) { %>
+  <div class="notice info">
+    <span class="notice-icon">&#9673;</span>
+    <div class="notice-body">
+      <strong><%= missing %> more site<%= missing === 1 ? '' : 's' %> in your Google account
+      <%= missing === 1 ? 'is' : 'are' %> not set up here yet.</strong>
+      Import them to give each its own dashboard, alerts, tasks and reports.
+      <div style="margin-top:9px"><a class="btn sm" href="/brands/import">Import from Google</a></div>
+    </div>
+  </div>
+<% } %>
+
+<div class="split">
+  <div>
+    <% if (!brands.length) { %>
+      <div class="card">
+        <div class="card-body">
+          <div class="empty">
+            <div class="empty-icon">&#9673;</div>
+            <h3>No brands yet</h3>
+            <p>
+              A brand pairs one website with its Search Console property and its GA4 property.
+              Alerts, reports, tasks and audits are all organised per brand, so this is the first thing to set up.
+            </p>
+          </div>
+        </div>
+      </div>
+    <% } %>
+
+    <% brands.forEach(function(b){ %>
+      <div class="card">
+        <div class="card-head">
+          <h2><a href="/brands/<%= b.id %>"><%= b.name %></a></h2>
+          <% if (!b.active) { %><span class="badge neutral">paused</span><% } %>
+          <div class="btn-row">
+            <a class="btn secondary sm" href="/brands/<%= b.id %>">Manage</a>
+          </div>
+        </div>
+        <div class="card-body">
+          <dl class="meta-list" style="margin-bottom:12px">
+            <dt>Website</dt>
+            <dd><a href="<%= b.site_url %>" target="_blank" rel="noopener"><%= b.site_url %></a></dd>
+            <dt>Search Console</dt>
+            <dd>
+              <% if (b.gsc_property) { %>
+                <span class="mono" style="font-size:12.5px"><%= b.gsc_property %></span>
+                <span class="badge <%= b.caps.gsc ? 'good' : 'medium' %>"><%= b.caps.gsc ? 'data synced' : 'no data yet' %></span>
+              <% } else { %>
+                <span style="color:var(--text-3)">not linked</span>
+              <% } %>
+            </dd>
+            <dt>GA4</dt>
+            <dd>
+              <% if (b.ga4_property_id) { %>
+                <%= b.ga4_property_name || '' %>
+                <span class="mono" style="font-size:12.5px;color:var(--text-2)">(<%= b.ga4_property_id %>)</span>
+                <span class="badge <%= b.caps.ga4 ? 'good' : 'medium' %>"><%= b.caps.ga4 ? 'data synced' : 'no data yet' %></span>
+              <% } else { %>
+                <span style="color:var(--text-3)">not linked</span>
+              <% } %>
+            </dd>
+            <dt>Data range</dt>
+            <dd>
+              <% if (b.coverage.gsc && b.coverage.gsc.n) { %>
+                <%= b.coverage.gsc.a %> → <%= b.coverage.gsc.b %>
+                <span style="color:var(--text-2)">(<%= fmtInt(b.coverage.gsc.n) %> days)</span>
+              <% } else { %>
+                <span style="color:var(--text-3)">nothing synced yet</span>
+              <% } %>
+            </dd>
+          </dl>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <span class="badge <%= b.alertCount ? 'accent' : 'neutral' %>"><%= b.alertCount %> alert<%= b.alertCount === 1 ? '' : 's' %> on</span>
+            <span class="badge neutral"><%= b.openTasks %> open task<%= b.openTasks === 1 ? '' : 's' %></span>
+            <div class="spacer" style="flex:1"></div>
+            <form method="POST" action="/brands/<%= b.id %>/sync" class="inline-form">
+              <input type="hidden" name="days" value="90">
+              <button type="submit" class="btn secondary sm">Sync now</button>
+            </form>
+            <a class="btn ghost sm" href="/alerts?brand=<%= b.id %>">Alerts</a>
+            <a class="btn ghost sm" href="/tasks?brand=<%= b.id %>">Tasks</a>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+
+  <div>
+    <div class="card">
+      <div class="card-head">
+        <h3>Add a brand</h3>
+        <% if (connected) { %><a class="btn secondary sm" href="/brands/import">Import all from Google</a><% } %>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="/brands/create">
+          <div class="field">
+            <label for="name">Brand name</label>
+            <input type="text" id="name" name="name" required placeholder="e.g. American Web Builders">
+          </div>
+
+          <div class="field">
+            <label for="site_url">Website URL</label>
+            <input type="text" id="site_url" name="site_url" required placeholder="example.com">
+            <div class="hint">Used for crawls and the uptime check.</div>
+          </div>
+
+          <div class="field">
+            <label for="gsc_property">Search Console property</label>
+            <% if (sites && sites.length) { %>
+              <select id="gsc_property" name="gsc_property">
+                <option value="">— none —</option>
+                <% sites.forEach(function(s){ %>
+                  <option value="<%= s.siteUrl %>"><%= s.siteUrl %> (<%= s.permissionLevel %>)</option>
+                <% }) %>
+              </select>
+            <% } else { %>
+              <input type="text" id="gsc_property" name="gsc_property" placeholder="https://example.com/ or sc-domain:example.com">
+              <div class="hint">
+                <%= connected ? 'No verified properties were returned for this account.' : 'Connect Google to pick from a list.' %>
+              </div>
+            <% } %>
+          </div>
+
+          <div class="field">
+            <label for="ga4_property_id">GA4 property</label>
+            <% if (ga4Props && ga4Props.length) { %>
+              <select id="ga4_property_id" name="ga4_property_id">
+                <option value="">— none —</option>
+                <% ga4Props.forEach(function(p){ %>
+                  <option value="<%= p.id %>"><%= p.account %> › <%= p.name %> (<%= p.id %>)</option>
+                <% }) %>
+              </select>
+            <% } else { %>
+              <input type="text" id="ga4_property_id" name="ga4_property_id" placeholder="411317117">
+              <div class="hint">The numeric property id, without the "properties/" prefix.</div>
+            <% } %>
+          </div>
+
+          <div class="field">
+            <label for="notify_email">Alert recipients</label>
+            <input type="text" id="notify_email" name="notify_email" placeholder="you@agency.com, lead@agency.com">
+            <div class="hint">Comma-separated. Used as the default for this brand's alerts.</div>
+          </div>
+
+          <div class="field">
+            <label for="slack_webhook">Slack webhook <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>
+            <input type="text" id="slack_webhook" name="slack_webhook" placeholder="https://hooks.slack.com/services/…">
+          </div>
+
+          <button type="submit" class="btn block">Add brand &amp; sync</button>
+          <div class="hint" style="margin-top:8px">
+            The first sync pulls 90 days of Search Console and GA4 history, then switches on a recommended
+            set of alerts based on what data is actually available.
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

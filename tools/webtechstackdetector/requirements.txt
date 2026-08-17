@@ -1,0 +1,22 @@
+# Technical SEO audit crawler (main.py).
+#
+# Derived from the tool's actual imports. It guards its optional imports and
+# degrades with a printed message rather than crashing, so only the core
+# packages below are needed to produce a JSON audit result — which is what the
+# SEO Automation Suite consumes.
+
+# --- Core: required for any crawl ------------------------------------------
+requests
+beautifulsoup4
+
+# --- Required for the Word deliverable -------------------------------------
+# The suite itself reads --json and renders its own report, so this is only
+# needed if you run main.py directly to produce a .docx. Without it the tool
+# falls back to writing .rtf.
+python-docx
+
+# --- Optional ---------------------------------------------------------------
+# --render (headless-Chromium rendering for JavaScript-heavy pages). After
+# installing the package, also run:
+#     python -m playwright install chromium
+playwright

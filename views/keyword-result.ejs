@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+    <div class="toolbar">
+      <a class="btn ghost sm" href="/keywords">&larr; Keyword clustering</a>
+      <div class="spacer"></div>
+      <a class="btn secondary sm" href="/keywords/<%= run.id %>/csv">Download Excel</a>
+      <form method="POST" action="/keywords/<%= run.id %>/delete" onsubmit="return confirm('Delete this clustering run?')" style="display:inline">
+        <button class="btn danger-ghost sm" type="submit">Delete run</button>
+      </form>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat">
+        <div class="label">Keywords</div>
+        <div class="value"><%= run.keyword_count %></div>
+        <div class="meta"><%= run.brand_name || 'No brand linked' %></div>
+      </div>
+      <div class="stat">
+        <div class="label">Clusters</div>
+        <div class="value"><%= run.cluster_count %></div>
+        <div class="meta"><%= run.source === 'gsc' ? 'From Search Console' : 'Pasted list' %></div>
+      </div>
+      <div class="stat">
+        <div class="label">Showing</div>
+        <div class="value"><%= clusters.length %></div>
+        <div class="meta">after filters</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><%= run.name || ('Run #' + run.id) %></h2>
+        <div class="btn-row">
+          <form method="POST" action="/keywords/<%= run.id %>/create-tasks">
+            <input type="number" name="limit" value="25" min="1" max="100" style="width:70px">
+            <button class="btn secondary sm" type="submit">Create content tasks</button>
+          </form>
+        </div>
+      </div>
+      <div class="card-body">
+        <form method="GET" action="/keywords/<%= run.id %>">
+          <div class="form-row">
+            <div>
+              <label for="f-intent">Intent</label>
+              <select id="f-intent" name="intent">
+                <option value="">Any intent</option>
+                <% intents.forEach(function(i){ %>
+                  <option value="<%= i %>" <%= query.intent === i ? 'selected' : '' %>><%= i %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div>
+              <label for="f-rec">Recommendation</label>
+              <select id="f-rec" name="rec">
+                <option value="">Any recommendation</option>
+                <% recs.forEach(function(r){ %>
+                  <option value="<%= r %>" <%= query.rec === r ? 'selected' : '' %>><%= r %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div>
+              <label for="f-q">Search</label>
+              <input type="text" id="f-q" name="q" value="<%= query.q || '' %>" placeholder="keyword contains…">
+            </div>
+          </div>
+          <button class="btn secondary sm" type="submit">Filter</button>
+          <% if (query.intent || query.rec || query.q) { %><a class="btn ghost sm" href="/keywords/<%= run.id %>">Clear</a><% } %>
+        </form>
+
+        <div class="section-divider"></div>
+
+        <%# Run-level notices. These exist so the run's own limitations are
+            visible on the page rather than buried in the JSON: a truncated
+            run, and place names the location gazetteer did not recognise. %>
+        <% var res = (run && run.result) || {}; %>
+        <% if (res.truncated) { %>
+          <div class="callout warn" style="margin-bottom:12px">
+            Only the top <%= res.truncated.maxClusters %> clusters were kept.
+            <%= fmtInt(res.truncated.droppedClusters) %> smaller cluster(s) covering
+            <%= fmtInt(res.truncated.droppedKeywords) %> keyword(s) are not shown.
+          </div>
+        <% } %>
+        <% if ((res.unrecognisedPlaces || []).length) { %>
+          <div class="callout" style="margin-bottom:12px">
+            <strong>Possible locations not recognised.</strong>
+            These words appear after "in"/"near" in your keywords but are not in the
+            built-in location list, so their keywords were grouped on wording alone
+            rather than treated as separate locations:
+            <%= res.unrecognisedPlaces.slice(0, 8).map(function(p){ return p.word + ' (' + p.keywordCount + ')'; }).join(', ') %><%= res.unrecognisedPlaces.length > 8 ? '…' : '' %>.
+            Add the relevant one to the brand's market in
+            <a href="/brands/<%= run.brand_id %>">brand settings</a> if it matters.
+          </div>
+        <% } %>
+
+        <% if (!clusters.length) { %>
+          <div class="empty-state"><div class="icon">&#9782;</div>No clusters match these filters.</div>
+        <% } else { %>
+          <div class="table-wrap">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>Primary keyword</th>
+                  <th class="num">Keywords</th>
+                  <th>Intent</th>
+                  <th>Suggested page type</th>
+                  <th class="num">Impressions</th>
+                  <th class="num">Clicks</th>
+                  <th class="num">Avg pos</th>
+                  <th>Recommendation</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% clusters.forEach(function(c){ %>
+                  <%
+                    var intentBadge = ({
+                      'Transactional': 'critical',
+                      'Commercial investigation': 'high',
+                      'Local': 'accent',
+                      'Informational': 'low',
+                      'Navigational': 'neutral',
+                    })[c.intent] || 'neutral';
+                    var recBadge = ({
+                      'Create new page': 'accent',
+                      'Improve existing page': 'medium',
+                      'Consolidate existing pages': 'high',
+                      'Existing page — already strong': 'good',
+                    })[c.recommendation] || 'neutral';
+                  %>
+                  <tr>
+                    <td class="wide">
+                      <strong><%= c.primaryKeyword %></strong>
+                      <%# Flags added by the clustering rework. Guarded with
+                          typeof so runs saved before these fields existed
+                          still render. %>
+                      <% if (c.isGeoTargeted) { %><span class="badge neutral" title="This cluster targets a specific location and is kept separate from national keywords">📍 <%= c.placeKey %></span><% } %>
+                      <% if (c.isHub) { %><span class="badge neutral" title="Covers several distinct sub-topics — consider a hub page with child pages">Hub</span><% } %>
+                      <% if (c.needsReview) { %><span class="badge warn" title="These keywords are only loosely related — check the grouping before commissioning">Check grouping</span><% } %>
+                      <% if ((c.subClusters || []).length >= 2) { %>
+                        <div class="sub-line">Sub-topics: <%= c.subClusters.slice(0, 4).map(function(s){ return s.label; }).join(' · ') %><%= c.subClusters.length > 4 ? ' …' : '' %></div>
+                      <% } %>
+                      <% if (c.supportingKeywords.length) { %>
+                        <div class="sub-line">+<%= c.supportingKeywords.length %> supporting: <%= c.supportingKeywords.slice(0, 5).join(', ') %><%= c.supportingKeywords.length > 5 ? '…' : '' %></div>
+                      <% } %>
+                      <% if (c.existingPage) { %>
+                        <div class="sub-line url"><%= c.existingPage %></div>
+                      <% } %>
+                    </td>
+                    <td class="num"><%= c.keywordCount %></td>
+                    <td><span class="badge <%= intentBadge %>"><%= c.intent %></span> <span class="hint"><%= c.intentConfidence %></span></td>
+                    <td class="wide"><%= c.suggestedPageType %></td>
+                    <td class="num"><%= Math.round(c.totalImpressions).toLocaleString('en-US') %></td>
+                    <td class="num"><%= Math.round(c.totalClicks).toLocaleString('en-US') %></td>
+                    <td class="num"><%= c.avgPosition == null ? '—' : c.avgPosition.toFixed(1) %></td>
+                    <td class="wide">
+                      <span class="badge <%= recBadge %>"><%= c.recommendation %></span>
+                      <div class="sub-line"><%= c.recommendationReason %></div>
+                    </td>
+                    <td style="white-space:nowrap">
+                      <% var approval = approvedById.get(c.id); %>
+                      <% if (!approval) { %>
+                        <form method="POST" action="/keywords/<%= run.id %>/cluster/<%= c.id %>/approve">
+                          <button type="submit" class="btn secondary sm">Approve for content</button>
+                        </form>
+                      <% } else { %>
+                        <div class="btn-row" style="flex-wrap:nowrap">
+                          <form method="POST" action="/keywords/<%= run.id %>/cluster/<%= c.id %>/brief">
+                            <button type="submit" class="btn secondary sm">Content brief</button>
+                          </form>
+                          <form method="POST" action="/keywords/<%= run.id %>/cluster/<%= c.id %>/unapprove"
+                                onsubmit="return confirm('Withdraw approval for this keyword?')">
+                            <button type="submit" class="btn ghost sm" title="Approved by <%= approval.approved_by %>">&#10003; Approved</button>
+                          </form>
+                        </div>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+  </div>
+  </div>
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

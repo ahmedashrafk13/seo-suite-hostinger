@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+    <%
+      // filters uses the internal names (brandId, search); the routes read the
+      // query-string names (brand, q). Mapping between them here is what keeps
+      // the brand/search filter alive across Board↔Table and Export links.
+      var QS_NAME = { brandId: 'brand', search: 'q', onlyOpen: 'open' };
+      var qs = function(overrides) {
+        var params = Object.assign({}, filters, { view: view }, overrides || {});
+        var out = [];
+        Object.keys(params).forEach(function(k) {
+          var v = params[k];
+          if (v === null || v === undefined || v === '') return;
+          out.push(encodeURIComponent(QS_NAME[k] || k) + '=' + encodeURIComponent(v));
+        });
+        return out.join('&');
+      };
+
+      // Board is a triage surface: the four open statuses are the work, Done
+      // and Dismissed are an archive and get their own collapsed group rather
+      // than an equal share of the screen.
+      var CLOSED = ['done', 'dismissed'];
+      var openCols = columns.filter(function(c){ return CLOSED.indexOf(c.value) === -1; });
+      var closedCols = columns.filter(function(c){ return CLOSED.indexOf(c.value) !== -1; });
+      var closedTotal = closedCols.reduce(function(a, c){ return a + c.total; }, 0);
+
+      var statusLabel = {};
+      statuses.forEach(function(s){ statusLabel[s.value] = s.label; });
+
+      var today = new Date().toISOString().slice(0, 10);
+      function dueMeta(t) {
+        if (!t.due_date || t.status === 'done' || t.status === 'dismissed') return null;
+        var days = Math.round((new Date(t.due_date + 'T00:00:00Z') - new Date(today + 'T00:00:00Z')) / 86400000);
+        if (days < 0) return { cls: 'overdue', text: (days === -1 ? '1 day' : Math.abs(days) + ' days') + ' overdue' };
+        if (days === 0) return { cls: 'due-soon', text: 'Due today' };
+        if (days <= 3) return { cls: 'due-soon', text: 'Due in ' + days + 'd' };
+        return { cls: '', text: 'Due ' + t.due_date.slice(5) };
+      }
+      function initials(name) {
+        if (!name) return '—';
+        var parts = String(name).trim().split(/[\s@._-]+/).filter(Boolean);
+        if (!parts.length) return '—';
+        return (parts[0][0] + (parts[1] ? parts[1][0] : '')).slice(0, 2);
+      }
+
+      // Human-readable summary of what is currently filtering the board, each
+      // removable on its own — an empty board should never be a mystery.
+      var activeChips = [];
+      if (filters.brandId) {
+        var fb = brands.filter(function(b){ return b.id === filters.brandId; })[0];
+        activeChips.push({ key: 'Brand', label: fb ? fb.name : filters.brandId, href: '?' + qs({ brandId: null }) });
+      }
+      if (filters.status) activeChips.push({ key: 'Status', label: statusLabel[filters.status] || filters.status, href: '?' + qs({ status: null }) });
+      if (filters.source) activeChips.push({ key: 'Source', label: sources[filters.source] || filters.source, href: '?' + qs({ source: null }) });
+      if (filters.severity) activeChips.push({ key: 'Severity', label: filters.severity, href: '?' + qs({ severity: null }) });
+      if (filters.assignee) activeChips.push({ key: 'Assignee', label: filters.assignee, href: '?' + qs({ assignee: null }) });
+      if (filters.search) activeChips.push({ key: 'Search', label: filters.search, href: '?' + qs({ search: null }) });
+      if (filters.onlyOpen) activeChips.push({ key: 'Only', label: 'open tasks', href: '?' + qs({ onlyOpen: null }) });
+      if (filters.approval === 'pending') activeChips.push({ key: 'Approval', label: 'awaiting sign-off', href: '?' + qs({ approval: null }) });
+      if (filters.approval === 'approved') activeChips.push({ key: 'Approval', label: 'approved', href: '?' + qs({ approval: null }) });
+      if (filters.overdue) activeChips.push({ key: 'Due', label: 'overdue', href: '?' + qs({ overdue: null }) });
+    %>
+
+    <%
+      // Counts are entry points, not trivia: each tile is the filter that
+      // produces it.
+      var noFilter = { status: null, onlyOpen: null, approval: null, overdue: null };
+      var tiles = [
+        { label: 'Total', value: counts.total, href: '?' + qs(noFilter),
+          on: !filters.status && !filters.onlyOpen && !filters.approval && !filters.overdue },
+        { label: 'Open', value: counts.open, href: '?' + qs(Object.assign({}, noFilter, { onlyOpen: '1' })),
+          on: Boolean(filters.onlyOpen) },
+        { label: 'Needs approval', value: counts.needsApproval, href: '?' + qs(Object.assign({}, noFilter, { approval: 'pending' })),
+          on: filters.approval === 'pending', cls: counts.needsApproval ? 'warn' : '',
+          hint: 'Flagged for SEO sign-off — most sit in Backlog, not in the Awaiting column' },
+        { label: 'Overdue', value: counts.overdue, href: '?' + qs(Object.assign({}, noFilter, { overdue: '1' })),
+          on: Boolean(filters.overdue), cls: counts.overdue ? 'bad' : '' },
+        { label: 'Done', value: counts.done, href: '?' + qs(Object.assign({}, noFilter, { status: 'done' })),
+          on: filters.status === 'done' },
+      ];
+    %>
+    <div class="stat-row">
+      <% tiles.forEach(function(t){ %>
+        <a class="stat <%= t.on ? 'active' : '' %>" href="<%= t.href %>" <%= t.hint ? 'title="' + t.hint + '"' : '' %>>
+          <div class="label"><%= t.label %></div>
+          <div class="value <%= t.cls || '' %>"><%= t.value %></div>
+        </a>
+      <% }) %>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Task board</h2>
+        <div class="btn-row">
+          <a class="btn <%= view === 'board' ? '' : 'secondary' %> sm" href="?<%= qs({ view: 'board' }) %>">Board</a>
+          <a class="btn <%= view === 'table' ? '' : 'secondary' %> sm" href="?<%= qs({ view: 'table' }) %>">Table</a>
+          <a class="btn secondary sm" href="/tasks/export/csv?<%= qs({ view: undefined }) %>">Export Excel</a>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <form method="GET" action="/tasks">
+          <input type="hidden" name="view" value="<%= view %>">
+          <div class="filter-bar">
+            <div class="fb-field">
+              <label for="f-brand">Brand</label>
+              <select id="f-brand" name="brand">
+                <option value="">All brands</option>
+                <% brands.forEach(function(b){ %>
+                  <option value="<%= b.id %>" <%= filters.brandId === b.id ? 'selected' : '' %>><%= b.name %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="fb-field">
+              <label for="f-status">Status</label>
+              <select id="f-status" name="status">
+                <option value="">Any status</option>
+                <% statuses.forEach(function(s){ %>
+                  <option value="<%= s.value %>" <%= filters.status === s.value ? 'selected' : '' %>><%= s.label %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="fb-field">
+              <label for="f-source">Source</label>
+              <select id="f-source" name="source">
+                <option value="">Any source</option>
+                <% Object.keys(sources).forEach(function(k){ %>
+                  <option value="<%= k %>" <%= filters.source === k ? 'selected' : '' %>><%= sources[k] %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="fb-field">
+              <label for="f-severity">Severity</label>
+              <select id="f-severity" name="severity">
+                <option value="">Any severity</option>
+                <% ['critical','high','medium','low','info'].forEach(function(sv){ %>
+                  <option value="<%= sv %>" <%= filters.severity === sv ? 'selected' : '' %>><%= sv %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="fb-field">
+              <label for="f-assignee">Assignee</label>
+              <select id="f-assignee" name="assignee">
+                <option value="">Anyone</option>
+                <% assignees.forEach(function(a){ %>
+                  <option value="<%= a %>" <%= filters.assignee === a ? 'selected' : '' %>><%= a %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="fb-field fb-search">
+              <label for="f-q">Search</label>
+              <input type="text" id="f-q" name="q" value="<%= filters.search || '' %>" placeholder="title, detail, URL">
+            </div>
+            <button class="btn sm" type="submit">Apply</button>
+          </div>
+        </form>
+
+        <% if (activeChips.length) { %>
+          <div class="active-filters">
+            <span class="hint" style="margin:0">Filtering by</span>
+            <% activeChips.forEach(function(c){ %>
+              <span class="filter-chip">
+                <span class="k"><%= c.key %>:</span> <%= c.label %>
+                <a href="<%= c.href %>" aria-label="Remove <%= c.key %> filter" title="Remove filter">&times;</a>
+              </span>
+            <% }) %>
+            <a class="btn ghost xs" href="/tasks?view=<%= view %>">Clear all</a>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (view === 'board') { %>
+      <details class="board-group" open>
+        <summary>
+          Active work
+          <span class="grp-count"><%= openCols.reduce(function(a,c){ return a + c.total; }, 0) %> open</span>
+        </summary>
+        <div class="board">
+          <% openCols.forEach(function(col){ %>
+            <div class="board-col <%= col.tasks.length ? '' : 'is-empty' %>">
+              <div class="board-col-head">
+                <span class="status-dot <%= col.value %>"></span>
+                <span class="t"><%= col.label %></span>
+                <span class="n"><%= col.total %></span>
+              </div>
+              <div class="board-col-body">
+                <% if (!col.tasks.length) { %>
+                  <div class="empty-state" style="padding:14px 6px;font-size:12px"><%= col.description %></div>
+                <% } %>
+                <% col.tasks.forEach(function(t){ var due = dueMeta(t); %>
+                  <a class="task-card <%= t.severity %> <%= due && due.cls === 'overdue' ? 'is-overdue' : '' %>" href="/tasks/<%= t.id %>">
+                    <div class="tc-title" title="<%= t.title %>"><%= t.title %></div>
+                    <div class="tc-meta">
+                      <span class="badge <%= t.severity %>"><%= t.severity %></span>
+                      <span class="chip"><%= sources[t.source] || t.source %></span>
+                      <% if (t.brand_name) { %><span class="chip brand"><%= t.brand_name %></span><% } %>
+                      <% if (t.requires_approval) { %>
+                        <span class="badge <%= t.approved_at ? 'good' : 'medium' %>"><%= t.approved_at ? 'approved' : 'needs approval' %></span>
+                      <% } %>
+                    </div>
+                    <% if (t.affected_url) { %>
+                      <div class="tc-url" title="<%= t.affected_url %>"><%= shortUrl(t.affected_url, 80) %></div>
+                    <% } %>
+                    <%
+                      // The footer only earns its space when it carries
+                      // something: a board where every card says "Unassigned"
+                      // is 119 rows of noise, not information.
+                      var hasFoot = t.assignee || due || t.effort;
+                    %>
+                    <% if (hasFoot) { %>
+                      <div class="tc-foot">
+                        <% if (t.assignee) { %>
+                          <span class="avatar" title="<%= t.assignee %>"><%= initials(t.assignee) %></span>
+                          <span><%= t.assignee %></span>
+                        <% } %>
+                        <span class="spacer"></span>
+                        <% if (due) { %>
+                          <span class="tc-due <%= due.cls %>"><%= due.text %></span>
+                        <% } else if (t.effort) { %>
+                          <span class="tc-due"><%= t.effort %></span>
+                        <% } %>
+                      </div>
+                    <% } %>
+                  </a>
+                <% }) %>
+              </div>
+              <% if (col.total > col.tasks.length) { %>
+                <div class="board-col-foot">
+                  <a href="/tasks?<%= qs({ view: 'table', status: col.value }) %>">
+                    +<%= col.total - col.tasks.length %> more — open in table
+                  </a>
+                </div>
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+      </details>
+
+      <details class="board-group">
+        <summary>
+          Closed
+          <span class="grp-count">
+            <% closedCols.forEach(function(c, i){ %><%= i ? ' · ' : '' %><%= c.label %> <%= c.total %><% }) %>
+          </span>
+        </summary>
+        <% if (!closedTotal) { %>
+          <div class="empty-state">Nothing has been completed or dismissed yet.</div>
+        <% } else { %>
+          <div class="board board-closed">
+            <% closedCols.forEach(function(col){ %>
+              <div class="board-col <%= col.tasks.length ? '' : 'is-empty' %>">
+                <div class="board-col-head">
+                  <span class="status-dot <%= col.value %>"></span>
+                  <span class="t"><%= col.label %></span>
+                  <span class="n"><%= col.total %></span>
+                </div>
+                <div class="board-col-body">
+                  <% if (!col.tasks.length) { %>
+                    <div class="empty-state" style="padding:14px 6px;font-size:12px"><%= col.description %></div>
+                  <% } %>
+                  <% col.tasks.forEach(function(t){ %>
+                    <a class="task-card <%= t.severity %>" href="/tasks/<%= t.id %>">
+                      <div class="tc-title" title="<%= t.title %>"><%= t.title %></div>
+                      <div class="tc-meta">
+                        <span class="badge <%= t.severity %>"><%= t.severity %></span>
+                        <span class="chip"><%= sources[t.source] || t.source %></span>
+                        <% if (t.brand_name) { %><span class="chip brand"><%= t.brand_name %></span><% } %>
+                      </div>
+                      <div class="tc-foot">
+                        <% if (t.assignee) { %>
+                          <span class="avatar" title="<%= t.assignee %>"><%= initials(t.assignee) %></span>
+                          <span><%= t.assignee %></span>
+                        <% } %>
+                        <span class="spacer"></span>
+                        <span class="tc-due"><%= t.status === 'done' ? 'Done' : 'Dismissed' %> <%= fmtDate(t.completed_at || t.updated_at) %></span>
+                      </div>
+                    </a>
+                  <% }) %>
+                </div>
+                <% if (col.total > col.tasks.length) { %>
+                  <div class="board-col-foot">
+                    <a href="/tasks?<%= qs({ view: 'table', status: col.value }) %>">
+                      +<%= col.total - col.tasks.length %> more — open in table
+                    </a>
+                  </div>
+                <% } %>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+      </details>
+
+    <% } else { %>
+      <div class="card">
+        <div class="card-head">
+          <h3>All matching tasks</h3>
+          <span class="sub"><%= tasks.length %> shown</span>
+        </div>
+        <div class="card-body">
+          <form method="POST" action="/tasks/bulk">
+            <div class="btn-row" style="margin-bottom:10px">
+              <label for="bulk-action" class="sr-only">Bulk action</label>
+              <select id="bulk-action" name="action" style="width:auto;min-width:170px">
+                <option value="approve">Approve</option>
+                <option value="in_progress">Mark in progress</option>
+                <option value="done">Mark done</option>
+                <option value="dismissed">Dismiss</option>
+                <option value="assign">Assign to…</option>
+                <option value="delete">Delete</option>
+              </select>
+              <label for="bulk_assignee" class="sr-only">Assignee (for the Assign action)</label>
+              <input type="text" id="bulk_assignee" name="assignee" placeholder="assignee (for Assign)" style="max-width:180px">
+              <button class="btn secondary sm" type="submit">Apply to selected</button>
+            </div>
+            <div class="table-wrap"><table class="data tasks-table">
+              <thead><tr>
+                <th class="pick">
+                  <input type="checkbox" id="task-select-all" aria-label="Select all tasks"
+                         onclick="var b=this.closest('table');Array.prototype.forEach.call(b.querySelectorAll('input[name=task_ids]'),function(c){c.checked=this.checked}.bind(this))">
+                </th>
+                <th class="wrap col-title">Title</th><th class="col-brand">Brand</th><th>Status</th><th>Severity</th>
+                <th>Source</th><th class="col-assignee">Assignee</th><th>Due</th><th>Approval</th><th>Updated</th>
+              </tr></thead>
+              <tbody>
+              <% tasks.forEach(function(t){ var due = dueMeta(t); %>
+                <tr>
+                  <td class="pick"><input type="checkbox" name="task_ids" value="<%= t.id %>" aria-label="Select task <%= t.id %>"></td>
+                  <td class="wrap col-title"><a href="/tasks/<%= t.id %>"><%= t.title %></a></td>
+                  <td class="wrap col-brand"><%= t.brand_name || '—' %></td>
+                  <td class="narrow">
+                    <span class="status-dot <%= t.status %>" style="display:inline-block;margin-right:5px"></span><%= statusLabel[t.status] || t.status.replace('_',' ') %>
+                  </td>
+                  <td><span class="badge <%= t.severity %>"><%= t.severity %></span></td>
+                  <td class="narrow"><%= sources[t.source] || t.source %></td>
+                  <td class="wrap col-assignee"><%= t.assignee || '—' %></td>
+                  <td class="narrow"><% if (due) { %><span class="tc-due <%= due.cls %>"><%= due.text %></span><% } else { %>—<% } %></td>
+                  <td><% if (t.requires_approval) { %><span class="badge <%= t.approved_at ? 'good' : 'medium' %>"><%= t.approved_at ? 'approved' : 'needed' %></span><% } else { %>—<% } %></td>
+                  <td class="narrow"><%= fmtDateTime(t.updated_at) %></td>
+                </tr>
+              <% }) %>
+              <% if (!tasks.length) { %>
+                <tr><td colspan="10"><div class="empty-state">No tasks match these filters.</div></td></tr>
+              <% } %>
+              </tbody>
+            </table></div>
+          </form>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="card">
+      <div class="card-body">
+        <details class="disclosure">
+          <summary>New task</summary>
+          <form method="POST" action="/tasks/create">
+            <div class="form-row">
+              <div>
+                <label for="title">Title</label>
+                <input type="text" id="title" name="title" required>
+              </div>
+              <div>
+                <label for="brand_id">Brand</label>
+                <select id="brand_id" name="brand_id">
+                  <option value="">— none —</option>
+                  <% brands.forEach(function(b){ %>
+                    <option value="<%= b.id %>" <%= filters.brandId === b.id ? 'selected' : '' %>><%= b.name %></option>
+                  <% }) %>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label for="severity">Severity</label>
+                <select id="severity" name="severity">
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="low">Low</option>
+                  <option value="info">Info</option>
+                </select>
+              </div>
+              <div>
+                <label for="category">Category</label>
+                <input type="text" id="category" name="category" placeholder="e.g. Technical">
+              </div>
+              <div>
+                <label for="assignee">Assignee</label>
+                <input type="text" id="assignee" name="assignee" list="assignee-list">
+                <datalist id="assignee-list">
+                  <% assignees.forEach(function(a){ %><option value="<%= a %>"><% }) %>
+                </datalist>
+              </div>
+              <div>
+                <label for="due_date">Due date</label>
+                <input type="date" id="due_date" name="due_date">
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label for="affected_url">Affected URL</label>
+                <input type="text" id="affected_url" name="affected_url" placeholder="https://…">
+              </div>
+              <div>
+                <label for="effort">Effort</label>
+                <input type="text" id="effort" name="effort" placeholder="e.g. 2h">
+              </div>
+            </div>
+            <label for="detail">Detail</label>
+            <textarea id="detail" name="detail" rows="2"></textarea>
+            <button class="btn" type="submit">Add task</button>
+          </form>
+        </details>
+      </div>
+    </div>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

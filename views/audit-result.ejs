@@ -1,0 +1,159 @@
+<%
+function n(v) { return fmtInt(v); }
+%>
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+    <div class="btn-row" style="margin-bottom:12px">
+      <a class="btn secondary sm" href="/audit">&larr; All audits</a>
+      <div class="spacer"></div>
+      <% if (report) { %>
+        <a class="btn secondary sm" href="/audit/<%= run.id %>/export" target="_blank">Print / export</a>
+        <a class="btn secondary sm" href="/audit/<%= run.id %>/csv">Download Excel</a>
+        <form method="POST" action="/audit/<%= run.id %>/create-tasks" style="display:inline">
+          <button type="submit" class="btn sm">Create tasks from findings</button>
+        </form>
+      <% } %>
+      <form method="POST" action="/audit/<%= run.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this audit run? This cannot be undone.')">
+        <button type="submit" class="btn danger-ghost sm">Delete</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><%= run.domain %></h2>
+        <span class="sub"><%= run.brand_name || 'No brand' %> &middot; started <%= fmtDateTime(run.created_at) %></span>
+      </div>
+      <div class="card-body">
+        <p style="margin:0 0 6px">
+          <span class="badge <%= statusBadge(run.status) %>"><%= run.status %></span>
+        </p>
+
+        <% if (run.status === 'error' && run.error) { %>
+          <div class="notice error"><span class="notice-icon">&#9888;</span><div class="notice-body"><%= run.error %></div></div>
+        <% } %>
+
+        <% if (isRunning) { %>
+          <div id="progress-area" class="notice info">
+            <span class="notice-icon">&#8987;</span>
+            <div class="notice-body">
+              <div>Crawl in progress&hellip; this page refreshes automatically.</div>
+              <div id="progress-lines" class="hint"></div>
+            </div>
+          </div>
+          <script>
+            (function poll() {
+              fetch('/audit/<%= run.id %>/status').then(function (r) { return r.json(); }).then(function (d) {
+                if (d.status && d.status !== 'running') { window.location.reload(); return; }
+                var el = document.getElementById('progress-lines');
+                if (el && d.progress) el.textContent = d.progress.join(' · ');
+                setTimeout(poll, 4000);
+              }).catch(function () { setTimeout(poll, 6000); });
+            })();
+          </script>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (!report) { %>
+      <% if (!isRunning && run.status !== 'error') { %>
+        <div class="card"><div class="card-body"><div class="empty-state">No structured result is available for this run.</div></div></div>
+      <% } %>
+    <% } else { %>
+
+      <% if (previousReport) { %>
+        <div class="notice <%= report.health >= previousReport.health ? 'success' : 'warn' %>">
+          <span class="notice-icon">&#8646;</span>
+          <div class="notice-body">
+            Compared with the <a href="/audit/<%= previousReport.id %>">previous crawl</a> on <%= fmtDateTime(previousReport.created_at) %>:
+            health <%= previousReport.health == null ? '—' : previousReport.health %> &rarr; <%= report.health == null ? '—' : report.health %>.
+          </div>
+        </div>
+      <% } %>
+
+      <div class="stat-row">
+        <div class="stat"><div class="label">Site health</div>
+          <div class="value"><span class="badge <%= report.health >= 90 ? 'good' : (report.health >= 70 ? 'medium' : 'critical') %> lg"><%= report.health == null ? '—' : report.health %>/100</span></div>
+        </div>
+        <div class="stat"><div class="label">Pages crawled</div><div class="value"><%= n(report.pagesCrawled) %></div></div>
+        <div class="stat"><div class="label">Critical</div><div class="value"><%= report.bySeverity.critical || 0 %></div></div>
+        <div class="stat"><div class="label">High</div><div class="value"><%= report.bySeverity.high || 0 %></div></div>
+        <div class="stat"><div class="label">Medium + low</div><div class="value"><%= (report.bySeverity.medium || 0) + (report.bySeverity.low || 0) %></div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Failing checks (<%= report.failing.length %>)</h3></div>
+        <% if (!report.failing.length) { %>
+          <div class="card-body"><div class="empty-state">No failing checks — every check passed.</div></div>
+        <% } else { %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Severity</th><th>Issue</th><th class="num">Affected</th><th>Recommended action</th></tr></thead>
+            <tbody>
+              <% report.failing.forEach(function(f){ %>
+                <tr>
+                  <td><span class="badge <%= f.severity %>"><%= f.severity %></span></td>
+                  <td>
+                    <div class="emphasis"><%= f.issue %></div>
+                    <% if (f.summary) { %><div class="hint"><%= f.summary %></div><% } %>
+                    <% if (f.items && f.items.length) { %>
+                      <ul style="margin:6px 0 0;padding-left:16px;font-size:12px;color:var(--text-2)">
+                        <% f.items.slice(0, 8).forEach(function(it){ %>
+                          <li style="word-break:break-all"><%= it.url || it.note || '—' %><% if (it.url && it.note) { %> &mdash; <%= it.note %><% } %></li>
+                        <% }) %>
+                      </ul>
+                      <% if (f.items.length > 8) { %><div class="hint"><%= f.items.length - 8 %> more not shown &mdash; see the full <a href="/audit/<%= run.id %>/csv">Excel export</a>.</div><% } %>
+                    <% } %>
+                  </td>
+                  <td class="num"><%= n(f.failed) %> <%= f.unit %></td>
+                  <td><%= f.action %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Passing checks (<%= report.passing.length %>)</h3></div>
+        <% if (!report.passing.length) { %>
+          <div class="card-body"><div class="empty-state">No checks passed.</div></div>
+        <% } else { %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Issue</th><th class="num">Checked</th></tr></thead>
+            <tbody>
+              <% report.passing.forEach(function(f){ %>
+                <tr><td><%= f.issue %></td><td class="num"><%= n(f.total) %> <%= f.unit %></td></tr>
+              <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+      </div>
+    <% } %>
+
+    <div class="card">
+      <div class="card-head"><h3>Tasks from this run</h3></div>
+      <% if (!relatedTasks.length) { %>
+        <div class="card-body"><div class="empty-state">No tasks created from this run yet.</div></div>
+      <% } else { %>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Title</th><th>Severity</th><th>Status</th><th>Assignee</th></tr></thead>
+          <tbody>
+          <% relatedTasks.forEach(function(t){ %>
+            <tr>
+              <td><a href="/tasks/<%= t.id %>"><%= t.title %></a></td>
+              <td><span class="badge <%= t.severity %>"><%= t.severity %></span></td>
+              <td><%= String(t.status).replace('_',' ') %></td>
+              <td><%= t.assignee || '—' %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+      <% } %>
+    </div>
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

@@ -1,0 +1,143 @@
+<%
+// Minimal line-icon set (24x24, stroke=currentColor) so the nav reads as a
+// designed system instead of mixed emoji glyphs across platforms/fonts.
+const ICONS = {
+  dashboard: '<rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/>',
+  brands: '<path d="M4 21V7l8-4 8 4v14"/><path d="M9 21v-6h6v6"/><path d="M9 11h.01M15 11h.01M12 11h.01"/>',
+  tasks: '<rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><path d="M8 12.5l2.6 2.6L16.5 9"/>',
+  alerts: '<path d="M12 3L2.5 20h19L12 3z"/><path d="M12 10.5v4"/><path d="M12 17.5h.01"/>',
+  opportunities: '<path d="M4 17l6-6 4 4 6-8"/><path d="M15 6h5v5"/>',
+  performance: '<path d="M4 20V10M11 20V4M18 20v-7"/><path d="M2.5 20.5h19"/>',
+  audit: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M19.5 19.5L15 15"/><path d="M8 10.5l1.7 1.7L13.5 8"/>',
+  speed: '<path d="M3.6 18.5a9.5 9.5 0 1 1 16.8 0"/><path d="M12 14.5l4.2-4.6"/><circle cx="12" cy="15.5" r="1.4"/>',
+  setup: '<path d="M12 3.2v3M12 17.8v3M3.2 12h3M17.8 12h3M6 6l2.1 2.1M15.9 15.9L18 18M18 6l-2.1 2.1M8.1 15.9L6 18"/><circle cx="12" cy="12" r="3.2"/>',
+  team: '<circle cx="9" cy="8" r="3.3"/><path d="M2.8 20a6.2 6.2 0 0 1 12.4 0"/><path d="M16.5 5.4a3.3 3.3 0 0 1 0 6.2"/><path d="M17.8 14.5A6.2 6.2 0 0 1 21.2 20"/>',
+  linking: '<circle cx="7" cy="12" r="3.4"/><circle cx="17" cy="12" r="3.4"/><path d="M10 12h4"/>',
+  keywords: '<path d="M12.5 3.5H20v7.5L11 20l-8-8 9.5-8.5z"/><path d="M16 7.5h.01"/>',
+  briefs: '<path d="M6 3.5h9l4 4V20a1 1 0 01-1 1H6a1 1 0 01-1-1V4.5a1 1 0 011-1z"/><path d="M15 3.5V8h4"/><path d="M8.5 13.5h7M8.5 17h4.5"/><path d="M9.5 10l1 1 2-2"/>',
+  reports: '<path d="M6 3.5h9l4 4V20a1 1 0 01-1 1H6a1 1 0 01-1-1V4.5a1 1 0 011-1z"/><path d="M15 3.5V8h4"/><path d="M8.5 13h7M8.5 16.5h7"/>',
+  connect: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.4 2.3 3.6 5.3 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.3-3.6-8.5S9.6 5.8 12 3.5z"/>',
+  workflow: '<circle cx="5" cy="6" r="2.3"/><circle cx="19" cy="6" r="2.3"/><circle cx="12" cy="18" r="2.3"/><path d="M7 7.3L11 16M17 7.3L13 16"/>',
+  settings: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.4M12 18.1v2.4M20.5 12h-2.4M5.9 12H3.5M17.7 6.3l-1.7 1.7M8 16l-1.7 1.7M17.7 17.7L16 16M8 8L6.3 6.3"/>',
+  ai: '<path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z"/><path d="M19 15l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8.8-1.9z"/>',
+};
+function icon(name) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONS[name] || ''}</svg>`;
+}
+%>
+<nav class="sidebar">
+  <div class="brand"><span class="dot"></span> SEO Suite</div>
+
+  <%
+  /* Nav order follows the way the work actually runs: see the numbers →
+     analyse them → act on what they say → hand a report over → configure.
+     Items were previously grouped by when they were built rather than by
+     what they are for (Performance sat under "Analyse" next to the crawlers,
+     Weekly reports sat under "Analyse" though it is a deliverable, and the
+     two AI areas were split across "Analyse" and "Setup"). */
+  %>
+
+  <div class="nav-section">Overview</div>
+  <div class="nav-group">
+    <% if (perms && perms.isAdmin && typeof setupRemaining !== 'undefined' && setupRemaining > 0) { %>
+      <a class="nav-link <%= active === 'onboarding' ? 'active' : '' %>" href="/onboarding">
+        <span class="nav-icon"><%- icon('setup') %></span> Get started
+        <span class="nav-badge urgent"><%= setupRemaining %></span>
+      </a>
+    <% } %>
+    <a class="nav-link <%= active === 'dashboard' ? 'active' : '' %>" href="/dashboard">
+      <span class="nav-icon"><%- icon('dashboard') %></span> Dashboard
+    </a>
+    <a class="nav-link <%= active === 'performance' ? 'active' : '' %>" href="/performance">
+      <span class="nav-icon"><%- icon('performance') %></span> Performance
+    </a>
+  </div>
+
+  <div class="nav-section">Analyse</div>
+  <div class="nav-group">
+    <a class="nav-link <%= active === 'audit' ? 'active' : '' %>" href="/audit">
+      <span class="nav-icon"><%- icon('audit') %></span> Technical audit
+    </a>
+    <a class="nav-link <%= active === 'pagespeed' ? 'active' : '' %>" href="/pagespeed">
+      <span class="nav-icon"><%- icon('speed') %></span> PageSpeed
+    </a>
+    <a class="nav-link <%= active === 'linking' ? 'active' : '' %>" href="/linking">
+      <span class="nav-icon"><%- icon('linking') %></span> Internal linking
+    </a>
+    <a class="nav-link <%= active === 'keywords' ? 'active' : '' %>" href="/keywords">
+      <span class="nav-icon"><%- icon('keywords') %></span> Keyword clusters
+    </a>
+    <a class="nav-link <%= active === 'briefs' ? 'active' : '' %>" href="/keywords/briefs">
+      <span class="nav-icon"><%- icon('briefs') %></span> Content briefs
+    </a>
+  </div>
+
+  <div class="nav-section">Act</div>
+  <div class="nav-group">
+    <a class="nav-link <%= active === 'alerts' ? 'active' : '' %>" href="/alerts">
+      <span class="nav-icon"><%- icon('alerts') %></span> Alerts
+      <% if (navCounts.openAlerts) { %><span class="nav-badge"><%= navCounts.openAlerts %></span><% } %>
+    </a>
+    <a class="nav-link <%= active === 'opportunities' ? 'active' : '' %>" href="/tasks/opportunities">
+      <span class="nav-icon"><%- icon('opportunities') %></span> Opportunities
+    </a>
+    <a class="nav-link <%= active === 'tasks' ? 'active' : '' %>" href="/tasks">
+      <span class="nav-icon"><%- icon('tasks') %></span> Tasks
+      <% if (navCounts.needsApproval) { %>
+        <span class="nav-badge urgent" title="<%= navCounts.needsApproval %> awaiting approval"><%= navCounts.needsApproval %></span>
+      <% } else if (navCounts.openTasks) { %>
+        <span class="nav-badge"><%= navCounts.openTasks %></span>
+      <% } %>
+    </a>
+  </div>
+
+  <div class="nav-section">Report</div>
+  <div class="nav-group">
+    <a class="nav-link <%= active === 'reports' ? 'active' : '' %>" href="/reports">
+      <span class="nav-icon"><%- icon('reports') %></span> Weekly reports
+    </a>
+  </div>
+
+  <div class="nav-section">AI</div>
+  <div class="nav-group">
+    <a class="nav-link <%= active === 'ai' ? 'active' : '' %>" href="/ai-suggestions">
+      <span class="nav-icon"><%- icon('ai') %></span> AI Suggestions
+      <span class="nav-badge">soon</span>
+    </a>
+    <a class="nav-link <%= active === 'ai-lab' ? 'active' : '' %>" href="/ai-lab">
+      <span class="nav-icon"><%- icon('ai') %></span> AI Lab
+      <span class="nav-badge">beta</span>
+    </a>
+  </div>
+
+  <div class="nav-section">Setup</div>
+  <div class="nav-group">
+    <a class="nav-link <%= active === 'brands' ? 'active' : '' %>" href="/brands">
+      <span class="nav-icon"><%- icon('brands') %></span> Brands &amp; sync
+      <% if (navBrands && navBrands.length) { %><span class="nav-badge"><%= navBrands.length %></span><% } %>
+    </a>
+    <% if (perms && perms.isAdmin) { %>
+      <a class="nav-link <%= active === 'team' ? 'active' : '' %>" href="/team">
+        <span class="nav-icon"><%- icon('team') %></span> Team
+        <% if (pendingMembers) { %>
+          <span class="nav-badge urgent" title="<%= pendingMembers %> waiting for approval"><%= pendingMembers %></span>
+        <% } %>
+      </a>
+    <% } %>
+    <a class="nav-link <%= active === 'connect' ? 'active' : '' %>" href="/connect">
+      <span class="nav-icon"><%- icon('connect') %></span> Connect Google
+    </a>
+    <a class="nav-link <%= active === 'settings' ? 'active' : '' %>" href="/settings">
+      <span class="nav-icon"><%- icon('settings') %></span> Settings
+    </a>
+    <a class="nav-link <%= active === 'workflow' ? 'active' : '' %>" href="/workflow">
+      <span class="nav-icon"><%- icon('workflow') %></span> Workflow map
+    </a>
+  </div>
+
+  <div class="sidebar-foot">
+    Automation identifies and recommends.<br>People approve and publish.
+  </div>
+</nav>
+
+<main class="main">

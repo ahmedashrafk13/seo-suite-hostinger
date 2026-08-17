@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+    <div class="card">
+      <div class="card-body">
+        <p class="hint">
+          <strong>Beta / comparison area.</strong> This section generates an AI-powered counterpart to four
+          existing deterministic features, using a paid Azure OpenAI model, so the team can compare them
+          side by side before deciding which to ship. Nothing here runs automatically — every generation is
+          a manual button click, and every call is logged and capped.
+        </p>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat">
+        <div class="label">Spend to date</div>
+        <div class="value">$<%= dashboard.spent.toFixed(4) %></div>
+        <div class="meta">of $<%= dashboard.cap.toFixed(2) %> cap</div>
+      </div>
+      <div class="stat">
+        <div class="label">Remaining budget</div>
+        <div class="value">$<%= dashboard.remaining.toFixed(4) %></div>
+      </div>
+      <div class="stat">
+        <div class="label">Total calls logged</div>
+        <div class="value"><%= dashboard.history.length %></div>
+      </div>
+      <div class="stat">
+        <div class="label">Pricing basis</div>
+        <div class="value sm">$<%= dashboard.pricing.inputPer1M %>/1M in · $<%= dashboard.pricing.outputPer1M %>/1M out</div>
+        <div class="meta">approximate list price — verify against your Azure agreement</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Spend by feature</h3></div>
+      <div class="card-body">
+        <% if (!dashboard.byFeature.length) { %>
+          <div class="empty-state">No AI calls logged yet.</div>
+        <% } else { %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Feature</th><th>Calls</th><th>Prompt tokens</th><th>Completion tokens</th><th>Cost (USD)</th></tr></thead>
+            <tbody>
+            <% dashboard.byFeature.forEach(function(f){ %>
+              <tr>
+                <td><%= f.feature %></td>
+                <td><%= f.calls %></td>
+                <td><%= fmtInt(f.prompt_tokens) %></td>
+                <td><%= fmtInt(f.completion_tokens) %></td>
+                <td>$<%= Number(f.cost_usd).toFixed(4) %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Pick a brand</h3></div>
+      <div class="card-body">
+        <% if (!brands.length) { %>
+          <div class="empty-state">Add a brand first.</div>
+        <% } else { %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Brand</th><th>AI Content Brief</th><th>AI Opportunities</th><th>AI Linking Rationale</th><th>AI Task Recommendations</th></tr></thead>
+            <tbody>
+            <% brands.forEach(function(b){ %>
+              <tr>
+                <td><%= b.name %></td>
+                <td><a class="btn secondary sm" href="/keywords?brand=<%= b.id %>">Pick a cluster from Keyword clusters &rarr;</a></td>
+                <td><a class="btn secondary sm" href="/ai-lab/<%= b.id %>/opportunities">Open</a></td>
+                <td><a class="btn secondary sm" href="/ai-lab/<%= b.id %>/linking">Open</a></td>
+                <td><a class="btn secondary sm" href="/ai-lab/<%= b.id %>/tasks">Open</a></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+          <p class="hint">Content briefs are generated per keyword cluster — approve a cluster in Keyword clustering, then look for the "AI (Beta)" link on its real content brief.</p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Generation history</h3></div>
+      <div class="card-body">
+        <% if (!dashboard.history.length) { %>
+          <div class="empty-state">Nothing generated yet.</div>
+        <% } else { %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>When</th><th>Feature</th><th>Brand</th><th>Prompt tokens</th><th>Completion tokens</th><th>Cost</th></tr></thead>
+            <tbody>
+            <% dashboard.history.forEach(function(h){ %>
+              <tr>
+                <td><%= fmtDateTime(h.created_at) %></td>
+                <td><%= h.feature %></td>
+                <td><%= h.brand_name || '—' %></td>
+                <td><%= fmtInt(h.prompt_tokens) %></td>
+                <td><%= fmtInt(h.completion_tokens) %></td>
+                <td>$<%= Number(h.cost_usd).toFixed(4) %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+      </div>
+    </div>
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>
