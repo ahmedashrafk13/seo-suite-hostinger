@@ -15,7 +15,16 @@
     // installs and only one of them carry its packages — so the state is
     // checked and shown here rather than discovered as a failed crawl.
     %>
-    <% if (typeof pythonStatus !== 'undefined' && pythonStatus && !pythonStatus.ok) { %>
+    <%
+    // Only a deployment that will ACTUALLY run the Python crawler can be
+    // blocked by a missing Python package. Where the JavaScript port is
+    // selected instead — every container build, and any host without a Python
+    // interpreter — the audit runs perfectly well and this banner was pure
+    // false alarm: it claimed audits would fail immediately, and offered an
+    // install button whose only possible outcome was `spawnSync python ENOENT`.
+    const usingPython = typeof tool !== 'undefined' && tool && tool.runtime === 'python';
+    %>
+    <% if (usingPython && typeof pythonStatus !== 'undefined' && pythonStatus && !pythonStatus.ok) { %>
       <div class="notice error">
         <span class="notice-icon">&#9888;</span>
         <div class="notice-body">
@@ -35,6 +44,14 @@
           <% } %>
         </div>
       </div>
+    <% } else if (!usingPython) { %>
+      <p class="hint mt-0">
+        Audits run on the <strong>JavaScript port</strong> of the crawler
+        <% if (typeof tool !== 'undefined' && tool && tool.choice && tool.choice.reason) { %>
+          <span class="muted">(<%= tool.choice.reason %>)</span>
+        <% } %>
+        — no Python required, and nothing to install.
+      </p>
     <% } %>
 
     <div class="card">
