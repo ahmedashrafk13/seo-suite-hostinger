@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>The graph view of the site.</strong> Crawls it, builds an entity fingerprint per page, finds the
+        topic clusters those fingerprints imply, and reports what is missing from them: pages nothing links to,
+        hubs that do not link to their own spokes, breadcrumb trails that are absent or that would point at a
+        404, and the specific link pairs worth adding.
+      </p>
+      <p class="hint" style="margin-bottom:0">
+        Links are proposed from <strong>named-entity overlap</strong>, not keyword matching. Two pages that both
+        discuss the same standards and bodies are genuinely related; two pages that both contain the word
+        "training" are not. That selectivity is what keeps the list short enough to review — which is the only
+        length that gets used. This does not replace the full
+        <a href="/linking">internal linking crawl</a>, which sweeps far more pages and produces the spreadsheet.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <% if (brand) { %>
+  <div class="card">
+    <div class="card-head"><h3>Analyse architecture</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/ai-seo/architecture/run">
+        <input type="hidden" name="brand_id" value="<%= brand.id %>">
+        <div class="field-row">
+          <label class="field">
+            <span>Pages to crawl</span>
+            <select name="max_pages">
+              <option value="30">30 — quick look</option>
+              <option value="60" selected>60 — default</option>
+              <option value="120">120</option>
+              <option value="200">200 — slow, several minutes</option>
+            </select>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="want_ai" <%= aiAvailable ? 'checked' : 'disabled' %>>
+            Ask the model to write the anchor text and reason for each proposed link
+            <% if (!aiAvailable) { %><span class="muted">— needs an Azure OpenAI credential</span><% } %>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check"><input type="checkbox" name="force" value="1"> Regenerate rather than reusing the cached anchor text</label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite ? '' : 'disabled' %>>Build the graph</button>
+        </div>
+        <p class="hint">
+          If the site renders its navigation with JavaScript, the crawler sees no links and this will report
+          almost nothing — which is itself a finding, and a serious one, since AI retrieval fetchers see the
+          same thing.
+        </p>
+      </form>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

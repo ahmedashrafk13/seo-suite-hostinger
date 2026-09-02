@@ -84,7 +84,7 @@
                   <div class="ah-title">
                     <span class="dot-sev <%= it.severity %>"></span>
                     <%= it.def.label %>
-                    <% if (!it.available) { %><span class="badge neutral">needs <%= it.def.requires %> data</span><% } %>
+                    <% if (!it.available) { %><span class="badge neutral">needs <%= it.def.requiresLabel || (it.def.requires + ' data') %></span><% } %>
                     <% if (it.firedCount) { %><span class="badge accent"><%= it.firedCount %> fired</span><% } %>
                   </div>
                   <div class="ah-desc"><%= it.def.description %></div>

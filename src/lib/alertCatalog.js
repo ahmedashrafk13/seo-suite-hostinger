@@ -1399,6 +1399,237 @@ define({
 });
 
 // =========================================================================
+// GROUP 10 — AI SEO suite
+// =========================================================================
+//
+// These read what the AI SEO analyses have already measured (aiseo_runs,
+// aiseo_findings, aiseo_metrics) rather than doing the measuring themselves.
+//
+// That separation is deliberate. The analyses crawl sites, probe user agents
+// and call PageSpeed — work measured in minutes. The alert engine runs every
+// brand's subscriptions on an hourly tick and must stay fast, so it reads the
+// stored result of the last sweep instead of triggering a new one. The sweeps
+// themselves are scheduled jobs (see lib/scheduler.js: aiseo_tracking,
+// aiseo_reputation, aiseo_freshness).
+//
+// The consequence, stated so nobody is surprised by it: these alerts are only
+// as current as the last sweep. `aiseo_stale_sweep` below exists specifically
+// so a sweep that has silently stopped running is itself alertable — otherwise
+// a broken cron would present as "no problems found".
+
+// Latest completed run of one kind for a brand.
+function latestAiseoRun(brandId, kind) {
+  const row = db.prepare(`SELECT * FROM aiseo_runs
+    WHERE brand_id=? AND kind=? AND status='completed' ORDER BY id DESC LIMIT 1`).get(brandId, kind);
+  if (!row) return null;
+  let result = null;
+  try { result = row.json_result ? JSON.parse(row.json_result) : null; } catch { result = null; }
+  return { ...row, parsed: result };
+}
+
+function aiseoFindings(runId, severities) {
+  const list = severities.map(() => '?').join(',');
+  return db.prepare(`SELECT * FROM aiseo_findings WHERE run_id=? AND severity IN (${list})
+    ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 ELSE 2 END, id`)
+    .all(runId, ...severities);
+}
+
+define({
+  key: 'aiseo_retrieval_blocked',
+  label: 'AI retrieval fetcher cannot read the site',
+  group: 'AI SEO suite',
+  description: 'Fires when the last AI-crawler readiness check found a retrieval fetcher — OAI-SearchBot, ChatGPT-User, PerplexityBot, Claude-User, Googlebot, Bingbot — unable to read the page. While one is blocked, the brand cannot be cited in that assistant\'s answers at all. Training crawlers such as GPTBot and CCBot are deliberately NOT included: blocking those costs nothing in visibility and many publishers do it on purpose.',
+  sources: ['AI-crawler readiness'], requires: 'aiseo_readiness', requiresLabel: 'a completed AI-crawler readiness check', severity: 'critical',
+  defaultFrequency: 'daily',
+  params: [],
+  evaluate({ brand }) {
+    const run = latestAiseoRun(brand.id, 'readiness');
+    if (!run || !run.parsed) return [];
+    const blocked = (run.parsed.agents || []).filter((a) => a.purpose === 'retrieval'
+      && (a.verdict === 'blocked' || a.verdict === 'degraded'));
+    if (!blocked.length) return [];
+    return [{
+      dedupe: `${brand.id}:aiseo_retrieval_blocked:${run.id}`,
+      title: `${blocked.length} AI retrieval fetcher${blocked.length === 1 ? '' : 's'} cannot read ${short(run.target)}`,
+      message: `${blocked.map((a) => `• ${a.label}\n    ${a.reason}`).join('\n')}\n\nThese fetch a page at the moment a user asks a question, in order to cite it. While they are blocked this page cannot appear in those assistants' answers.\n\nChecked ${fmtWhen(run.finished_at)} against ${run.target}.`,
+      affected: [run.target],
+      action: blocked.some((a) => a.reason && a.reason.includes('robots.txt'))
+        ? 'Remove the robots.txt rules covering the retrieval agents. Keep any training-crawler rules that were set deliberately. robots.txt changes require SEO approval.'
+        : 'robots.txt allows these agents, so the block is at the edge: check Cloudflare bot-fight mode, any "block AI scrapers" plugin, and WAF user-agent rules.',
+      evidence: { runId: run.id, agents: blocked },
+    }];
+  },
+});
+
+define({
+  key: 'aiseo_client_rendered',
+  label: 'Content is invisible without JavaScript',
+  group: 'AI SEO suite',
+  description: 'Fires when the served HTML carries almost no content, so the page depends on JavaScript to render. Every AI retrieval fetcher reads the HTML and executes no JavaScript, which makes such a page effectively blank to all of them while looking perfect in a browser.',
+  sources: ['AI-crawler readiness', 'SEO tracking sweep'], requires: 'aiseo_readiness', requiresLabel: 'a completed AI-crawler readiness check', severity: 'critical',
+  defaultFrequency: 'daily',
+  params: [],
+  evaluate({ brand }) {
+    const run = latestAiseoRun(brand.id, 'readiness');
+    if (!run || !run.parsed || !run.parsed.jsDependence) return [];
+    const js = run.parsed.jsDependence;
+    if (!js.likelyClientRendered) return [];
+    return [{
+      dedupe: `${brand.id}:aiseo_client_rendered:${run.id}`,
+      title: `${short(run.target)} serves only ${js.servedWordCount} words before any JavaScript runs`,
+      message: `The HTML this server returns contains ${js.servedWordCount} words of main content and shows single-page-app markers (${js.scriptCount} script tags). Every AI retrieval fetcher reads this HTML and runs no JavaScript, so to them the page is effectively blank. Googlebot does render, on a delay and not always.\n\nChecked ${fmtWhen(run.finished_at)}.`,
+      affected: [run.target],
+      action: 'Server-render or pre-render the main content so it is present in the initial HTML response. On a client-rendered site this is the single highest-impact AI-visibility fix available.',
+      evidence: { runId: run.id, jsDependence: js },
+    }];
+  },
+});
+
+define({
+  key: 'aiseo_tracking_regression',
+  label: 'A tracking metric regressed',
+  group: 'AI SEO suite',
+  description: 'Watches the tracking board\'s metric history and fires when a metric that was passing now fails. Reads stored captures, so it is only as current as the last sweep.',
+  sources: ['SEO tracking sweep'], requires: 'aiseo_tracking', requiresLabel: 'a completed tracking sweep', severity: 'high',
+  defaultFrequency: 'daily',
+  params: [
+    { key: 'includeWarnings', label: 'Also alert on good → warning', type: 'select', default: 0, options: [{ value: 0, label: 'No — only good → fail' }, { value: 1, label: 'Yes' }] },
+    { key: 'maxItems', label: 'Report at most', type: 'number', default: 12, unit: 'metrics per alert' },
+  ],
+  evaluate({ brand, params }) {
+    // The newest capture per (metric, url), and the one before it. The
+    // correlated subquery is what keeps the timestamp and the value on the
+    // same row — a MAX() with GROUP BY would pair the latest timestamp with an
+    // arbitrary value, which is the classic way this check goes silently wrong.
+    const latest = db.prepare(`SELECT m.* FROM aiseo_metrics m
+      WHERE m.brand_id = ? AND m.metric_key LIKE 'track.%' AND m.captured_at = (
+        SELECT MAX(m2.captured_at) FROM aiseo_metrics m2
+        WHERE m2.brand_id = m.brand_id AND m2.metric_key = m.metric_key AND m2.url = m.url
+      )`).all(brand.id);
+    if (!latest.length) return [];
+
+    const bad = params.includeWarnings ? ['fail', 'warn'] : ['fail'];
+    const regressions = [];
+    latest.forEach((cur) => {
+      if (!bad.includes(cur.status)) return;
+      const prev = db.prepare(`SELECT * FROM aiseo_metrics
+        WHERE brand_id=? AND metric_key=? AND url=? AND captured_at < ?
+        ORDER BY captured_at DESC LIMIT 1`).get(brand.id, cur.metric_key, cur.url, cur.captured_at);
+      // No history means this is a baseline, not a regression. Alerting on a
+      // first capture would fire on every metric the first time a brand is
+      // swept, which is the fastest way to train someone to ignore alerts.
+      if (!prev || prev.status !== 'good') return;
+      regressions.push({ metric: cur.metric_key, url: cur.url, from: prev, to: cur });
+    });
+    if (!regressions.length) return [];
+
+    const shown = regressions.slice(0, params.maxItems);
+    return [{
+      dedupe: `${brand.id}:aiseo_tracking_regression:${latest[0].captured_at}`,
+      title: `${regressions.length} tracking metric${regressions.length === 1 ? '' : 's'} regressed on ${brand.name}`,
+      message: shown.map((x) => `• ${x.metric}${x.url ? ` (${short(x.url, 60)})` : ''}\n    was ${x.from.value} (${x.from.status}) on ${String(x.from.captured_at).slice(0, 16)}, now ${x.to.value} (${x.to.status})${x.to.detail ? ` — ${x.to.detail}` : ''}`).join('\n')
+        + (regressions.length > shown.length ? `\n\n…and ${regressions.length - shown.length} more.` : '')
+        + '\n\nRead from the stored tracking history, so this reflects the last completed sweep rather than the site right now.',
+      affected: shown.map((x) => x.url || brand.site_url),
+      action: 'Open the tracking board for this brand — the failing check names the affected URLs and the specific fix.',
+      evidence: { regressions: shown },
+    }];
+  },
+});
+
+define({
+  key: 'aiseo_damaging_mention',
+  label: 'A damaging brand claim appeared',
+  group: 'AI SEO suite',
+  description: 'Fires when the reputation scan stores a new third-party mention carrying a fraud, legal, closure, safety or accreditation claim. An unchallenged claim of this kind can become an assistant\'s stated answer about the brand to everyone who asks.',
+  sources: ['Reputation scan'], requires: 'aiseo_reputation', requiresLabel: 'a completed reputation scan', severity: 'critical',
+  defaultFrequency: 'daily',
+  params: [
+    { key: 'lookbackDays', label: 'Consider mentions first seen in the last', type: 'number', default: 3, unit: 'days' },
+    { key: 'maxItems', label: 'Report at most', type: 'number', default: 10, unit: 'mentions' },
+  ],
+  evaluate({ brand, params }) {
+    const since = new Date(Date.now() - (Math.max(1, params.lookbackDays) * 86400000))
+      .toISOString().slice(0, 19).replace('T', ' ');
+    const rows = db.prepare(`SELECT * FROM mentions
+      WHERE brand_id=? AND risk IS NOT NULL AND reviewed_at IS NULL AND first_seen_at >= ?
+      ORDER BY first_seen_at DESC LIMIT ?`).all(brand.id, since, Math.max(1, params.maxItems));
+    if (!rows.length) return [];
+    return [{
+      dedupe: `${brand.id}:aiseo_damaging_mention:${rows[0].dedupe_key}`,
+      title: `${rows.length} new mention${rows.length === 1 ? '' : 's'} carrying a damaging claim about ${brand.name}`,
+      message: rows.map((m) => `• [${m.source}] ${m.risk}\n    ${m.title || m.url}\n    ${m.url}`).join('\n')
+        + '\n\nAsked whether this brand can be trusted, an assistant weighs third-party discussion heavily — it is the part the brand did not write.',
+      affected: rows.map((m) => m.url),
+      action: 'Read each one before responding. Where a claim is factually wrong, correct it at the source and publish a page stating the correct fact plainly, so both a person and a retrieval system can find it. Mark each as reviewed on the reputation page once handled.',
+      evidence: { mentions: rows.map((m) => ({ url: m.url, source: m.source, risk: m.risk, title: m.title })) },
+    }];
+  },
+});
+
+define({
+  key: 'aiseo_intent_drift',
+  label: 'A page\'s search intent has drifted',
+  group: 'AI SEO suite',
+  description: 'Fires when the freshness sweep finds a page whose query mix has shifted materially — the topic is unchanged but the question being asked of it has moved. Traffic usually falls too slowly for any other alert to catch this, and the page reads perfectly well on inspection.',
+  sources: ['Freshness & intent drift'], requires: 'aiseo_freshness', requiresLabel: 'a completed freshness sweep', severity: 'high',
+  defaultFrequency: 'weekly',
+  params: [{ key: 'maxItems', label: 'Report at most', type: 'number', default: 8, unit: 'pages' }],
+  evaluate({ brand, params }) {
+    const run = latestAiseoRun(brand.id, 'freshness');
+    if (!run || !run.parsed) return [];
+    const drifted = (run.parsed.pages || []).filter((p) => p.verdict === 'intent-drift');
+    if (!drifted.length) return [];
+    const shown = drifted.slice(0, Math.max(1, params.maxItems));
+    return [{
+      dedupe: `${brand.id}:aiseo_intent_drift:${run.id}`,
+      title: `${drifted.length} page${drifted.length === 1 ? '' : 's'} on ${brand.name} show search-intent drift`,
+      message: shown.map((p) => {
+        const gained = (p.drift.gained || []).slice(0, 3).map((g) => `"${g.query}"`).join(', ');
+        const lost = (p.drift.lost || []).slice(0, 3).map((g) => `"${g.query}"`).join(', ');
+        return `• ${short(p.page, 80)}\n    divergence ${p.drift.divergence} bits${p.drift.intentChanged ? `, ${p.drift.intentFrom} → ${p.drift.intentTo}` : ''}\n    now gaining: ${gained || '—'}\n    no longer showing for: ${lost || '—'}`;
+      }).join('\n') + `\n\nMeasured ${fmtWhen(run.finished_at)} as Jensen-Shannon divergence over the impression-weighted query mix between two Search Console snapshots.`,
+      affected: shown.map((p) => p.page),
+      action: 'Re-angle rather than rewrite — the subject is still right. Compare each page\'s gained and lost query lists: together they name the new question precisely.',
+      evidence: { runId: run.id, pages: shown.map((p) => ({ page: p.page, divergence: p.drift.divergence, intentFrom: p.drift.intentFrom, intentTo: p.drift.intentTo })) },
+    }];
+  },
+});
+
+define({
+  key: 'aiseo_stale_sweep',
+  label: 'AI SEO sweeps have stopped running',
+  group: 'AI SEO suite',
+  description: 'Fires when no tracking sweep has completed for a while. This exists because the failure mode of every other alert in this group is silent: a cron that stopped firing produces no findings, which is indistinguishable from a healthy site.',
+  sources: ['SEO tracking sweep'], requires: 'aiseo_tracking', requiresLabel: 'a completed tracking sweep', severity: 'medium',
+  defaultFrequency: 'daily',
+  params: [{ key: 'maxAgeDays', label: 'Alert when the newest sweep is older than', type: 'number', default: 10, unit: 'days' }],
+  evaluate({ brand, params }) {
+    const row = db.prepare(`SELECT MAX(finished_at) last FROM aiseo_runs
+      WHERE brand_id=? AND kind='tracking' AND status='completed'`).get(brand.id);
+    if (!row || !row.last) return []; // never swept: nothing to compare against
+    const ageDays = Math.floor((Date.now() - Date.parse(String(row.last).replace(' ', 'T') + 'Z')) / 86400000);
+    if (!Number.isFinite(ageDays) || ageDays <= params.maxAgeDays) return [];
+    return [{
+      dedupe: `${brand.id}:aiseo_stale_sweep:${A.isoDate(new Date())}`,
+      title: `No tracking sweep for ${brand.name} in ${ageDays} days`,
+      message: `The last completed sweep finished ${String(row.last).slice(0, 16)}. Every other alert in this group reads stored sweep results, so while sweeps are not running they will report nothing — which looks exactly like a clean site.\n\nWith several brands the scheduled job rotates one per tick, so each brand is swept every N days by design; raise the threshold if that is the intended cadence.`,
+      affected: [brand.site_url],
+      action: 'Check the scheduled job is firing (Settings → scheduled work, or /internal/cron/status), then run a sweep by hand from the tracking board to confirm it completes.',
+      evidence: { lastSweep: row.last, ageDays },
+    }];
+  },
+});
+
+// Formats a stored timestamp for an alert body. Kept local because alert
+// messages are plain text sent by email and Slack, where the view helpers are
+// not available.
+function fmtWhen(ts) {
+  if (!ts) return 'at an unknown time';
+  return `on ${String(ts).slice(0, 16).replace('T', ' ')}`;
+}
+
+// =========================================================================
 // Public API
 // =========================================================================
 
@@ -1413,6 +1644,7 @@ const GROUP_ORDER = [
   'Core Web Vitals',
   'Availability',
   'Technical audit',
+  'AI SEO suite',
   'Data health',
 ];
 
@@ -1465,10 +1697,33 @@ function brandCapabilities(brand) {
     uptime: has('SELECT COUNT(*) n FROM uptime_checks WHERE brand_id=?'),
     audit: has("SELECT COUNT(*) n FROM audit_runs WHERE brand_id=? AND status='completed'"),
     linking: has("SELECT COUNT(*) n FROM linking_runs WHERE brand_id=? AND status='completed'"),
+    // The AI SEO alerts read stored analysis results, so each one's capability
+    // is "has that analysis ever completed for this brand". Gating on the run
+    // rather than on a credential is what makes a subscription unusable until
+    // there is actually something for it to read — otherwise it would sit
+    // enabled and silent, which is worse than being unavailable.
+    aiseo_readiness: has("SELECT COUNT(*) n FROM aiseo_runs WHERE brand_id=? AND kind='readiness' AND status='completed'"),
+    aiseo_tracking: has("SELECT COUNT(*) n FROM aiseo_runs WHERE brand_id=? AND kind='tracking' AND status='completed'"),
+    aiseo_reputation: has("SELECT COUNT(*) n FROM aiseo_runs WHERE brand_id=? AND kind='reputation' AND status='completed'"),
+    aiseo_freshness: has("SELECT COUNT(*) n FROM aiseo_runs WHERE brand_id=? AND kind='freshness' AND status='completed'"),
   };
 }
 
+// Human wording for a capability gate, used where a definition is not to hand.
+const CAPABILITY_LABELS = {
+  gsc: 'Search Console data',
+  ga4: 'GA4 data',
+  psi: 'PageSpeed data',
+  uptime: 'uptime data',
+  audit: 'a completed technical audit',
+  linking: 'a completed internal-linking crawl',
+  aiseo_readiness: 'a completed AI-crawler readiness check',
+  aiseo_tracking: 'a completed tracking sweep',
+  aiseo_reputation: 'a completed reputation scan',
+  aiseo_freshness: 'a completed freshness sweep',
+};
+
 module.exports = {
   all, get, grouped, resolveParams, brandCapabilities,
-  GROUP_ORDER, FREQUENCIES, CHANNELS,
+  GROUP_ORDER, FREQUENCIES, CHANNELS, CAPABILITY_LABELS,
 };

@@ -1,0 +1,35 @@
+<%
+/* Brand selector, shared by every AI SEO page.
+   When exactly one brand exists it is selected automatically by the route, so
+   this renders as a static line rather than a control nobody needs to touch.
+   With several brands it is a real choice, and NOT making it would mean
+   silently analysing the wrong site. */
+%>
+<% if (!brands.length) { %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body">
+      No brands yet. <a href="/brands">Add a brand</a> — these analyses run against a brand's website, its Search Console history, or both.
+    </div>
+  </div>
+<% } else if (brands.length === 1) { %>
+  <p class="hint mt-0">
+    Analysing <strong><%= brands[0].name %></strong> — <span class="muted"><%= brands[0].site_url %></span>
+    <% if (!brands[0].gsc_property) { %>
+      · <span class="badge medium">No Search Console property paired</span>
+    <% } %>
+  </p>
+<% } else { %>
+  <form method="GET" class="filter-bar" style="margin-bottom:14px">
+    <label class="field">
+      <span>Brand</span>
+      <select name="brand" onchange="this.form.submit()">
+        <option value="">Choose a brand…</option>
+        <% brands.forEach(function(b){ %>
+          <option value="<%= b.id %>" <%= brand && brand.id === b.id ? 'selected' : '' %>><%= b.name %></option>
+        <% }) %>
+      </select>
+    </label>
+    <noscript><button type="submit" class="btn secondary sm">Switch</button></noscript>
+  </form>
+<% } %>

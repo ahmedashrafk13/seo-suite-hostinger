@@ -32,3 +32,12 @@ data/*.lock/
 # Node ports of the vendored crawlers write their own reports/ when run
 # directly from the command line with no --out.
 tools/node/linking/reports/
+
+# Local Windows helpers and stray zero-byte files created by mistyped shell
+# commands. cloudflared.exe in particular is a multi-megabyte binary that has
+# no business in the repository Fly builds from.
+cloudflared.exe
+/node
+/npm
+/cd
+seo-automation-suite@1.0.0

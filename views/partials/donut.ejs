@@ -7,7 +7,7 @@ const _label = typeof label !== 'undefined' ? label : '';
 const _rows = (typeof rows !== 'undefined' ? rows : []).filter((r) => Number(r[typeof valueKey !== 'undefined' ? valueKey : 'value']) > 0);
 const _nameKey = typeof nameKey !== 'undefined' ? nameKey : 'name';
 const _valueKey = typeof valueKey !== 'undefined' ? valueKey : 'value';
-const _palette = typeof colors !== 'undefined' ? colors : ['#2563eb', '#4f46e5', '#0d9488', '#ea580c', '#ca8a04', '#94a3b8'];
+const _palette = typeof colors !== 'undefined' ? colors : ['#1e4d6b', '#0f766e', '#0f766e', '#c2620c', '#816200', '#9aa2b4'];
 const _uid = `dn${Math.random().toString(36).slice(2, 9)}`;
 %>
 <div class="donut-card">
@@ -50,7 +50,7 @@ const _uid = `dn${Math.random().toString(36).slice(2, 9)}`;
             plotOptions: { pie: { donut: { size: '68%', labels: {
               show: true,
               value: { fontSize: '22px', fontWeight: 700, color: '#0f172a', offsetY: -4 },
-              total: { show: true, label: 'Total', fontSize: '11px', color: '#94a3b8',
+              total: { show: true, label: 'Total', fontSize: '11px', color: '#9aa2b4',
                 formatter: function () { return total.toLocaleString('en-US'); } },
             } } } },
             tooltip: { theme: 'light', y: { formatter: function (v) { return v.toLocaleString('en-US') + ' (' + (total > 0 ? Math.round((v / total) * 100) : 0) + '%)'; } } },

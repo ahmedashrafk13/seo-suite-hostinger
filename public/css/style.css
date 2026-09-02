@@ -4,57 +4,65 @@
    so the chrome stays quiet and the data carries the colour.
    ========================================================================== */
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Roboto+Mono:wght@400;500;600&display=swap');
+
 :root {
-  /* Neutrals — slightly cool, so severity colours read cleanly against them */
-  --bg:            #f5f7fb;
+  /* Neutrals — a deep, slightly blue-black ink on a cool paper, not the
+     mid-grey "generic dashboard" scale. Contrast is deliberately high. */
+  --bg:            #f4f6fa;
   --surface:       #ffffff;
-  --surface-2:     #f9fafc;
-  --surface-3:     #eef1f6;
-  --border:        #e5e9f0;
-  --border-strong: #cbd3e0;
+  --surface-2:     #f7f9fc;
+  --surface-3:     #eaeef5;
+  --border:        #e2e6ef;
+  --border-strong: #c7ccdb;
 
-  --text:      #0f172a;
-  --text-2:    #475569;
-  --text-3:    #64748b;
-  --text-4:    #94a3b8; /* decorative-only: dots, borders — never body/label text (fails AA contrast) */
+  --text:      #0c1220;
+  --text-2:    #454f63;
+  --text-3:    #6b7488;
+  --text-4:    #9aa2b4; /* decorative-only: dots, borders — never body/label text (fails AA contrast) */
 
-  /* Brand — confident, trustworthy blue with an indigo lean */
-  --accent:        #2563eb;
-  --accent-hover:  #1d4ed8;
-  --accent-active: #1e40af;
-  --accent-soft:   #eef2ff;
-  --accent-border: #c7d7fe;
-  --accent-2:      #4f46e5;
+  /* Brand — deep teal-leaning indigo, a step off the default "SaaS blue"
+     while staying cool and trustworthy. Amber CTA accent for contrast. */
+  --accent:        #1e4d6b;
+  --accent-hover:  #163a52;
+  --accent-active: #102a3c;
+  --accent-soft:   #e9f1f6;
+  --accent-border: #bfd7e5;
+  --accent-2:      #0f766e;
+
+  --cta:        #c2620c;
+  --cta-hover:  #a4520a;
+  --cta-soft:   #fdf1e5;
 
   /* Severity — used for alerts, findings and task priority alike */
-  --critical:      #dc2626;
-  --critical-soft: #fef2f2;
-  --high:          #ea580c;
-  --high-soft:     #fff7ed;
-  --medium:        #7d5900; /* darkened from #ca8a04 — original failed WCAG AA (2.84:1) on --medium-soft */
-  --medium-soft:   #fefce8;
-  --low:           #2563eb;
-  --low-soft:      #eff6ff;
-  --info:          #475569;
-  --info-soft:     #eef1f6;
+  --critical:      #c0273c;
+  --critical-soft: #fbedef;
+  --high:          #c2620c;
+  --high-soft:     #fdf1e5;
+  --medium:        #816200;
+  --medium-soft:   #fbf6e0;
+  --low:           #1e4d6b;
+  --low-soft:      #e9f1f6;
+  --info:          #454f63;
+  --info-soft:     #eaeef5;
 
-  --good:      #059669;
-  --good-soft: #ecfdf5;
+  --good:      #147a52;
+  --good-soft: #e7f6ee;
   --bad:       var(--critical);
   --bad-soft:  var(--critical-soft);
 
   --radius:    10px;
-  --radius-sm: 7px;
+  --radius-sm: 6px;
   --radius-lg: 14px;
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, .05);
-  --shadow:    0 1px 3px rgba(15, 23, 42, .07), 0 1px 2px rgba(15, 23, 42, .04);
-  --shadow-lg: 0 12px 28px rgba(15, 23, 42, .12), 0 2px 6px rgba(15, 23, 42, .05);
-  --shadow-focus: 0 0 0 3px rgba(37, 99, 235, .22);
+  --shadow-sm: 0 1px 2px rgba(12, 18, 32, .04);
+  --shadow:    0 2px 5px rgba(12, 18, 32, .07), 0 1px 1px rgba(12, 18, 32, .04);
+  --shadow-lg: 0 16px 32px rgba(12, 18, 32, .14), 0 2px 6px rgba(12, 18, 32, .06);
+  --shadow-focus: 0 0 0 3px rgba(30, 77, 107, .25);
 
   --sidebar-w: 236px;
   --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-heading: "Plus Jakarta Sans", var(--font);
+  --font-heading: "Fraunces", "Plus Jakarta Sans", var(--font);
   --mono: "Roboto Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
   --ease: cubic-bezier(.22, .8, .32, 1);
@@ -81,11 +89,11 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   outline: none; box-shadow: var(--shadow-focus); border-radius: var(--radius-sm);
 }
 
-h1, h2, h3, h4 { margin: 0; font-family: var(--font-heading); font-weight: 700; letter-spacing: -.015em; color: var(--text); }
-h1 { font-size: 22px; }
-h2 { font-size: 17.5px; }
-h3 { font-size: 15px; }
-h4 { font-size: 13.5px; }
+h1, h2, h3, h4 { margin: 0; font-family: var(--font-heading); font-weight: 600; letter-spacing: -.01em; color: var(--text); }
+h1 { font-size: 23px; }
+h2 { font-size: 17.5px; font-family: var(--font); font-weight: 700; letter-spacing: -.015em; }
+h3 { font-size: 15px; font-family: var(--font); font-weight: 650; letter-spacing: -.01em; }
+h4 { font-size: 13.5px; font-family: var(--font); font-weight: 650; letter-spacing: 0; }
 p { margin: 0 0 10px; }
 p:last-child { margin-bottom: 0; }
 
@@ -102,7 +110,7 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .sidebar {
   width: var(--sidebar-w);
   flex: 0 0 var(--sidebar-w);
-  background: #0b1220;
+  background: #0d1a24;
   color: #94a3b8;
   display: flex;
   flex-direction: column;
@@ -122,8 +130,8 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 }
 .sidebar .brand .dot {
   width: 9px; height: 9px; border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, .22);
+  background: var(--cta);
+  box-shadow: 0 0 0 4px rgba(194, 98, 12, .22);
   flex: 0 0 auto;
 }
 
@@ -149,7 +157,7 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .nav-link:hover { background: rgba(255, 255, 255, .07); color: #fff; text-decoration: none; }
 .nav-link.active {
   background: var(--accent); color: #fff; font-weight: 620;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, .35);
+  box-shadow: 0 2px 8px rgba(30, 77, 107, .5);
 }
 .nav-link .nav-icon {
   width: 18px; height: 18px; flex: 0 0 auto;
@@ -265,25 +273,37 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .delta.flat { color: var(--text-3); }
 
 /* --------------------------------------------------------------- badges */
+/* Flat tags with a small solid indicator dot rather than a full soft-fill
+   pill: reads as a status label first, a colour second — the pill-of-colour
+   look is what makes dashboards feel templated. */
 .badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 1.5px 7px;
-  border-radius: 20px;
-  font-size: 11px; font-weight: 620;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px 2px 7px;
+  border-radius: var(--radius-sm);
+  font-size: 11px; font-weight: 650;
   letter-spacing: .01em;
+  text-transform: uppercase;
   white-space: nowrap;
   border: 1px solid transparent;
+  line-height: 1.6;
 }
-.badge.critical { background: var(--critical-soft); color: var(--critical); border-color: #f6d4d5; }
+.badge::before {
+  content: '';
+  width: 6px; height: 6px; border-radius: 50%;
+  flex: 0 0 auto;
+  background: currentColor;
+}
+.badge.critical { background: var(--critical-soft); color: var(--critical); border-color: #f2d4d9; }
 .badge.high     { background: var(--high-soft);     color: var(--high);     border-color: #f8ddc7; }
-.badge.medium   { background: var(--medium-soft);   color: var(--medium);   border-color: #f4e7bd; }
+.badge.medium   { background: var(--medium-soft);   color: var(--medium);   border-color: #f1e4bc; }
 .badge.low      { background: var(--low-soft);      color: var(--low);      border-color: #cfe3f8; }
 .badge.info     { background: var(--info-soft);     color: var(--info);     border-color: var(--border); }
-.badge.good     { background: var(--good-soft);     color: var(--good);     border-color: #c7e8d6; }
+.badge.good     { background: var(--good-soft);     color: var(--good);     border-color: #c3e5d3; }
 .badge.accent   { background: var(--accent-soft);   color: var(--accent);   border-color: var(--accent-border); }
 .badge.neutral  { background: var(--surface-3);     color: var(--text-2);   border-color: var(--border); }
-.badge.square   { border-radius: var(--radius-sm); }
-.badge.lg       { font-size: 12px; padding: 3px 9px; }
+.badge.neutral::before, .badge.accent::before { display: none; }
+.badge.pill     { border-radius: 20px; }
+.badge.lg       { font-size: 12px; padding: 3px 10px 3px 8px; }
 
 .dot-sev {
   width: 7px; height: 7px; border-radius: 50%;
@@ -314,7 +334,7 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
   position: relative;
   user-select: none;
 }
-.btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); text-decoration: none; color: #fff; box-shadow: 0 4px 10px rgba(37, 99, 235, .22); }
+.btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); text-decoration: none; color: #fff; box-shadow: 0 4px 10px rgba(30, 77, 107, .28); }
 .btn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(15, 23, 42, .08); }
 .btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
 .btn:disabled, .btn.disabled { opacity: .5; cursor: not-allowed; box-shadow: none; transform: none; }
@@ -471,10 +491,10 @@ table.data .sub-line { font-size: 11.5px; color: var(--text-2); margin-top: 2px;
 .notice .notice-icon { flex: 0 0 auto; font-size: 14px; line-height: 1.4; }
 .notice .notice-body { flex: 1; min-width: 0; }
 .notice strong { font-weight: 620; }
-.notice.success { background: var(--good-soft); border-color: #c7e8d6; color: #12603a; }
-.notice.error   { background: var(--critical-soft); border-color: #f6d4d5; color: #98191e; }
-.notice.warn    { background: var(--medium-soft); border-color: #f4e7bd; color: #7d5900; }
-.notice.info    { background: var(--accent-soft); border-color: var(--accent-border); color: #17439c; }
+.notice.success { background: var(--good-soft); border-color: #c3e5d3; color: #0e5f3f; }
+.notice.error   { background: var(--critical-soft); border-color: #f2d4d9; color: #8a1a29; }
+.notice.warn    { background: var(--medium-soft); border-color: #f1e4bc; color: #816200; }
+.notice.info    { background: var(--accent-soft); border-color: var(--accent-border); color: #163a52; }
 
 .empty {
   text-align: center;
@@ -500,8 +520,8 @@ table.data .sub-line { font-size: 11.5px; color: var(--text-2); margin-top: 2px;
    flex icon/body structure, for one-line or pre-formatted error text. */
 .error-box {
   background: var(--critical-soft);
-  border: 1px solid #f6d4d5;
-  color: #98191e;
+  border: 1px solid #f2d4d9;
+  color: #8a1a29;
   border-radius: var(--radius-sm);
   padding: 11px 14px;
   font-size: 13px;
@@ -563,7 +583,7 @@ table.data .sub-line { font-size: 11.5px; color: var(--text-2); margin-top: 2px;
   display: inline-flex; align-items: center; gap: 6px;
   transition: color .15s var(--ease), background .15s var(--ease), border-color .15s var(--ease);
 }
-.tab:hover { color: var(--text); background: rgba(37, 99, 235, .05); text-decoration: none; }
+.tab:hover { color: var(--text); background: rgba(30, 77, 107, .06); text-decoration: none; }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--accent-soft); }
 .tab .count {
   background: var(--surface-3); color: var(--text-2);
@@ -825,7 +845,7 @@ table.data .sub-line { font-size: 11.5px; color: var(--text-2); margin-top: 2px;
   font-size: 10.5px; font-weight: 550; white-space: nowrap;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis;
 }
-.chip.brand { background: var(--accent-soft); color: #17439c; }
+.chip.brand { background: var(--accent-soft); color: #163a52; }
 
 /* Filter bar: one dense row of controls, plus removable chips for whatever is
    currently applied, so an unexpectedly empty board explains itself. */
@@ -843,7 +863,7 @@ table.data .sub-line { font-size: 11.5px; color: var(--text-2); margin-top: 2px;
   display: inline-flex; align-items: center; gap: 6px;
   padding: 2px 5px 2px 9px; border-radius: 20px;
   background: var(--accent-soft); border: 1px solid var(--accent-border);
-  color: #17439c; font-size: 11.5px; font-weight: 550;
+  color: #163a52; font-size: 11.5px; font-weight: 550;
 }
 .filter-chip .k { color: var(--accent); opacity: .8; }
 .filter-chip a {
@@ -878,10 +898,10 @@ a.stat:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
 .lock-note {
   display: flex; gap: 7px; align-items: flex-start;
   background: var(--medium-soft);
-  border: 1px solid #f4e7bd;
+  border: 1px solid #f1e4bc;
   border-radius: var(--radius-sm);
   padding: 9px 11px;
-  font-size: 12.5px; color: #7d5900;
+  font-size: 12.5px; color: #816200;
   line-height: 1.45;
 }
 
@@ -1313,7 +1333,7 @@ details.plain[open] > summary { margin-bottom: 9px; }
   background: var(--surface-3); color: var(--text-2);
   border: 1px solid var(--border);
 }
-.setup-step.is-done .setup-mark { background: var(--good-soft); color: var(--good); border-color: #c7e8d6; }
+.setup-step.is-done .setup-mark { background: var(--good-soft); color: var(--good); border-color: #c3e5d3; }
 .setup-body { flex: 1; min-width: 0; }
 .setup-body h3 { font-size: 14.5px; }
 .setup-action { flex: 0 0 auto; padding-top: 2px; }
@@ -1322,3 +1342,87 @@ details.plain[open] > summary { margin-bottom: 9px; }
   .setup-row { flex-wrap: wrap; }
   .setup-action { width: 100%; }
 }
+
+/* ---------------------------------------------------------------------------
+   AI SEO suite: classes added for the keyword-metrics, gap-analysis,
+   link-opportunity, schema-builder and site-readiness views.
+
+   Kept at the end of the file and namespaced by intent rather than by feature,
+   because several of them are wanted by more than one of those views and a
+   per-view block would have duplicated all five.
+   --------------------------------------------------------------------------- */
+
+/* A URL, an anchor phrase or a JSON fragment inside a table cell. Wraps rather
+   than truncating: a URL a reader cannot see in full is a URL they have to
+   click to identify, and these tables exist to be scanned. */
+.mono-sm {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* A dense list where the default paragraph spacing would push a 30-row list
+   off the screen. */
+ul.tight, ol.tight { margin: 6px 0 10px; padding-left: 18px; }
+ul.tight > li, ol.tight > li { margin: 0 0 3px; line-height: 1.45; }
+
+/* A ready-to-paste code block. `user-select: all` means one click selects the
+   whole block, which is the entire interaction for a JSON-LD snippet. */
+.code-block {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  background: var(--surface-2, rgba(0,0,0,.04));
+  border: 1px solid var(--border, rgba(0,0,0,.1));
+  border-radius: var(--radius-sm, 6px);
+  padding: 10px 12px;
+  margin: 8px 0;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre;
+  tab-size: 2;
+}
+.code-block.selectable { user-select: all; }
+
+/* The matrix: a comparison table whose first column is a label and whose
+   remaining columns are one score per site. Numeric columns are centred and
+   tabular so the eye can compare down a column. */
+table.matrix th, table.matrix td { text-align: center; }
+table.matrix th:first-child, table.matrix td:first-child { text-align: left; }
+table.matrix td.score { font-variant-numeric: tabular-nums; font-weight: 600; }
+table.matrix td.ours { background: rgba(56, 132, 255, .07); }
+
+/* A score cell shaded by band. Used in the topic matrix and the keyword gap so
+   a 40-row table reads at a glance instead of being scanned number by number. */
+.cell-lead { background: rgba(34, 160, 96, .12); }
+.cell-behind { background: rgba(214, 84, 61, .12); }
+.cell-absent { background: rgba(214, 84, 61, .2); font-weight: 600; }
+.cell-none { color: var(--text-3, #888); }
+
+/* A small inline meter for a 0-100 score inside a table cell. */
+.meter { display: block; height: 4px; border-radius: 2px; background: rgba(0,0,0,.08); margin-top: 3px; }
+.meter > span { display: block; height: 100%; border-radius: 2px; background: var(--accent, #3884ff); }
+.meter.good > span { background: #22a060; }
+.meter.warn > span { background: #d9a406; }
+.meter.bad > span { background: #d6543d; }
+
+/* The provenance strip that sits under a number whose source matters. Smaller
+   and quieter than a badge, because it appears on every row of some tables and
+   a badge per row would be louder than the data. */
+.basis {
+  display: inline-block;
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--text-3, #888);
+  font-family: var(--mono);
+  letter-spacing: .01em;
+}
+.basis.measured { color: #1c7f4d; }
+.basis.proxy { color: #a06a00; }
+
+/* A two-column key/value block for a schema placeholder checklist. */
+.kv { display: grid; grid-template-columns: minmax(120px, 26%) 1fr; gap: 4px 14px; margin: 8px 0; }
+.kv dt { font-family: var(--mono); font-size: 11.5px; font-weight: 600; }
+.kv dd { margin: 0; font-size: 12.5px; line-height: 1.5; }

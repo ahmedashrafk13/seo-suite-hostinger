@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%
+const FEATURES = [
+  { slug: 'research', kind: 'research', name: 'Keyword & prompt research',
+    blurb: 'Search Console queries, Google autocomplete, an alphabet sweep and related searches — with search volume, keyword difficulty and a country filter, each value labelled with the source that produced it. Plus the prompts people type into ChatGPT, Perplexity and Gemini, which no keyword tool produces.' },
+  { slug: 'optimizer', kind: 'onpage', name: 'On-page score & in-line edits',
+    blurb: 'Scores a live page or a pasted draft against the pages it competes with — semantic coverage, readability, entity density, citability, heading hierarchy and keyword stuffing — measured after the navigation, footer and template furniture are excluded.' },
+  { slug: 'schema', kind: 'schema', name: 'Schema & structured data',
+    blurb: 'Classifies the page type first, then validates what is there and generates the complete block for every type that page type permits — plus the combined @graph, ready to paste. Names the types it will NOT generate, and why.' },
+  { slug: 'readiness', kind: 'readiness', name: 'AI-crawler readiness (one page)',
+    blurb: 'Asks each AI crawler\'s question for it: can I reach this page, and can I read it? Tested against robots.txt AND by requesting the page as that agent.' },
+  { slug: 'site-readiness', kind: 'site_readiness', name: 'AI-crawler readiness (whole site)',
+    blurb: 'The same question for the whole property, against an eight-point checklist: robots.txt, sitemap coverage, important pages returning 200, accidental noindex, canonical correctness, content in the HTML, standard internal links, and structured data that matches the visible text.' },
+  { slug: 'architecture', kind: 'architecture', name: 'Internal linking & architecture',
+    blurb: 'Builds an entity graph of the site, finds the topic clusters in it, and proposes the links, hubs and breadcrumbs that are missing from them.' },
+  { slug: 'link-opportunities', kind: 'link_opportunities', name: 'Link opportunities for a URL',
+    blurb: 'Give it one URL and it returns the pages that should link to it, each with an anchor phrase already present in that page\'s own copy and the sentence it sits in. URL, Source URL, Anchor text — exportable as CSV.' },
+  { slug: 'competitors', kind: 'competitive', name: 'Competitive intelligence',
+    blurb: 'A topic coverage matrix, a keyword gap and a backlink gap across named competitors — with brand names, generic labels and template text filtered out of every list, and what was filtered shown.' },
+  { slug: 'reputation', kind: 'reputation', name: 'Reputation & ambient signals',
+    blurb: 'Reddit, Hacker News and news coverage — the third-party sources an assistant weighs when asked whether a brand can be trusted.' },
+  { slug: 'review-platforms', kind: 'review_platforms', name: 'Review platform coverage',
+    blurb: 'Which review platforms have a profile for this brand and which do not, chosen by vertical and weighted by what a missing profile actually costs. Establishes existence without reading a single review.' },
+  { slug: 'freshness', kind: 'freshness', name: 'Freshness & intent drift',
+    blurb: 'Finds pages losing ground faster than the site, and pages whose topic is unchanged while the question being asked of it has moved.' },
+  { slug: 'ai-referrals', kind: 'ai_referrals', name: 'AI referral traffic (measured)',
+    blurb: 'The only report here that measures what AI visibility delivered rather than whether it is possible: sessions from ChatGPT, Perplexity, Copilot, Gemini and Claude, read from GA4, broken down by assistant and by the pages they send people to. States plainly what it cannot see — AI Overview clicks and citations nobody clicked.' },
+  { slug: 'monitoring', kind: 'tracking', name: 'SEO tracking board',
+    blurb: 'Every tracking element on one board — 4xx and 5xx pages with the internal links pointing at them, soft 404s, Core Web Vitals, SSL, redirects, canonicals, titles, headings, content, links, images, schema, rendering — sampled or sitewide, each with its own history.' },
+];
+const byKind = new Map((summary || []).map(function (s) { return [s.kind, s]; }));
+const brandQuery = brand ? ('?brand=' + brand.id) : '';
+%>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Nine analyses, one rule.</strong> Everything here is measured from sources this deployment can
+        actually reach — Search Console, GA4, PageSpeed/CrUX, this app's own crawler, keyless public endpoints —
+        and reasoned about by the configured AI model. Nothing invents a search volume, a keyword difficulty,
+        a backlink count or a citation share, because no credential for those exists here and a fabricated number
+        looks exactly like a real one in a client report. Where a question cannot be answered, the page says so.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <% if (activeRuns && activeRuns.length) { %>
+    <div class="notice info">
+      <span class="notice-icon">&#8635;</span>
+      <div class="notice-body">
+        <%= activeRuns.length %> <%= activeRuns.length === 1 ? 'analysis' : 'analyses' %> running now
+        (<%= activeRuns.map(function(a){ return a.kind; }).join(', ') %>).
+        These crawl live sites, so <%= maxConcurrent %> may run at once on this host.
+      </div>
+    </div>
+  <% } %>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Analyses ever run</div>
+      <div class="value"><%= (summary || []).reduce(function(a,s){ return a + s.runs; }, 0) %></div>
+      <div class="meta">across <%= (summary || []).filter(function(s){ return s.runs; }).length %> of 9 features</div>
+    </div>
+    <div class="stat">
+      <div class="label">Open findings</div>
+      <div class="value"><%= (openFindings || []).length %></div>
+      <div class="meta">from the latest run of each feature</div>
+    </div>
+    <div class="stat">
+      <div class="label">Urgent</div>
+      <div class="value"><%= (openFindings || []).filter(function(f){ return f.severity === 'critical' || f.severity === 'high'; }).length %></div>
+      <div class="meta">critical or high severity</div>
+    </div>
+    <div class="stat">
+      <div class="label">AI spend</div>
+      <div class="value">$<%= aiBudget.spent.toFixed(3) %></div>
+      <div class="meta">of the $<%= aiBudget.cap.toFixed(2) %> cap</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>The nine analyses</h3></div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Analysis</th><th>What it does</th><th>Last run</th><th>Score</th><th>Findings</th><th></th></tr></thead>
+        <tbody>
+        <% FEATURES.forEach(function (f) {
+             const s = byKind.get(f.kind) || { runs: 0, lastRun: null, score: null, findings: 0, urgent: 0 }; %>
+          <tr>
+            <td><strong><%= f.name %></strong></td>
+            <td class="muted" style="max-width:420px"><%= f.blurb %></td>
+            <td><%= s.lastRun ? fmtDate(s.lastRun) : '—' %></td>
+            <td><%= s.score == null ? '—' : Math.round(s.score) %></td>
+            <td>
+              <% if (!s.runs) { %>—<% } else { %>
+                <%= s.findings %><% if (s.urgent) { %> <span class="badge critical"><%= s.urgent %></span><% } %>
+              <% } %>
+            </td>
+            <td><a class="btn secondary xs" href="/ai-seo/<%= f.slug %><%= brandQuery %>">Open</a></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint">
+        The brand hub — the canonical facts an AI engine reads to decide what this company is, and the
+        <code>llms.txt</code> rendered from them — lives at
+        <a href="/ai-seo/brand-hub<%= brandQuery %>">Brand hub &amp; llms.txt</a>.
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>AI Assist</h3></div>
+    <div class="card-body">
+      <p class="hint mt-0">
+        AI-generated content briefs, opportunity recommendations, linking rationale, metadata rewrites and
+        task rewrites — one click, ready to use. Every generation is a manual, explicit click and spends real
+        AI budget; nothing on this list runs automatically.
+      </p>
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Tool</th><th>Works from</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>AI content brief</strong></td>
+            <td class="muted">A keyword cluster from Keyword clustering</td>
+            <td><a class="btn secondary xs" href="/ai-assist">Open</a></td>
+          </tr>
+          <tr>
+            <td><strong>AI opportunity recommendations</strong></td>
+            <td class="muted">The content-opportunity engine's findings</td>
+            <td><a class="btn secondary xs" href="/ai-assist">Open</a></td>
+          </tr>
+          <tr>
+            <td><strong>AI linking rationale</strong></td>
+            <td class="muted">The internal-linking crawler's recommendations</td>
+            <td><a class="btn secondary xs" href="/ai-assist">Open</a></td>
+          </tr>
+          <tr>
+            <td><strong>AI metadata rewrites</strong></td>
+            <td class="muted">Titles/descriptions flagged by the technical audit</td>
+            <td><a class="btn secondary xs" href="/ai-assist">Open</a></td>
+          </tr>
+          <tr>
+            <td><strong>AI task rewrites</strong></td>
+            <td class="muted">This brand's open tasks</td>
+            <td><a class="btn secondary xs" href="/ai-assist">Open</a></td>
+          </tr>
+        </tbody>
+      </table></div>
+      <p class="hint">
+        Pick a brand on the <a href="/ai-assist">AI Assist</a> hub to see its content clusters, opportunities,
+        linking runs, metadata gaps and open tasks.
+      </p>
+    </div>
+  </div>
+
+  <% if (openFindings && openFindings.length) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>Open findings across every analysis</h3>
+      <span class="muted" style="font-size:12px">Newest run per analysis, most severe first</span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Severity</th><th>Analysis</th><th>Finding</th><th>URL</th><th></th></tr></thead>
+        <tbody>
+        <% openFindings.forEach(function (f) { %>
+          <tr>
+            <td><span class="dot-sev <%= f.severity %>"></span> <%= f.severity %></td>
+            <td class="muted"><%= f.run_kind %></td>
+            <td><%= f.title %></td>
+            <td class="truncate" style="max-width:220px"><%= f.affected_url ? shortUrl(f.affected_url) : '—' %></td>
+            <td><a class="btn ghost xs" href="/ai-seo/<%= ({ onpage: 'optimizer', competitive: 'competitors', tracking: 'monitoring', site_readiness: 'site-readiness', link_opportunities: 'link-opportunities', review_platforms: 'review-platforms', ai_referrals: 'ai-referrals' }[f.run_kind]) || f.run_kind %>/<%= f.run_id %>">View</a></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="card">
+    <div class="card-head"><h3>Data sources</h3></div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Source</th><th>Status</th><th>Supplies</th><th>Notes</th></tr></thead>
+        <tbody>
+        <% providerList.forEach(function (p) { %>
+          <tr>
+            <td><strong><%= p.label %></strong></td>
+            <td>
+              <% if (p.available && p.enhancementMissing) { %>
+                <span class="badge accent">working</span>
+                <div class="muted" style="font-size:11px">limited — see notes</div>
+              <% } else if (p.available) { %><span class="badge good">available</span>
+              <% } else { %><span class="badge neutral">not configured</span><% } %>
+            </td>
+            <td class="muted" style="font-size:12px"><%= p.provides.join(', ') %></td>
+            <td class="muted" style="font-size:12px">
+              <%= p.enhancementMissing ? (p.enhancedNote || p.note || '—') : (p.available ? '—' : (p.note || '—')) %>
+            </td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint">
+        <strong>working</strong> means the source returns data but not everything it could — Reddit is scraped
+        successfully with no credential, and one only removes its rate limiting and adds post scores.
+        <strong>not configured</strong> means the source returns nothing at all.
+      </p>
+      <p class="hint">
+        The commercial rows are declared adapters, not live integrations. Each activates the moment its
+        environment variables are set; while they are unset, the features that would use them say on the page
+        which specific question they cannot answer rather than filling the gap with an estimate.
+      </p>
+    </div>
+  </div>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

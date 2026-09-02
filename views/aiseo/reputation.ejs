@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Why this sits in an SEO tool.</strong> Asked "is this brand any good", an assistant does not read
+        the brand's own site and stop — it weights third-party discussion heavily, because that is the part the
+        brand did not write. One confident forum thread asserting something false can become the assistant's
+        stated answer to everyone who asks, and nothing published on the brand's own site displaces it.
+      </p>
+      <p class="hint" style="margin-bottom:0">
+        Sentiment is classified by a local lexicon, deterministically, so the same comment scores the same twice
+        and a scan of several hundred items costs nothing. The AI model is asked only about the handful carrying
+        a damaging factual claim — where the distinction between an angry opinion and a false assertion changes
+        what you should do.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <% if (!publicSourcesEnabled) { %>
+    <div class="notice warn">
+      <span class="notice-icon">&#9888;</span>
+      <div class="notice-body">
+        Outbound calls to public sources are disabled by <code>AISEO_DISABLE_PUBLIC_SOURCES=1</code>,
+        so reputation scanning cannot run.
+      </div>
+    </div>
+  <% } %>
+
+  <% if (brand) { %>
+  <div class="card">
+    <div class="card-head"><h3>Watch terms</h3></div>
+    <div class="card-body">
+      <p class="hint mt-0">
+        Derived automatically from the brand name and its domain label. Add product names, a former trading
+        name, or common misspellings — a term shorter than four characters is skipped, because it returns noise
+        from everywhere.
+      </p>
+      <p class="mt-0">
+        <strong>Currently searching:</strong>
+        <% if (!watchTerms.length) { %>
+          <span class="badge medium">nothing usable — the brand name is too short or generic on its own</span>
+        <% } else { %>
+          <% watchTerms.forEach(function (t) { %><span class="chip"><%= t %></span><% }) %>
+        <% } %>
+      </p>
+      <form method="POST" action="/ai-seo/reputation/terms">
+        <input type="hidden" name="brand_id" value="<%= brand.id %>">
+        <div class="field">
+          <label for="mention_terms">Additional terms <span class="muted">(one per line)</span></label>
+          <textarea id="mention_terms" name="mention_terms" rows="3"><%= brand.mention_terms || '' %></textarea>
+        </div>
+        <div class="field">
+          <label for="mention_subreddits">
+            Subreddits to search as well as sitewide
+            <span class="muted">(comma separated, e.g. <code>webdesign, smallbusiness</code>)</span>
+          </label>
+          <input type="text" id="mention_subreddits" name="mention_subreddits"
+                 value="<%= brand.mention_subreddits || '' %>"
+                 placeholder="webdesign, smallbusiness">
+          <p class="hint mt-0" style="margin-bottom:0">
+            Reddit's sitewide search is broad and shallow; a scoped search of the two or three subreddits where
+            this audience actually talks finds threads the sitewide relevance ranking buries. Only the primary
+            term is searched per subreddit — every term against every subreddit multiplies requests against a
+            rate limit that is the binding constraint here.
+          </p>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn secondary" <%= perms.canWrite ? '' : 'disabled' %>>Save terms</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Run a scan</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/ai-seo/reputation/run">
+        <input type="hidden" name="brand_id" value="<%= brand.id %>">
+        <div class="field-row">
+          <label class="field">
+            <span>Reddit time window</span>
+            <select name="window">
+              <option value="week">Past week</option>
+              <option value="month">Past month</option>
+              <option value="year" selected>Past year</option>
+              <option value="all">All time</option>
+            </select>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="want_ai" <%= aiAvailable ? 'checked' : 'disabled' %>>
+            Triage the damaging claims with the model
+            <% if (!aiAvailable) { %><span class="muted">— needs an Azure OpenAI credential</span><% } %>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check"><input type="checkbox" name="force" value="1"> Re-triage rather than reusing the cached judgement</label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite && publicSourcesEnabled ? '' : 'disabled' %>>Scan now</button>
+        </div>
+        <p class="hint">
+          Reddit, Hacker News, Google News and Bing News, one term and one source at a time with a pause between
+          each. Slower on purpose: these are free public endpoints, and a run that hammers them earns a rate
+          limit that returns an empty array — which would look exactly like "no mentions".
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <% if (riskyMentions && riskyMentions.length) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>Mentions carrying a damaging claim</h3>
+      <span class="badge critical"><%= riskyMentions.filter(function(m){ return !m.reviewed_at; }).length %> unreviewed</span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Source</th><th>Mention</th><th>Claim type</th><th>Sentiment</th><th>Seen</th><th></th></tr></thead>
+        <tbody>
+        <% riskyMentions.forEach(function (m) { %>
+          <tr>
+            <td class="muted"><%= m.source %></td>
+            <td>
+              <a href="<%= m.url %>" target="_blank" rel="noopener"><%= m.title || m.url %></a>
+              <% if (m.snippet) { %><div class="muted" style="font-size:11px"><%= m.snippet.slice(0, 200) %></div><% } %>
+            </td>
+            <td><span class="badge critical"><%= m.risk %></span></td>
+            <td><span class="badge <%= m.sentiment === 'negative' ? 'critical' : (m.sentiment === 'positive' ? 'good' : 'neutral') %>"><%= m.sentiment %></span></td>
+            <td class="muted"><%= fmtDate(m.published_at || m.first_seen_at) %></td>
+            <td>
+              <% if (m.reviewed_at) { %><span class="badge good">reviewed</span>
+              <% } else if (perms.canWrite) { %>
+                <form method="POST" action="/ai-seo/reputation/mention/<%= m.id %>/reviewed" class="inline-form">
+                  <input type="hidden" name="brand_id" value="<%= brand.id %>">
+                  <button type="submit" class="btn ghost xs">Mark reviewed</button>
+                </form>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (mentions && mentions.length) { %>
+  <div class="card">
+    <div class="card-head"><h3>All stored mentions</h3></div>
+    <div class="card-body">
+      <div class="table-wrap scroll-y" style="max-height:520px">
+        <table class="data">
+          <thead><tr><th>Source</th><th>Mention</th><th>Sentiment</th><th>Engagement</th><th>Published</th></tr></thead>
+          <tbody>
+          <% mentions.forEach(function (m) { %>
+            <tr>
+              <td class="muted"><%= m.source %></td>
+              <td class="truncate" style="max-width:460px"><a href="<%= m.url %>" target="_blank" rel="noopener"><%= m.title || m.url %></a></td>
+              <td><span class="badge <%= m.sentiment === 'negative' ? 'critical' : (m.sentiment === 'positive' ? 'good' : 'neutral') %>"><%= m.sentiment %> <%= m.sentiment_score %></span></td>
+              <td><%= m.engagement || '—' %></td>
+              <td class="muted"><%= fmtDate(m.published_at || m.first_seen_at) %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <% } %>
+  <% } %>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

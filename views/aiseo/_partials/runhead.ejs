@@ -1,0 +1,119 @@
+<%
+/* The header every result page shares: the score, the change since the
+   previous run of the same analysis, the run's state, and the actions.
+
+   The score delta is the part that earns its place. A number on its own
+   invites "is 68 good?"; a number next to "was 54 nine days ago" answers the
+   question the reader actually has. Where there is no previous run it says
+   "first run" rather than showing a 0 change. */
+const scoreBand = (s) => (s == null ? 'none' : (s >= 75 ? 'good' : (s >= 50 ? 'average' : 'poor')));
+const delta = (run.score != null && previous && previous.score != null)
+  ? Math.round((run.score - previous.score) * 10) / 10 : null;
+%>
+<div class="card">
+  <div class="card-body">
+    <div class="psi-head" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+      <div class="psi-gauge <%= scoreBand(run.score) %>">
+        <span class="health-num"><%= run.score == null ? '—' : Math.round(run.score) %></span>
+      </div>
+      <div style="flex:1;min-width:240px">
+        <h3 style="margin:0 0 4px"><%= run.kindLabel %></h3>
+        <p class="muted mt-0" style="margin-bottom:6px">
+          <% if (run.target) { %>
+            <a href="<%= run.target.startsWith('http') ? run.target : '#' %>" <%= run.target.startsWith('http') ? 'target="_blank" rel="noopener"' : '' %>><%= run.target %></a>
+          <% } else { %>
+            Brand-wide
+          <% } %>
+          <% if (run.label) { %> · <%= run.label %><% } %>
+        </p>
+        <p class="muted mt-0">
+          Started <%= fmtDateTime(run.started_at) %>
+          <% if (run.finished_at) { %> · finished <%= fmtDateTime(run.finished_at) %><% } %>
+          <% if (run.ms) { %> · took <%= run.ms > 1000 ? (run.ms/1000).toFixed(1) + 's' : run.ms + 'ms' %><% } %>
+        </p>
+      </div>
+      <div>
+        <% if (delta != null) { %>
+          <div class="delta <%= delta > 0 ? 'up' : (delta < 0 ? 'down' : 'flat') %>">
+            <%= delta > 0 ? '+' : '' %><%= delta %> vs previous run
+          </div>
+          <div class="muted" style="font-size:12px"><%= fmtDate(previous.finished_at) %> · scored <%= Math.round(previous.score) %></div>
+        <% } else if (run.score != null) { %>
+          <div class="muted" style="font-size:12px">First run — no baseline to compare against yet.</div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <div class="card-foot">
+    <div class="btn-row">
+      <% if (run.status === 'completed') { %>
+        <% if (perms.canWrite) { %>
+          <form method="POST" action="/ai-seo/<%= slug %>/<%= run.id %>/tasks" class="inline-form">
+            <button type="submit" class="btn secondary sm">Create tasks from findings</button>
+          </form>
+        <% } %>
+        <a class="btn ghost sm" href="/ai-seo/<%= slug %>/<%= run.id %>/json">Export JSON</a>
+      <% } %>
+      <a class="btn ghost sm" href="/ai-seo/<%= slug %><%= run.brand_id ? '?brand=' + run.brand_id : '' %>">Run again</a>
+      <% if (perms.canWrite && run.status !== 'running') { %>
+        <form method="POST" action="/ai-seo/<%= slug %>/<%= run.id %>/delete" class="inline-form"
+              onsubmit="return confirm('Delete this run and its findings?')">
+          <button type="submit" class="btn danger-ghost sm">Delete run</button>
+        </form>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<% if (run.status === 'running') { %>
+  <div class="notice <%= orphaned ? 'error' : 'info' %>">
+    <span class="notice-icon"><%= orphaned ? '&#9888;' : '&#8635;' %></span>
+    <div class="notice-body">
+      <% if (orphaned) { %>
+        <strong>This run was interrupted.</strong> The application restarted while it was working — on shared
+        hosting that happens whenever the app is idled out. Nothing was saved. Start it again.
+      <% } else { %>
+        <strong>Working…</strong> This analysis fetches live pages, so it takes anywhere from a few seconds
+        to a couple of minutes. This page refreshes itself when it finishes — you can also leave and come back.
+      <% } %>
+    </div>
+  </div>
+  <% if (!orphaned) { %>
+  <script>
+  // Polls the run's own status endpoint rather than reloading the whole page on
+  // a timer: a reload every few seconds would lose the scroll position and
+  // hammer the server, and would give no way to distinguish "still running"
+  // from "interrupted".
+  (function () {
+    var url = '/ai-seo/<%= slug %>/<%= run.id %>/status';
+    var tries = 0;
+    function poll() {
+      tries += 1;
+      fetch(url, { headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (s) {
+          if (!s) return schedule();
+          if (s.status !== 'running') { window.location.reload(); return; }
+          if (s.orphaned) { window.location.reload(); return; }
+          schedule();
+        })
+        .catch(schedule);
+    }
+    function schedule() {
+      // Backs off: a crawl of 60 pages can run for a minute or two, and there
+      // is nothing to learn from asking four times a second.
+      var wait = tries < 5 ? 2000 : (tries < 20 ? 4000 : 8000);
+      if (tries < 200) setTimeout(poll, wait);
+    }
+    setTimeout(poll, 1500);
+  }());
+  </script>
+  <% } %>
+<% } else if (run.status === 'error') { %>
+  <div class="notice error">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body">
+      <strong>This run failed.</strong> <%= run.error || 'No reason was recorded.' %>
+    </div>
+  </div>
+<% } %>

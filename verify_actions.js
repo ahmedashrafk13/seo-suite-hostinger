@@ -20,7 +20,7 @@
 //   * /brands/:id/sync               calls the Google APIs
 //   * /alerts/test-notification,
 //     /reports/:id/send              send real email
-//   * /ai-lab/**/generate            spend money on API calls
+//   * /ai-assist/**/generate            spend money on API calls
 //   * /brands/:id/delete, /*/delete  destructive by design
 //   * /auth/*                        session mutation, not app logic
 // Those need a human on a staging brand, and are listed in the handover notes.

@@ -232,12 +232,12 @@ app.use('/keywords', requireAuth, require('./routes/keywords'));
 app.use('/alerts', requireAuth, require('./routes/alerts'));
 app.use('/tasks', requireAuth, require('./routes/tasks'));
 app.use('/reports', requireAuth, require('./routes/reports'));
-app.use('/ai-suggestions', requireAuth, require('./routes/aiSuggestions'));
 app.use('/settings', requireAuth, require('./routes/settings'));
 app.use('/team', requireAuth, require('./routes/team'));
 app.use('/onboarding', requireAuth, require('./routes/onboarding'));
 app.use('/workflow', requireAuth, require('./routes/workflow'));
-app.use('/ai-lab', requireAuth, require('./routes/aiLab'));
+app.use('/ai-assist', requireAuth, require('./routes/aiAssist'));
+app.use('/ai-seo', requireAuth, require('./routes/aiseo'));
 
 app.use((req, res) => {
   res.status(404).render('error', {
@@ -262,6 +262,14 @@ const server = app.listen(PORT, () => {
   // exists, so clear those before anything reads them.
   try { toolRunner.reconcileOnBoot(); } catch (e) {
     console.error('[boot] run reconciliation failed:', e.message);
+  }
+
+  // Same problem, different runner: the AI SEO analyses run in-process, so a
+  // Passenger restart mid-crawl leaves a row saying 'running' that nothing will
+  // ever finish. Left alone, its result page polls forever, which reads as
+  // "still working" rather than "was interrupted".
+  try { require('./lib/aiseo/runner').reconcileOnBoot(); } catch (e) {
+    console.error('[boot] AI SEO run reconciliation failed:', e.message);
   }
 
   // Alerts, nightly sync, weekly reports, database backups and assignment

@@ -285,6 +285,10 @@ function gscAppearance(brandId, days) {
   return gscByDimension(brandId, 'gsc_appearance_daily', 'appearance', days, 25);
 }
 
+function gscSearchType(brandId, days) {
+  return gscByDimension(brandId, 'gsc_search_type', 'search_type', days, 10);
+}
+
 function gscSitemaps(brandId) {
   return db.prepare('SELECT * FROM gsc_sitemaps WHERE brand_id=? ORDER BY path').all(brandId);
 }
@@ -330,6 +334,15 @@ function ga4Acquisition(brandId, days, limit = 100) {
     FROM ga4_acquisition_daily WHERE brand_id=? AND date BETWEEN ? AND ?
     GROUP BY source, medium ORDER BY sessions DESC LIMIT ?`)
     .all(brandId, w.startDate, w.endDate, limit);
+}
+
+// New-vs-returning cross-tab (see ga4_device_segment_daily / ga4_geo_segment_daily).
+function ga4DeviceSegment(brandId, days) {
+  return ga4ByDimension(brandId, 'ga4_device_segment_daily', ['device_category', 'new_vs_returning'], days, 40);
+}
+
+function ga4GeoSegment(brandId, days) {
+  return ga4ByDimension(brandId, 'ga4_geo_segment_daily', ['country', 'new_vs_returning'], days, 40);
 }
 
 function ga4Events(brandId, days, limit = 100) {
@@ -423,6 +436,54 @@ function indexingRows(brandId, { limit = 50, offset = 0 } = {}) {
   return { rows, total };
 }
 
+// Weekly cohort retention, pivoted into one row per cohort week with a
+// column per weeks-since-first-session — the shape the Retention tab's
+// cohort table renders directly.
+function ga4RetentionTable(brandId, { weeks = 8 } = {}) {
+  const rows = db.prepare(`SELECT cohort_week, week_index, active_users
+    FROM ga4_retention WHERE brand_id=? ORDER BY cohort_week DESC, week_index ASC`).all(brandId);
+  const byWeek = new Map();
+  rows.forEach((r) => {
+    if (!byWeek.has(r.cohort_week)) byWeek.set(r.cohort_week, { cohortWeek: r.cohort_week, weeks: {} });
+    byWeek.get(r.cohort_week).weeks[r.week_index] = r.active_users;
+  });
+  return [...byWeek.values()].slice(0, weeks);
+}
+
+// Ecommerce monetization by date — zero/blank rows are expected for brands
+// with no GA4 ecommerce tracking configured, not a sync failure.
+function ga4Monetization(brandId, days) {
+  const anchor = latestGa4Date(brandId);
+  if (!anchor) return [];
+  const w = windowFrom(anchor, days);
+  return db.prepare(`SELECT date, purchase_revenue, item_revenue, transactions
+    FROM ga4_monetization WHERE brand_id=? AND date BETWEEN ? AND ? ORDER BY date DESC`)
+    .all(brandId, w.startDate, w.endDate);
+}
+
+// Predictive metrics by date — empty for brands whose GA4 property doesn't
+// yet qualify (not enough purchase/conversion volume, no eligible audience).
+function ga4Predictive(brandId, days) {
+  const anchor = latestGa4Date(brandId);
+  if (!anchor) return [];
+  const w = windowFrom(anchor, days);
+  return db.prepare(`SELECT date, purchase_probability, churn_probability, predicted_revenue_90d
+    FROM ga4_predictive WHERE brand_id=? AND date BETWEEN ? AND ? ORDER BY date DESC`)
+    .all(brandId, w.startDate, w.endDate);
+}
+
+// Whatever custom dimensions/metrics were discovered for this brand's GA4
+// property, grouped by dimension/metric name — generic, never hardcoded.
+function ga4CustomDimensions(brandId, days) {
+  const anchor = latestGa4Date(brandId);
+  if (!anchor) return [];
+  const w = windowFrom(anchor, days);
+  return db.prepare(`SELECT date, dimension_name, dimension_value, metric_name, metric_value
+    FROM ga4_custom_dimensions WHERE brand_id=? AND date BETWEEN ? AND ?
+    ORDER BY date DESC, dimension_name, metric_name LIMIT 2000`)
+    .all(brandId, w.startDate, w.endDate);
+}
+
 // Latest Core Web Vitals snapshot per strategy, plus the one before it so
 // degradation can be detected.
 function latestCwv(brandId, strategy = 'mobile') {
@@ -440,6 +501,15 @@ function cannibalizedQueries(brandId, { minImpressions = 50, minPages = 2 } = {}
       COUNT(DISTINCT page) page_count,
       SUM(impressions) impressions,
       SUM(clicks) clicks,
+      -- Impression-weighted average position across the competing URLs. Was
+      -- not selected at all, which forced opportunities.js to score
+      -- cannibalisation against a hardcoded guess of position 9 or 12.
+      SUM(position*impressions)/NULLIF(SUM(impressions),0) position,
+      -- The best position any single competing URL achieves. This is the
+      -- grounded ceiling for a consolidation estimate: whatever one of these
+      -- URLs already manages while signals are split, one merged page should
+      -- manage at least that.
+      MIN(position) best_position,
       GROUP_CONCAT(page, ' | ') pages
     FROM gsc_query_page
     WHERE brand_id=? AND period_start=? AND period_end=? AND impressions >= 5
@@ -477,7 +547,8 @@ module.exports = {
   entityComparison, pageComparison, queryComparison,
   topPages, topQueries, dailySeries, ga4Series, latestCwv,
   cannibalizedQueries, pageForQuery, queryPagePairs, GSC_LAG_DAYS,
-  gscCountries, gscDevices, gscAppearance, gscSitemaps,
+  gscCountries, gscDevices, gscAppearance, gscSearchType, gscSitemaps,
   ga4Channels, ga4Devices, ga4Browsers, ga4Countries, ga4Cities, ga4Acquisition, ga4Events,
+  ga4DeviceSegment, ga4GeoSegment, ga4RetentionTable, ga4Monetization, ga4Predictive, ga4CustomDimensions,
   indexingSummary, indexingRows, richResultsSummary, crawlerSummary,
 };

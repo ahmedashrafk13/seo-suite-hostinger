@@ -14,8 +14,9 @@ const router = express.Router();
 const RANGES = [7, 28, 90];
 const SORTABLE = new Set(['clicks', 'impressions', 'ctr', 'position']);
 const TABS = [
-  'queries', 'pages', 'querypage', 'countries', 'devices', 'appearance', 'sitemaps', 'indexing',
-  'channels', 'ga4pages', 'ga4devices', 'ga4geo', 'ga4acquisition', 'ga4events', 'ai',
+  'queries', 'pages', 'querypage', 'countries', 'devices', 'appearance', 'searchtype', 'sitemaps', 'indexing',
+  'channels', 'ga4pages', 'ga4devices', 'ga4geo', 'ga4acquisition', 'ga4events', 'retention', 'monetization',
+  'predictive', 'customdimensions', 'ai',
 ];
 const PAGE_SIZE = 50;
 
@@ -97,6 +98,7 @@ router.get('/', (req, res, next) => {
       let countries = A.gscCountries(brand.id, days, 2000);
       const devices = A.gscDevices(brand.id, days);
       const appearance = A.gscAppearance(brand.id, days);
+      const searchType = A.gscSearchType(brand.id, days);
       const sitemaps = A.gscSitemaps(brand.id);
       if (q) countries = countries.filter((r) => r.entity.toLowerCase().includes(q));
       const countryPage = paginate(countries, page);
@@ -115,6 +117,12 @@ router.get('/', (req, res, next) => {
       const ga4AcquisitionPage = paginate(ga4AcquisitionRows, page);
       const ga4EventRows = A.ga4Events(brand.id, days, 1000);
       const ga4EventPage = paginate(ga4EventRows, page);
+      const ga4DeviceSegmentRows = A.ga4DeviceSegment(brand.id, days);
+      const ga4GeoSegmentRows = A.ga4GeoSegment(brand.id, days);
+      const retention = A.ga4RetentionTable(brand.id);
+      const monetization = A.ga4Monetization(brand.id, days);
+      const predictive = A.ga4Predictive(brand.id, days);
+      const customDimensions = A.ga4CustomDimensions(brand.id, days);
 
       // Page indexing — sampled via URL Inspection (see sync.inspectSample);
       // Google exposes no bulk coverage API, so this reflects only the pages
@@ -147,8 +155,9 @@ router.get('/', (req, res, next) => {
         queryPageRows: queryPagePaged.rows, queryPageTotal: queryPagePaged.total,
         ga4Pages: ga4PagePage.rows, ga4PageTotal: ga4PagePage.total,
         countries: countryPage.rows, countryTotal: countryPage.total, countriesForChart: countries,
-        devices, appearance, sitemaps,
+        devices, appearance, searchType, sitemaps,
         ga4DeviceRows, ga4BrowserRows,
+        ga4DeviceSegmentRows, ga4GeoSegmentRows, retention, monetization, predictive, customDimensions,
         ga4CountryRows: ga4CountryPage.rows, ga4CountryTotal: ga4CountryPage.total, ga4CountriesForChart: ga4CountryRows,
         ga4CityRows,
         ga4AcquisitionRows: ga4AcquisitionPage.rows, ga4AcquisitionTotal: ga4AcquisitionPage.total, ga4AcquisitionForChart: ga4AcquisitionRows,

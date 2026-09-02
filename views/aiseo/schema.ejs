@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Reads the markup a page already has, validates it, and generates what is missing.</strong>
+        Validation is local, against requirement tables transcribed from Google's own structured-data
+        documentation — Google's Rich Results Test has no public API, and a scrape of the web UI would break
+        silently on any redesign. The tables keep Google's own distinction: a missing <em>required</em> property
+        means no rich result at all; a missing <em>recommended</em> one means a weaker one than a competitor gets.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <div class="card">
+    <div class="card-head"><h3>Audit a page</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/ai-seo/schema/run">
+        <% if (brand) { %><input type="hidden" name="brand_id" value="<%= brand.id %>"><% } %>
+        <div class="field">
+          <label for="url">Page URL</label>
+          <input type="url" id="url" name="url" required
+                 placeholder="<%= brand ? brand.site_url : 'https://example.com/page' %>">
+        </div>
+        <div class="field">
+          <label>Types you are interested in <span class="muted">(optional — the audit reports everything it finds regardless)</span></label>
+          <div class="checkbox-row" style="flex-wrap:wrap;gap:10px">
+            <% Object.keys(typeRules).forEach(function (t) { %>
+              <label class="check" style="min-width:180px">
+                <input type="checkbox" name="types" value="<%= t %>"> <%= typeRules[t].label %>
+              </label>
+            <% }) %>
+          </div>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="want_ai" <%= aiAvailable ? 'checked' : 'disabled' %>>
+            Ask the model which types genuinely fit, and draft them
+            <% if (!aiAvailable) { %><span class="muted">— needs an Azure OpenAI credential</span><% } %>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check"><input type="checkbox" name="force" value="1"> Regenerate rather than reusing the cached draft</label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite ? '' : 'disabled' %>>Audit and generate</button>
+          <% if (brand) { %>
+            <a class="btn secondary" href="/ai-seo/brand-hub?brand=<%= brand.id %>">Brand hub &amp; llms.txt &rarr;</a>
+          <% } %>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>What each type requires</h3></div>
+    <div class="card-body">
+      <div class="table-wrap scroll-y" style="max-height:520px">
+        <table class="data">
+          <thead><tr><th>Type</th><th>Required</th><th>Recommended</th><th>What to watch</th></tr></thead>
+          <tbody>
+          <% Object.keys(typeRules).forEach(function (t) { const rule = typeRules[t]; %>
+            <tr>
+              <td><strong><%= rule.label %></strong></td>
+              <td><code><%= (rule.required || []).join(', ') || '—' %></code></td>
+              <td class="muted"><code><%= (rule.recommended || []).join(', ') || '—' %></code></td>
+              <td class="muted" style="font-size:12px;max-width:420px"><%= rule.notes || '—' %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

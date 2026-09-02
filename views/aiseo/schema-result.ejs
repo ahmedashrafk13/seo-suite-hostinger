@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%- include('_partials/runhead') %>
+
+<% const r = run.result; %>
+<% if (run.status === 'completed' && r && r.empty) { %>
+  <div class="notice error">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body"><%= r.reason %></div>
+  </div>
+  <%- include('_partials/findings') %>
+<% } else if (run.status === 'completed' && r) { %>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">JSON-LD blocks</div>
+      <div class="value"><%= r.counts.blocks %></div>
+      <div class="meta"><%= r.counts.nodes %> typed nodes inside them</div>
+    </div>
+    <div class="stat">
+      <div class="label">Required properties missing</div>
+      <div class="value"><%= r.counts.errors %></div>
+      <div class="meta">each one costs the rich result entirely</div>
+    </div>
+    <div class="stat">
+      <div class="label">Recommended missing</div>
+      <div class="value"><%= r.counts.warnings %></div>
+      <div class="meta">valid, but weaker than a competitor's</div>
+    </div>
+    <div class="stat">
+      <div class="label">Types declared</div>
+      <div class="value sm"><%= r.detectedTypes.length ? r.detectedTypes.join(', ') : 'none' %></div>
+      <% if (r.microdata.length) { %><div class="meta">plus microdata: <%= r.microdata.length %> types</div><% } %>
+    </div>
+  </div>
+
+  <% if (r.pageType) { %>
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">This page reads as</div>
+      <div class="value sm"><%= r.pageType.label %></div>
+      <div class="meta">
+        scored <%= r.pageType.score %><% if (r.pageType.runnerUp) { %> · next: <%= r.pageType.runnerUp.label %> at <%= r.pageType.runnerUp.score %><% } %>
+        <% if (!r.pageType.confident) { %> · <span class="badge medium">low confidence</span><% } %>
+      </div>
+    </div>
+    <div class="stat">
+      <div class="label">Wrong types declared</div>
+      <div class="value"><%= (r.pageType.mismatches || []).length %></div>
+      <div class="meta">
+        <%= (r.pageType.mismatches || []).length ? 'markup the page\'s own content contradicts' : 'nothing declared that this page type forbids' %>
+      </div>
+    </div>
+    <div class="stat">
+      <div class="label">Blocks generated</div>
+      <div class="value"><%= r.counts.generatedBlocks || 0 %></div>
+      <div class="meta"><%= r.counts.readyToPaste || 0 %> need no further input</div>
+    </div>
+    <div class="stat">
+      <div class="label">Types deliberately not generated</div>
+      <div class="value"><%= r.counts.skippedTypes || 0 %></div>
+      <div class="meta">with a stated reason for each</div>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/findings') %>
+
+  <div class="card">
+    <div class="card-head"><h3>What is on the page now</h3></div>
+    <div class="card-body">
+      <% if (!r.detected.length) { %>
+        <div class="empty-state">No structured data found on this page.</div>
+      <% } else { %>
+        <% r.detected.forEach(function (d) { %>
+          <div class="alert-item">
+            <div class="alert-head">
+              <strong><%= d.type %></strong>
+              <% if (d.canonical && d.canonical !== d.type) { %><span class="badge neutral">checked as <%= d.canonical %></span><% } %>
+              <% if (!d.known) { %><span class="badge info">no requirement table</span><% } %>
+              <% const errs = (d.problems || []).filter(function (p) { return p.severity === 'error'; }).length; %>
+              <% const warns = (d.problems || []).filter(function (p) { return p.severity === 'warning'; }).length; %>
+              <% if (errs) { %><span class="badge critical"><%= errs %> error<%= errs === 1 ? '' : 's' %></span><% } %>
+              <% if (warns) { %><span class="badge medium"><%= warns %> warning<%= warns === 1 ? '' : 's' %></span><% } %>
+              <% if (!errs && !warns && d.known) { %><span class="badge good">complete</span><% } %>
+            </div>
+            <div class="alert-body">
+              <% if (d.note) { %><p class="muted mt-0"><%= d.note %></p><% } %>
+              <% if (d.parseError) { %>
+                <p class="mt-0"><strong>Does not parse:</strong> <%= d.parseError %></p>
+                <p class="pre" style="font-size:11px"><%= d.raw %></p>
+              <% } %>
+              <% if (d.problems && d.problems.length) { %>
+                <ul class="meta-list">
+                  <% d.problems.forEach(function (p) { %>
+                    <li>
+                      <span class="badge <%= p.severity === 'error' ? 'critical' : 'medium' %>"><%= p.severity %></span>
+                      <%= p.message %>
+                    </li>
+                  <% }) %>
+                </ul>
+              <% } %>
+              <% if (d.rule && d.rule.notes) { %>
+                <p class="hint mt-0" style="margin-bottom:0"><%= d.rule.notes %></p>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      <% } %>
+
+      <% if (r.microdata.length) { %>
+        <p class="hint">
+          <strong>Microdata also present:</strong> <%= r.microdata.join(', ') %>. Detected but not validated —
+          two formats describing the same thing is a common source of contradictory markup, and Google reads both.
+        </p>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (r.pageType) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>What kind of page this is</h3>
+      <span class="muted" style="font-size:12px">Everything generated below depends on this answer</span>
+    </div>
+    <div class="card-body">
+      <% if ((r.pageType.mismatches || []).length) { %>
+        <div class="notice error">
+          <span class="notice-icon">&#9888;</span>
+          <div class="notice-body">
+            <% r.pageType.mismatches.forEach(function (m) { %>
+              <p class="mt-0">
+                <strong>This page declares <%= m.declared %> markup and reads as a <%= m.pageLabel.toLowerCase() %>.</strong>
+                <%= m.reason %>
+              </p>
+            <% }) %>
+            <% if (!r.pageType.confident) { %>
+              <p class="mt-0">
+                The classifier is <strong>not confident</strong> here, so confirm the page type before removing
+                anything — see the evidence below.
+              </p>
+            <% } %>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th style="width:14%">Signal</th><th style="width:8%">Weight</th><th>Evidence</th></tr></thead>
+        <tbody>
+        <% (r.pageType.evidence || []).forEach(function (e) { %>
+          <tr class="<%= e.counterEvidence ? 'muted' : '' %>">
+            <td class="mono-sm"><%= e.source %><% if (e.type) { %> → <%= e.type %><% } %></td>
+            <td><%= e.counterEvidence ? '—' : e.weight %></td>
+            <td style="font-size:12.5px">
+              <%= e.why %>
+              <% if (e.counterEvidence) { %> <span class="badge neutral">counter-evidence</span><% } %>
+            </td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+
+      <p class="hint">
+        <strong>Why a price is not enough to make a page a product page.</strong>
+        The discriminator is the <em>transaction apparatus</em> — an add-to-cart control, an SKU, a variant
+        selector — not the presence of a number. Service pages, pricing pages and course pages all quote prices,
+        and treating a price as evidence of a product is exactly what produced Product markup on service pages.
+        A price with no purchase control is recorded above as evidence <em>against</em> product, which is what it
+        is.
+        <% if (r.pageType.commerce && (r.pageType.commerce.found || []).length) { %>
+          <br>Commerce signals found on this page:
+          <%= r.pageType.commerce.found.map(function (f) { return f.key; }).join(', ') %>.
+        <% } %>
+      </p>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (r.build && r.build.blocks && r.build.blocks.length) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>The schema for this page, ready to paste</h3>
+      <div class="btn-row">
+        <a class="btn secondary sm" href="/ai-seo/schema/<%= run.id %>/jsonld?script=1&download=1">Download the &lt;script&gt; tag</a>
+        <a class="btn ghost sm" href="/ai-seo/schema/<%= run.id %>/jsonld">View raw JSON-LD</a>
+      </div>
+    </div>
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>One combined <code>@graph</code>, cross-referenced by <code>@id</code>.</strong>
+        This is what actually goes on the page. Separate blocks side by side state unlinked facts — a standalone
+        Article next to a standalone Organization does not say "this article was published by this organisation",
+        and the <code>@id</code> references below do.
+        <% if ((r.build.sitewideTypes || []).length) { %>
+          <br><strong><%= r.build.sitewideTypes.join(' and ') %></strong>
+          belong in the shared layout rather than on this page alone, so every page carries the same
+          <code>@id</code>. They are included here so the graph is complete; emit them once, globally.
+        <% } %>
+      </p>
+      <p class="hint mt-0">
+        <strong>Every unknowable property is omitted, not set to <code>null</code>.</strong>
+        Google treats an explicit null as a malformed value — worse than an absent property, which it simply
+        ignores. So each block below is valid JSON-LD exactly as it stands, and the values that could not be read
+        from the page are listed beside it as a checklist rather than smuggled into it.
+      </p>
+
+      <% if (r.build.graphScript) { %>
+        <h4>Combined @graph</h4>
+        <pre class="code-block selectable"><%= r.build.graphScript %></pre>
+      <% } %>
+
+      <h4 style="margin-top:22px">Block by block</h4>
+      <% r.build.blocks.forEach(function (b) { %>
+        <details class="disclosure" style="margin-bottom:14px" <%= b.requiredPlaceholders.length ? 'open' : '' %>>
+          <summary>
+            <strong><%= b.type %></strong>
+            <% if (!b.requiredPlaceholders.length) { %><span class="badge good">ready to paste</span>
+            <% } else { %><span class="badge medium"><%= b.requiredPlaceholders.length %> required value<%= b.requiredPlaceholders.length === 1 ? '' : 's' %> missing</span><% } %>
+            <% if (b.requestedExplicitly) { %><span class="badge critical">you asked for this type — the page contradicts it</span><% } %>
+            <% if (b.verifyRequired) { %><span class="badge medium">verify before publishing</span><% } %>
+          </summary>
+
+          <p class="hint mt-0"><strong>Basis:</strong> <%= b.basis %></p>
+          <% if (b.notes) { %><p class="hint mt-0"><%= b.notes %></p><% } %>
+          <% if (b.forbiddenReason) { %>
+            <div class="notice error">
+              <span class="notice-icon">&#9888;</span>
+              <div class="notice-body">
+                Generated because it was requested explicitly. For a page of this type it is normally wrong:
+                <%= b.forbiddenReason %>
+              </div>
+            </div>
+          <% } %>
+
+          <% if (b.placeholders.length) { %>
+            <h5 style="margin:12px 0 4px">Values to fill in</h5>
+            <dl class="kv">
+              <% b.placeholders.forEach(function (ph) { %>
+                <dt>
+                  <%= ph.property %>
+                  <% if (ph.required) { %><span class="badge critical">required</span><% } %>
+                </dt>
+                <dd>
+                  <span class="mono-sm"><%= ph.shape %></span>
+                  <div class="muted" style="font-size:12px;margin-top:2px"><%= ph.where %></div>
+                </dd>
+              <% }) %>
+            </dl>
+          <% } %>
+
+          <pre class="code-block selectable"><%= b.script %></pre>
+          <div class="btn-row">
+            <a class="btn ghost xs" href="/ai-seo/schema/<%= run.id %>/jsonld?type=<%= encodeURIComponent(b.type) %>&script=1&download=1">Download this block</a>
+          </div>
+        </details>
+      <% }) %>
+
+      <% if ((r.build.skipped || []).length) { %>
+        <h4 style="margin-top:22px">Types deliberately NOT generated</h4>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th style="width:14%">Type</th><th style="width:22%">Because</th><th>Reason</th></tr></thead>
+          <tbody>
+          <% r.build.skipped.forEach(function (sk) { %>
+            <tr>
+              <td class="mono-sm"><%= sk.type %></td>
+              <td class="muted" style="font-size:12px"><%= sk.because %></td>
+              <td style="font-size:12.5px"><%= sk.reason %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+        <p class="hint">
+          This list is the point of the page-type check. A type on it was not omitted for lack of effort — it was
+          omitted because generating it would misdescribe the page, and markup that is complete and wrong is
+          worse than markup that is incomplete and right. Where you know something the classifier does not, ask
+          for the type explicitly on the form and it will be generated with the objection recorded against it.
+        </p>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (r.generated && r.generated.length) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>Fragment view (superseded by the blocks above)</h3>
+      <span class="muted" style="font-size:12px">Kept because it shows the raw shape each type was derived from</span>
+    </div>
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Use the pasteable blocks above instead.</strong> This older view leaves unreadable fields as
+        explicit <code>null</code>s, which Google treats as malformed — so these fragments are not safe to paste
+        as they stand. They are retained only because seeing the raw derivation is occasionally the fastest way
+        to check why a property came out the way it did.
+      </p>
+      <% r.generated.forEach(function (g) { %>
+        <div class="disclosure" style="margin-bottom:16px">
+          <h4 style="margin:0 0 4px"><%= g.type %> <span class="muted" style="font-weight:400;font-size:12px">— <%= g.basis %></span></h4>
+          <% if (g.needsHumanInput && g.needsHumanInput.length) { %>
+            <ul class="meta-list">
+              <% g.needsHumanInput.forEach(function (n) { %>
+                <li><span class="badge medium">needs input</span> <%= n %></li>
+              <% }) %>
+            </ul>
+          <% } %>
+          <p class="pre" style="font-size:11px;white-space:pre-wrap"><%= JSON.stringify(g.jsonld, null, 2) %></p>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (r.aiDraft) { %>
+  <div class="card">
+    <div class="card-head"><h3>Model's view of which types fit</h3></div>
+    <div class="card-body">
+      <%- include('_partials/aiblock', { ai: r.aiDraft }) %>
+      <% if (r.aiDraft.ok && r.aiDraft.data) { %>
+        <% (r.aiDraft.data.recommended || []).forEach(function (rec) { %>
+          <div class="disclosure" style="margin-bottom:16px">
+            <h4 style="margin:0 0 4px"><%= rec.type %></h4>
+            <p class="muted mt-0"><%= rec.whyItFits %></p>
+            <% if (rec.riskIfWrong) { %><p class="hint mt-0"><strong>Risk if wrong:</strong> <%= rec.riskIfWrong %></p><% } %>
+            <% if (rec.needsHumanInput && rec.needsHumanInput.length) { %>
+              <p class="mt-0"><span class="badge medium">needs input</span> <%= rec.needsHumanInput.join('; ') %></p>
+            <% } %>
+            <p class="pre" style="font-size:11px;white-space:pre-wrap"><%= JSON.stringify(rec.jsonld, null, 2) %></p>
+          </div>
+        <% }) %>
+        <% if (r.aiDraft.data.rejected && r.aiDraft.data.rejected.length) { %>
+          <h4>Types it ruled out</h4>
+          <ul class="meta-list">
+            <% r.aiDraft.data.rejected.forEach(function (rej) { %>
+              <li><strong><%= rej.type %></strong> — <%= rej.whyNot %></li>
+            <% }) %>
+          </ul>
+        <% } %>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/provenance', { prov: r.provenance }) %>
+<% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

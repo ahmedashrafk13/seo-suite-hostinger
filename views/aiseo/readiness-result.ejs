@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%- include('_partials/runhead') %>
+
+<% const r = run.result; %>
+<% if (run.status === 'completed' && r) { %>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Retrieval fetchers that can read this page</div>
+      <div class="value"><%= r.agentSummary.retrievalOk %> / <%= r.agentSummary.retrievalMeasured == null ? r.agentSummary.retrievalTotal : r.agentSummary.retrievalMeasured %></div>
+      <div class="meta">the ones that decide whether the brand can be cited</div>
+    </div>
+    <div class="stat">
+      <div class="label">Retrieval fetchers untestable</div>
+      <div class="value"><%= r.agentSummary.retrievalUnverifiable || 0 %></div>
+      <div class="meta">edge refuses unverified clients — not counted as blocked</div>
+    </div>
+    <div class="stat">
+      <div class="label">Training crawlers blocked</div>
+      <div class="value"><%= r.agentSummary.trainingBlocked %> / <%= r.agentSummary.trainingTotal %></div>
+      <div class="meta">reported for completeness — costs nothing in visibility</div>
+    </div>
+    <div class="stat">
+      <div class="label">TTFB (measured)</div>
+      <div class="value"><%= r.ttfb.ms == null ? '—' : r.ttfb.ms + 'ms' %></div>
+      <div class="meta">median of <%= r.ttfb.samples.filter(function(s){ return s != null; }).length %> samples · target <%= r.thresholds.ttfbMs.target %>ms</div>
+    </div>
+    <div class="stat">
+      <div class="label">Content in the served HTML</div>
+      <div class="value sm"><%= r.jsDependence && r.jsDependence.contentInHtml ? 'yes' : 'no' %></div>
+      <div class="meta"><%= r.jsDependence ? fmtInt(r.jsDependence.servedWordCount) + ' words before any JavaScript runs' : 'page not readable' %></div>
+    </div>
+  </div>
+
+  <%- include('_partials/findings') %>
+
+  <div class="card">
+    <div class="card-head"><h3>Per-agent verdict</h3></div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr>
+          <th>Agent</th><th>Purpose</th><th>robots.txt</th><th>Live probe</th><th>Verdict</th><th>Why</th>
+        </tr></thead>
+        <tbody>
+        <% r.agents.forEach(function (a) { %>
+          <tr>
+            <td><code><%= a.token %></code><div class="muted" style="font-size:11px"><%= a.label %></div></td>
+            <td>
+              <% if (a.purpose === 'retrieval') { %><span class="badge accent">retrieval</span>
+              <% } else { %><span class="badge neutral">training</span><% } %>
+            </td>
+            <td>
+              <% if (a.allowed) { %><span class="badge good">allowed</span>
+              <% } else { %><span class="badge critical">blocked</span><% } %>
+              <% if (a.rule) { %><div class="muted" style="font-size:11px"><code><%= a.rule %></code></div><% } %>
+              <% if (a.matchedAgent) { %><div class="muted" style="font-size:11px">matched <code>User-agent: <%= a.matchedAgent %></code></div><% } %>
+            </td>
+            <td>
+              <% if (!a.probe) { %><span class="muted">not probed</span>
+              <% } else { %>
+                HTTP <%= a.probe.status == null ? '—' : a.probe.status %>
+                <% if (a.probe.contentRatio != null) { %>
+                  <div class="muted" style="font-size:11px"><%= Math.round(a.probe.contentRatio * 100) %>% of a browser's bytes</div>
+                <% } %>
+                <% if (a.probe.error) { %><div class="muted" style="font-size:11px"><%= a.probe.error %></div><% } %>
+              <% } %>
+            </td>
+            <td>
+              <% if (a.verdict === 'reachable') { %><span class="badge good">reachable</span>
+              <% } else if (a.verdict === 'allowed-by-robots') { %><span class="badge accent">allowed</span>
+              <% } else if (a.verdict === 'degraded') { %><span class="badge medium">degraded</span>
+              <% } else if (a.verdict === 'blocked') { %><span class="badge critical">blocked</span>
+              <% } else if (a.verdict === 'unverifiable') { %><span class="badge medium">untestable</span>
+              <% } else { %><span class="badge neutral">unknown</span><% } %>
+            </td>
+            <td class="muted" style="font-size:12px"><%= a.reason || '—' %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <% if (r.control) { %>
+        <p class="hint">
+          <strong>Control probe:</strong> the same page was requested with a neutral, non-AI user agent
+          (<code><%= r.control.ua %></code>) and the server answered
+          <strong>HTTP <%= r.control.status == null ? (r.control.error || 'no response') : r.control.status %><%= r.control.challenge ? ' — ' + r.control.challenge : '' %></strong>.
+          <% if (r.control.discriminates) { %>
+            An ordinary unrecognised client is served normally, so every refusal in the table above is aimed at
+            that specific user agent and is a real block.
+          <% } else { %>
+            This edge refuses <em>every</em> client it cannot verify, not AI agents in particular. Real crawlers
+            authenticate by source IP and reverse DNS, which cannot be reproduced from here, so refusals are
+            reported as <strong>untestable</strong> rather than blocked — the honest answer, and one only the
+            server's own access logs can settle.
+          <% } %>
+        </p>
+      <% } %>
+      <p class="hint" style="margin-bottom:0">
+        The live probe wins over robots.txt when they disagree: an <code>Allow</code> line is worth nothing if
+        the server answers the request with a challenge page. "Degraded" means a 200 came back but with well
+        under two-thirds of the bytes a browser gets — worth investigating, since a consent wall or a stripped
+        variant looks like success to every status-code check.
+      </p>
+    </div>
+  </div>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <div class="card-head"><h3>Speed and TLS</h3></div>
+      <div class="card-body">
+        <ul class="kv">
+          <li><span>TTFB (median of 3)</span><span><%= r.ttfb.ms == null ? '—' : r.ttfb.ms + 'ms' %> <span class="muted">samples: <%= r.ttfb.samples.map(function(s){ return s == null ? 'failed' : s + 'ms'; }).join(', ') %></span></span></li>
+          <li><span>HTML document time</span><span><%= r.fetch.ms == null ? '—' : r.fetch.ms + 'ms' %></span></li>
+          <li><span>HTML size</span><span><%= r.fetch.bytes ? (r.fetch.bytes / 1024).toFixed(0) + ' KB' : '—' %></span></li>
+          <li><span>Redirect hops before this page</span><span><%= r.fetch.redirectChain.length %></span></li>
+          <li><span>Certificate valid to</span><span><%= r.certificate.ok ? r.certificate.validTo : (r.certificate.error || '—') %></span></li>
+          <li><span>Days until expiry</span><span><%= r.certificate.ok ? r.certificate.daysLeft : '—' %></span></li>
+          <li><span>Certificate validates</span><span><%= r.certificate.ok ? (r.certificate.authorized ? 'yes' : 'no — ' + r.certificate.authorizationError) : '—' %></span></li>
+          <li><span>Issuer</span><span><%= r.certificate.ok ? (r.certificate.issuer || '—') : '—' %></span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Indexability and headers</h3></div>
+      <div class="card-body">
+        <ul class="kv">
+          <li><span>robots meta</span><span><%= r.indexability.robotsMeta || '(none)' %></span></li>
+          <li><span>X-Robots-Tag</span><span><%= r.indexability.xRobots || '(none)' %></span></li>
+          <li><span>noindex</span><span><%= r.indexability.noindex ? 'YES' : 'no' %></span></li>
+          <li><span>nosnippet</span><span><%= r.indexability.nosnippet ? 'YES — blocks AI Overview eligibility' : 'no' %></span></li>
+          <li><span>Canonical</span><span class="truncate"><%= r.indexability.canonical || '(none)' %></span></li>
+          <li><span>Strict-Transport-Security</span><span><%= r.security.hsts ? 'set' : 'absent' %></span></li>
+          <li><span>Content-Security-Policy</span><span><%= r.security.csp ? 'set' : 'absent' %></span></li>
+          <li><span>X-Content-Type-Options</span><span><%= r.security.xContentType || 'absent' %></span></li>
+          <li><span>Referrer-Policy</span><span><%= r.security.referrerPolicy || 'absent' %></span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <div class="card-head"><h3>Discovery files</h3></div>
+      <div class="card-body">
+        <ul class="kv">
+          <li><span>robots.txt</span><span><%= r.robots.present ? 'present' : 'absent (HTTP ' + (r.robots.status || '—') + ')' %></span></li>
+          <li><span>Sitemaps declared in robots.txt</span><span><%= r.robots.sitemaps.length ? r.robots.sitemaps.join(', ') : 'none' %></span></li>
+          <li><span>Sitemap URLs found</span><span><%= fmtInt(r.sitemap.count) %></span></li>
+          <li><span>llms.txt</span><span><%= r.llms.present ? 'present (' + fmtInt(r.llms.bytes) + ' bytes)' : 'absent — optional, and not used by Google' %></span></li>
+        </ul>
+        <% if (r.robots.body) { %>
+          <h4>robots.txt as served</h4>
+          <p class="pre" style="font-size:11px;white-space:pre-wrap;max-height:260px;overflow:auto"><%= r.robots.body %></p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Semantic structure</h3></div>
+      <div class="card-body">
+        <% if (!r.semantic) { %>
+          <div class="empty-state">The page could not be parsed.</div>
+        <% } else { %>
+          <p class="hint mt-0">
+            AI retrieval systems chunk pages by structure. Without landmarks, navigation and footers are
+            indistinguishable from the content, so every extracted passage is diluted with boilerplate.
+          </p>
+          <ul class="kv">
+            <% ['main','article','section','nav','header','footer','aside','time','figure','table'].forEach(function (k) { %>
+              <li><span>&lt;<%= k %>&gt;</span><span><%= r.semantic[k] ? '&#10003; present' : '&#10007; absent' %></span></li>
+            <% }) %>
+            <li><span>Lists</span><span><%= r.semantic.lists %></span></li>
+          </ul>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <% if (r.crux) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>Core Web Vitals from real Chrome users</h3>
+      <span class="muted" style="font-size:12px">
+        <%= r.crux.scope === 'origin'
+          ? 'Origin-wide — this URL has too little traffic for its own CrUX record'
+          : 'This URL specifically' %>
+      </span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Metric</th><th>75th percentile</th><th>Google "good"</th><th>Project target</th></tr></thead>
+        <tbody>
+          <% const rows = [
+            { key: 'LARGEST_CONTENTFUL_PAINT_MS', label: 'LCP', unit: 'ms', scale: 1, good: r.thresholds.lcpMs.googleGood, target: r.thresholds.lcpMs.target },
+            { key: 'INTERACTION_TO_NEXT_PAINT', label: 'INP', unit: 'ms', scale: 1, good: r.thresholds.inpMs.googleGood, target: r.thresholds.inpMs.target },
+            { key: 'CUMULATIVE_LAYOUT_SHIFT_SCORE', label: 'CLS', unit: '', scale: 0.01, good: r.thresholds.cls.googleGood, target: r.thresholds.cls.target },
+            { key: 'EXPERIMENTAL_TIME_TO_FIRST_BYTE', label: 'TTFB (field)', unit: 'ms', scale: 1, good: r.thresholds.ttfbMs.googleGood, target: r.thresholds.ttfbMs.target },
+          ]; %>
+          <% rows.forEach(function (row) { const m = r.crux.metrics[row.key]; if (!m || m.percentile == null) return;
+               const v = Math.round(m.percentile * row.scale * 1000) / 1000; %>
+            <tr>
+              <td><%= row.label %></td>
+              <td>
+                <span class="pm-value <%= v <= row.good ? 'good' : 'poor' %>"><%= row.unit === 'ms' ? Math.round(v) + 'ms' : v.toFixed(3) %></span>
+                <% if (m.category) { %><span class="badge neutral"><%= m.category %></span><% } %>
+              </td>
+              <td class="muted"><%= row.unit === 'ms' ? row.good + 'ms' : row.good %></td>
+              <td class="muted"><%= row.unit === 'ms' ? row.target + 'ms' : row.target %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint" style="margin-bottom:0">
+        Field data, not a lab score. The Lighthouse numbers move with the test machine; these are what Google's
+        ranking systems actually read, which is why the pass/fail verdicts above are taken from here.
+      </p>
+    </div>
+  </div>
+  <% } else if (r.psi && r.psi.error) { %>
+    <div class="notice warn">
+      <span class="notice-icon">&#9888;</span>
+      <div class="notice-body">
+        <strong>PageSpeed Insights could not be read:</strong> <%= r.psi.error %>.
+        Everything else on this page was measured directly and is unaffected.
+      </div>
+    </div>
+  <% } %>
+
+  <% if (r.psi && !r.psi.error && r.psi.categories) { %>
+  <div class="card">
+    <div class="card-head"><h3>Lighthouse (lab), for the opportunity list only</h3></div>
+    <div class="card-body">
+      <div class="psi-gauges">
+        <% r.psi.categories.forEach(function (c) { %>
+          <div style="text-align:center">
+            <div class="psi-gauge <%= c.band %>"><span class="health-num"><%= c.score == null ? '—' : c.score %></span></div>
+            <div class="muted" style="font-size:12px"><%= c.title %></div>
+          </div>
+        <% }) %>
+      </div>
+      <% if (r.psi.insights && r.psi.insights.length) { %>
+        <h4>Biggest opportunities</h4>
+        <ul class="meta-list">
+          <% r.psi.insights.slice(0, 8).forEach(function (i) { %>
+            <li><strong><%= i.title %></strong> <span class="muted"><%= i.displayValue || '' %></span></li>
+          <% }) %>
+        </ul>
+      <% } %>
+      <p class="hint" style="margin-bottom:0">
+        No verdict on this page is taken from these numbers. A lab score that flips between runs on an unchanged
+        page trains people to ignore findings, so the pass/fail work is done from field data above.
+      </p>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/provenance', { prov: r.provenance }) %>
+<% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

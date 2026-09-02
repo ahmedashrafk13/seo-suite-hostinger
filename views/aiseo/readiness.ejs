@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Asks each AI crawler's own question: can I reach this page, and can I read it?</strong>
+        Tested twice — against robots.txt, and by actually requesting the page as that user agent. The second
+        test is the one that finds real problems: the usual cause of a blocked AI fetcher is not a rule someone
+        wrote but a Cloudflare bot-fight setting, a "block AI scrapers" plugin, or a WAF rule, all of which
+        answer 403 or a challenge page while robots.txt says Allow.
+      </p>
+      <p class="hint" style="margin-bottom:0">
+        <strong>Training crawlers and retrieval fetchers are reported separately, because they mean opposite
+        things.</strong> Blocking GPTBot or CCBot costs nothing in visibility and plenty of publishers do it
+        deliberately. Blocking OAI-SearchBot, PerplexityBot or Claude-User means the brand cannot be cited in
+        those assistants' answers at all. A tool that reports one number for both is useless.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <div class="card">
+    <div class="card-head"><h3>Check a page</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/ai-seo/readiness/run">
+        <% if (brand) { %><input type="hidden" name="brand_id" value="<%= brand.id %>"><% } %>
+        <div class="field">
+          <label for="url">URL <span class="muted">(leave empty to check the brand's homepage)</span></label>
+          <input type="url" id="url" name="url" placeholder="<%= brand ? brand.site_url : 'https://example.com/page' %>">
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="probe_edge" checked>
+            Request the page as each AI user agent
+            <span class="muted">(<%= agents.filter(function(a){ return a.ua; }).length %> live requests — the only way to see an edge block)</span>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="include_psi" checked>
+            Fetch Core Web Vitals from real Chrome users via PageSpeed Insights
+            <span class="muted">(adds 30-60 seconds)</span>
+          </label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite ? '' : 'disabled' %>>Run readiness check</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Agents checked</h3></div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Agent</th><th>Purpose</th><th>What a block costs</th><th>Live probe possible</th></tr></thead>
+        <tbody>
+        <% agents.forEach(function (a) { %>
+          <tr>
+            <td><code><%= a.token %></code> <span class="muted"><%= a.label %></span></td>
+            <td>
+              <% if (a.purpose === 'retrieval') { %><span class="badge critical">retrieval</span>
+              <% } else { %><span class="badge neutral">training</span><% } %>
+            </td>
+            <td class="muted" style="font-size:12px">
+              <%= a.purpose === 'retrieval'
+                ? 'Cannot cite this brand in an answer.'
+                : 'Nothing, in visibility terms. Often blocked on purpose.' %>
+            </td>
+            <td><%= a.ua ? 'yes' : 'no — publishes no user-agent string' %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Thresholds applied</h3></div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Metric</th><th>Target for this project</th><th>Google's "good" boundary</th><th>Google's "poor" boundary</th></tr></thead>
+        <tbody>
+          <tr><td>TTFB</td><td><%= thresholds.ttfbMs.target %>ms</td><td><%= thresholds.ttfbMs.googleGood %>ms</td><td>&gt; <%= thresholds.ttfbMs.googleNeedsWork %>ms</td></tr>
+          <tr><td>Document load</td><td><%= thresholds.loadMs.target %>ms</td><td class="muted">—</td><td class="muted">—</td></tr>
+          <tr><td>LCP</td><td><%= thresholds.lcpMs.target %>ms</td><td><%= thresholds.lcpMs.googleGood %>ms</td><td>&gt; <%= thresholds.lcpMs.googleNeedsWork %>ms</td></tr>
+          <tr><td>INP</td><td><%= thresholds.inpMs.target %>ms</td><td><%= thresholds.inpMs.googleGood %>ms</td><td>&gt; <%= thresholds.inpMs.googleNeedsWork %>ms</td></tr>
+          <tr><td>CLS</td><td><%= thresholds.cls.target %></td><td><%= thresholds.cls.googleGood %></td><td>&gt; <%= thresholds.cls.googleNeedsWork %></td></tr>
+        </tbody>
+      </table></div>
+      <p class="hint" style="margin-bottom:0">
+        Both columns are reported because they disagree: a site at LCP 2.3s passes Google and misses this
+        project's 2.0s target. Reporting only one of them turns that into an argument nobody can settle.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

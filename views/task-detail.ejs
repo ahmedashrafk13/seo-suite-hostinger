@@ -53,6 +53,42 @@
           </p>
           <% if (task.detail) { %><pre style="white-space:pre-wrap;font-family:inherit;font-size:13px"><%= task.detail %></pre><% } %>
 
+          <%
+            // evidence.items (audit findings, linking broken/orphans) carries the
+            // FULL per-URL detail — the same "url — broken link → target (HTTP 404)"
+            // information shown in the Technical audit / Internal linking sections,
+            // not a bare list of "example" URLs with no explanation.
+            var evItems = (task.evidence && task.evidence.items) || null;
+            if (!evItems && task.evidence && task.evidence.exampleUrls) {
+              evItems = task.evidence.exampleUrls.map(function(u){ return { url: u, note: null }; });
+            }
+            evItems = evItems || [];
+            var evTotal = task.evidence
+              ? (task.evidence.affectedCount ?? task.evidence.failed ?? task.evidence.total ?? evItems.length)
+              : evItems.length;
+          %>
+          <% if (evItems.length) { %>
+            <div class="section-divider"></div>
+            <h4>Affected URLs (<%= evTotal %>)</h4>
+            <div class="table-wrap" style="max-height:320px;overflow:auto">
+              <table class="data compact">
+                <thead><tr><th>URL</th><th>What's wrong</th></tr></thead>
+                <tbody>
+                  <% evItems.forEach(function(it){ %>
+                    <tr>
+                      <td class="wrap"><% if (it.url) { %><a href="<%= it.url %>" target="_blank" rel="noopener"><%= it.url %></a><% } else { %>—<% } %></td>
+                      <td class="wrap"><%= it.note || '—' %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <% if (evTotal > evItems.length) { %>
+              <p class="hint"><%= evTotal - evItems.length %> more not shown — see the full
+                <a href="/tasks/export/csv">Excel export</a>.</p>
+            <% } %>
+          <% } %>
+
           <div class="section-divider"></div>
           <h4>Change status</h4>
           <form method="POST" action="/tasks/<%= task.id %>/status">

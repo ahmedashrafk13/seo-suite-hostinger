@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%- include('_partials/runhead') %>
+
+<% const r = run.result; %>
+<% if (run.status === 'completed' && r && r.empty) { %>
+  <div class="notice error">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body"><%= r.reason %></div>
+  </div>
+  <%- include('_partials/findings') %>
+<% } else if (run.status === 'completed' && r) { %>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Pages in the graph</div>
+      <div class="value"><%= r.graph.nodeCount %></div>
+      <div class="meta"><%= r.crawl.fetched %> fetched of <%= r.crawl.maxPages %> budget<%= r.crawl.complete ? ' · crawl complete' : ' · budget reached, more pages exist' %></div>
+    </div>
+    <div class="stat">
+      <div class="label">Internal links between them</div>
+      <div class="value"><%= fmtInt(r.graph.edgeCount) %></div>
+      <div class="meta"><%= r.graph.avgOutLinks %> per page on average</div>
+    </div>
+    <div class="stat">
+      <div class="label">Topic clusters found</div>
+      <div class="value"><%= r.communities.length %></div>
+      <div class="meta">by shared named entities, not by URL folder</div>
+    </div>
+    <div class="stat">
+      <div class="label">Orphan pages</div>
+      <div class="value"><%= r.orphans.length %></div>
+      <div class="meta"><%= r.weaklyLinked.length %> more with exactly one inbound link</div>
+    </div>
+  </div>
+
+  <%- include('_partials/findings') %>
+
+  <div class="card">
+    <div class="card-head"><h3>Topic clusters</h3></div>
+    <div class="card-body">
+      <% if (!r.communities.length) { %>
+        <div class="empty-state">
+          No two pages shared enough named entities to form a cluster. On a small site that is normal; on a
+          large one it usually means the pages are written too generically to be about anything specific.
+        </div>
+      <% } else { %>
+        <% r.communities.forEach(function (c) { %>
+          <div class="alert-item">
+            <div class="alert-head">
+              <strong><%= c.hubTitle || c.hub %></strong>
+              <span class="badge neutral"><%= c.size %> pages</span>
+              <span class="badge <%= c.hubLinksToSpokes >= Math.ceil((c.size - 1) / 2) ? 'good' : 'medium' %>">
+                hub links to <%= c.hubLinksToSpokes %> of <%= c.size - 1 %> spokes
+              </span>
+              <span class="badge <%= c.spokesLinkingToHub >= Math.ceil((c.size - 1) / 2) ? 'good' : 'medium' %>">
+                <%= c.spokesLinkingToHub %> spokes link back
+              </span>
+              <span class="badge neutral"><%= c.connectedness %>% connected</span>
+            </div>
+            <div class="alert-body">
+              <p class="mt-0"><strong>Shared subjects:</strong> <%= c.sharedEntities.join(', ') || '—' %></p>
+              <div class="table-wrap"><table class="data">
+                <thead><tr><th>Page</th><th>Depth</th><th>Inbound</th><th>Outbound</th><th>Words</th></tr></thead>
+                <tbody>
+                <% c.members.forEach(function (m) { %>
+                  <tr>
+                    <td class="truncate" style="max-width:420px">
+                      <% if (m.url === c.hub) { %><span class="badge accent">hub</span> <% } %>
+                      <a href="<%= m.url %>" target="_blank" rel="noopener"><%= shortUrl(m.url, 70) %></a>
+                      <% if (m.title) { %><div class="muted" style="font-size:11px"><%= m.title %></div><% } %>
+                    </td>
+                    <td><%= m.depth %></td>
+                    <td><%= m.inLinks %></td>
+                    <td><%= m.outLinks %></td>
+                    <td><%= fmtInt(m.words) %></td>
+                  </tr>
+                <% }) %>
+                </tbody>
+              </table></div>
+            </div>
+          </div>
+        <% }) %>
+        <p class="hint" style="margin-bottom:0">
+          The hub is chosen as the shallowest page with the broadest entity coverage — which is what a topic's
+          overview page normally is. A cluster whose hub links to few of its own spokes is not functioning as a
+          hub whatever the site map says.
+        </p>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Proposed internal links</h3>
+      <span class="muted" style="font-size:12px"><%= r.candidates.length %> pairs, within-topic first</span>
+    </div>
+    <div class="card-body">
+      <% if (!r.candidates.length) { %>
+        <div class="empty-state">No unlinked pair shared enough entities to be worth linking.</div>
+      <% } else { %>
+        <%
+        /* The model's anchor text, keyed by pair, so the measured pair and the
+           written anchor appear on one row rather than in two tables the reader
+           has to join by eye. */
+        const aiByPair = new Map();
+        if (r.aiLinks && r.aiLinks.ok && r.aiLinks.data && Array.isArray(r.aiLinks.data.links)) {
+          r.aiLinks.data.links.forEach(function (l) { aiByPair.set(l.sourceUrl + '>>' + l.targetUrl, l); });
+        }
+        %>
+        <% if (r.aiLinks) { %><%- include('_partials/aiblock', { ai: r.aiLinks }) %><% } %>
+        <div class="table-wrap scroll-y" style="max-height:620px">
+          <table class="data">
+            <thead><tr>
+              <th>From</th><th>To</th><th>Overlap</th><th>Shared subjects</th>
+              <th>Suggested anchor</th><th>Reason</th>
+            </tr></thead>
+            <tbody>
+            <% r.candidates.forEach(function (c) { const ai = aiByPair.get(c.sourceUrl + '>>' + c.targetUrl); %>
+              <tr style="<%= ai && ai.skip ? 'opacity:.55' : '' %>">
+                <td class="truncate" style="max-width:230px"><a href="<%= c.sourceUrl %>" target="_blank" rel="noopener"><%= shortUrl(c.sourceUrl, 44) %></a></td>
+                <td class="truncate" style="max-width:230px">
+                  <a href="<%= c.targetUrl %>" target="_blank" rel="noopener"><%= shortUrl(c.targetUrl, 44) %></a>
+                  <div class="muted" style="font-size:11px"><%= c.targetInboundNow %> inbound now</div>
+                </td>
+                <td>
+                  <%= c.similarity %>
+                  <% if (c.sameCommunity) { %><br><span class="badge accent">same topic</span><% } %>
+                </td>
+                <td class="muted" style="font-size:11px;max-width:200px"><%= c.sharedEntities.slice(0, 5).join(', ') %></td>
+                <td>
+                  <% if (ai && ai.skip) { %><span class="badge neutral">model says skip</span>
+                  <% } else if (ai) { %><strong><%= ai.anchor %></strong>
+                    <% if (ai.placement) { %><div class="muted" style="font-size:11px"><%= ai.placement %></div><% } %>
+                  <% } else { %><span class="muted">—</span><% } %>
+                </td>
+                <td class="muted" style="font-size:11px;max-width:260px"><%= ai ? ai.reason : '—' %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <p class="hint" style="margin-bottom:0">
+          <strong>Review before applying.</strong> Bulk internal-link changes require sign-off in this system
+          for a reason: a link nobody needs makes the site harder to navigate, and a hub diluted by
+          indiscriminate outbound links is worse than one with fewer, deliberate ones. Direction is chosen
+          deliberately — from the narrower page toward the broader, better-linked one.
+        </p>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <div class="card-head"><h3>Breadcrumb trails</h3></div>
+      <div class="card-body">
+        <% const needing = r.breadcrumbs.filter(function (b) { return b.needsBreadcrumb || b.missingLevels.length; }); %>
+        <% if (!needing.length) { %>
+          <div class="empty-state">Every nested page has a breadcrumb trail, and no trail would point at a missing page.</div>
+        <% } else { %>
+          <div class="table-wrap scroll-y" style="max-height:460px">
+            <table class="data">
+              <thead><tr><th>Page</th><th>Now</th><th>Proposed trail</th></tr></thead>
+              <tbody>
+              <% needing.slice(0, 60).forEach(function (b) { %>
+                <tr>
+                  <td class="truncate" style="max-width:220px"><a href="<%= b.url %>" target="_blank" rel="noopener"><%= shortUrl(b.url, 46) %></a></td>
+                  <td>
+                    <% if (b.currentTrail) { %>
+                      <span class="muted" style="font-size:11px"><%= b.currentTrail.join(' › ') %></span>
+                      <div><span class="badge good">from <%= b.currentSource %></span></div>
+                    <% } else { %><span class="badge medium">none</span><% } %>
+                  </td>
+                  <td>
+                    <span style="font-size:12px"><%= b.proposed.map(function (t) { return t.name; }).join(' › ') %></span>
+                    <% if (b.missingLevels.length) { %>
+                      <div><span class="badge critical">no page for: <%= b.missingLevels.join(', ') %></span></div>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <p class="hint" style="margin-bottom:0">
+            Trails are proposed from the URL path, because that is the hierarchy the site already commits to —
+            proposing one that contradicts the URL would be worse than proposing none. A level flagged
+            "no page for" would render as a link to a 404, so either build that listing page (usually worth
+            having as a hub) or render that level as plain text.
+          </p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Least-linked pages</h3></div>
+      <div class="card-body">
+        <div class="table-wrap scroll-y" style="max-height:460px">
+          <table class="data">
+            <thead><tr><th>Page</th><th>Inbound</th><th>Depth</th><th>Impressions (28d)</th></tr></thead>
+            <tbody>
+            <% r.graph.nodes.slice(0, 40).forEach(function (n) { %>
+              <tr>
+                <td class="truncate" style="max-width:300px">
+                  <a href="<%= n.url %>" target="_blank" rel="noopener"><%= shortUrl(n.url, 60) %></a>
+                  <% if (n.title) { %><div class="muted" style="font-size:11px"><%= n.title %></div><% } %>
+                </td>
+                <td>
+                  <% if (n.inLinks === 0) { %><span class="badge critical">0</span><% } else { %><%= n.inLinks %><% } %>
+                </td>
+                <td><%= n.depth %></td>
+                <td><%= n.performance ? fmtInt(n.performance.impressions) : '—' %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <p class="hint" style="margin-bottom:0">
+          Ordered by inbound links, fewest first. An orphan already earning impressions is the best work on this
+          page: the demand is proven and only internal signals are holding it back.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <% if (r.crawl.failures && r.crawl.failures.length) { %>
+  <div class="card">
+    <div class="card-head"><h3>Pages the crawl could not read</h3></div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>URL</th><th>Status</th><th>Error</th></tr></thead>
+        <tbody>
+        <% r.crawl.failures.forEach(function (f) { %>
+          <tr><td class="truncate"><%= f.url %></td><td><%= f.status || '—' %></td><td class="muted"><%= f.error || '—' %></td></tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/provenance', { prov: r.provenance }) %>
+<% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

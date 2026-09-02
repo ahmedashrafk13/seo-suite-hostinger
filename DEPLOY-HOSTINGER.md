@@ -94,6 +94,36 @@ https://your-domain.com/internal/cron/status?token=YOUR_CRON_TOKEN
 
 Every job should show a recent `lastRunAt` and `"lastStatus": "ok"`.
 
+### The AI SEO sweeps
+
+Three more jobs run through the same URL and need no extra cron line:
+`aiseo_tracking` (daily), `aiseo_reputation` (daily) and `aiseo_freshness`
+(weekly).
+
+**Each sweeps one brand per tick — the one whose last sweep is oldest.** That
+is deliberate: a full sweep crawls a sample of pages, probes fifteen user
+agents and calls PageSpeed Insights, and doing that for every brand in a single
+tick would exhaust the PageSpeed quota and this plan's memory allowance. The
+consequence is that **with N brands, each brand is swept every N days.**
+
+If that is too slow for a particular brand, either raise the per-tick count in
+`.env`:
+
+```
+AISEO_TRACKING_BRANDS_PER_TICK=3
+```
+
+…or give that job its own cron line:
+
+```
+wget -q -O /dev/null "https://your-domain.com/internal/cron?token=YOUR_CRON_TOKEN&job=aiseo_tracking"
+```
+
+These sweeps run with AI assistance switched off. A scheduled job that spends
+the Azure budget unattended would reach the spend cap before anyone had read a
+single finding; the AI half of each feature is one button click away on its
+result page.
+
 > If your plan gives you real SSH cron, `cd ~/seo-suite && node src/cron.js`
 > does the same thing. Prefer the URL: the WebAssembly SQLite engine allows one
 > writer at a time, and the URL runs the work **inside the web process** instead

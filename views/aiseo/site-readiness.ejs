@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>The whole property, against an eight-point checklist.</strong>
+        The page-level report answers "can an AI fetcher read this URL". This one answers it for the site, in the
+        order that matters: a page a fetcher cannot <em>reach</em> cannot be read; a page it reads but is told to
+        ignore is not indexed; a page it reads and finds empty contributes nothing; and markup that contradicts
+        the visible page is worse than no markup. The URL set is the union of the sitemap and a link crawl —
+        which is the only way the "sitemap contains all target URLs" check can be answered at all, since a
+        sitemap compared against itself is never incomplete.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <div class="card">
+    <div class="card-head"><h3>Check a whole site</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/ai-seo/site-readiness/run">
+        <% if (brand) { %><input type="hidden" name="brand_id" value="<%= brand.id %>"><% } %>
+        <div class="field">
+          <label for="site">Site URL
+            <span class="muted">
+              <% if (brand) { %>(leave empty to use <%= brand.site_url %>)<% } else { %>(required)<% } %>
+            </span>
+          </label>
+          <input type="url" id="site" name="site" placeholder="https://example.com/"
+                 <%= brand ? '' : 'required' %>>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Crawl up to</span>
+            <select name="max_pages">
+              <option value="40">40 pages — quick look</option>
+              <option value="120" selected>120 pages</option>
+              <option value="250">250 pages</option>
+              <option value="400">400 pages — slow, thorough</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Examine structured data on</span>
+            <select name="deep_sample">
+              <option value="10">10 pages</option>
+              <option value="25" selected>25 pages</option>
+              <option value="50">50 pages</option>
+              <option value="80">80 pages</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint mt-0">
+          The structured-data check compares every marked-up value against the page's rendered text, which is
+          the one structured-data failure a validator cannot catch. It runs on the pages carrying the most
+          markup rather than on all of them, because a templating fault repeats identically across a section
+          and the marginal page adds nothing.
+        </p>
+
+        <div class="field">
+          <label for="important_urls">Important URLs
+            <span class="muted">(one per line — checked directly for a 200 rather than inferred from the crawl)</span>
+          </label>
+          <textarea id="important_urls" name="important_urls" rows="3"
+                    placeholder="https://example.com/pricing&#10;https://example.com/services/flagship"></textarea>
+          <p class="hint mt-0">
+            The homepage and the shallowest URL in each sitemap section are always included. Add anything else
+            whose being broken would matter — a page the crawl never reaches has no status, so naming it is the
+            only way to be sure it was checked.
+          </p>
+        </div>
+
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="probe_edge" checked>
+            Request the homepage as each AI user agent
+            <span class="muted">— finds edge rules (Cloudflare bot-fight, WAF user-agent rules, "block AI scrapers" plugins) that return 403 while robots.txt says Allow. This is the most common real cause of an AI fetcher being unable to read a site, and robots.txt alone never shows it.</span>
+          </label>
+        </div>
+
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite ? '' : 'disabled' %>>Run the checklist</button>
+          <a class="btn ghost" href="/ai-seo/readiness">Check a single URL instead</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>What is checked, and in what order</h3></div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>#</th><th>Item</th><th>Weight</th><th>Why it is at this position</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>robots.txt</td><td>18</td><td>Per AI agent, split into <strong>retrieval</strong> fetchers (which cite pages and cost visibility when blocked) and <strong>training</strong> crawlers (blocking which costs nothing). Both robots.txt and the live wire response.</td></tr>
+          <tr><td>2</td><td>Sitemap contains all target URLs</td><td>12</td><td>Answerable only against a second URL source, so the crawl supplies one. Pages that are 404 or noindex are excluded — their absence from a sitemap is correct.</td></tr>
+          <tr><td>3</td><td>Important pages return 200</td><td>16</td><td>"Important" is defined, not assumed: the homepage, anything you name, and each section's entry point. A broken section entry point costs every page beneath it.</td></tr>
+          <tr><td>4</td><td>No accidental noindex</td><td>14</td><td>"Accidental" is the operative word: a noindex page <em>also listed in the sitemap</em> is the site contradicting itself, which is the signature of an accident rather than a decision.</td></tr>
+          <tr><td>5</td><td>Canonical points to the correct page</td><td>12</td><td>Missing, off-host, pointing at a URL the crawl found broken, or three or more distinct pages collapsing onto one.</td></tr>
+          <tr><td>6</td><td>Main content is available in HTML</td><td>16</td><td>Every AI retrieval fetcher reads the served HTML and runs no JavaScript. A client-rendered page is blank to them while looking perfect in a browser.</td></tr>
+          <tr><td>7</td><td>Internal links are standard links</td><td>8</td><td>A <code>&lt;div onclick&gt;</code>, an <code>href="#"</code> driven by script, and an anchor with no href all behave like links to a person and are invisible to every AI fetcher. A site navigated that way has, to them, one page.</td></tr>
+          <tr><td>8</td><td>Structured data valid and matches visible text</td><td>4</td><td>Parse errors, a declared type the content contradicts, a marked-up price or rating absent from the page, and FAQ answers a reader cannot see.</td></tr>
+        </tbody>
+      </table></div>
+      <p class="hint">
+        The score is the weighted share of items passing, with a warn counting half. The weights say what blocks
+        retrieval versus what merely weakens it — which is why item 8, the one most tools lead with, carries the
+        least.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

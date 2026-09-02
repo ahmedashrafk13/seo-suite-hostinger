@@ -6,7 +6,7 @@ const _rows = typeof rows !== 'undefined' ? rows : [];
 const _nameKey = typeof nameKey !== 'undefined' ? nameKey : 'entity';
 const _valueKey = typeof valueKey !== 'undefined' ? valueKey : 'clicks';
 const _codeType = typeof codeType !== 'undefined' ? codeType : 'alpha3';
-const _color = typeof color !== 'undefined' ? color : '#2563eb';
+const _color = typeof color !== 'undefined' ? color : '#1e4d6b';
 const _uid = `wm${Math.random().toString(36).slice(2, 9)}`;
 const _values = {};
 _rows.forEach((r) => { _values[r[_nameKey]] = Number(r[_valueKey]) || 0; });

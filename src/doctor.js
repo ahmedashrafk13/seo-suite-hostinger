@@ -146,14 +146,76 @@ try {
   require.resolve('better-sqlite3');
   ok('Native SQLite available', 'faster than the WebAssembly build');
 } catch {
-  console.log('  note    better-sqlite3 (native) is not installed — the WebAssembly engine is in use.');
-  console.log('          This is expected on shared hosting and everything works; it is simply slower.');
+  // This used to read "everything works; it is simply slower", which is not
+  // true and is the kind of reassurance that loses a database.
+  //
+  // The wasm VFS locks by creating a `<db>.lock` DIRECTORY (mkdir is atomic, so
+  // EEXIST -> SQLITE_BUSY). That is a real mutex, but a coarse one: it ignores
+  // SQLite's lock levels entirely, so readers take the same exclusive lock as
+  // writers, and WAL is unavailable because the VFS has no shared memory. It
+  // also records no owner and never refreshes the lock's mtime, which is what
+  // previously let one process delete a live process's lock and corrupt the
+  // file (see sqliteDriver.js). That specific hole is now closed, but a single
+  // writer is still the only configuration this engine is really safe in.
+  warn('WebAssembly SQLite engine in use (better-sqlite3 native is not installed)',
+    'Prefer ONE writer process. Locking is a coarse whole-file mutex with no WAL, so the web app, `npm run cron` and the backup job all writing concurrently will serialise badly and leave less margin for error. Keep backups, and install better-sqlite3 (real locking plus WAL) wherever a compiler is available.');
 }
 try {
   require.resolve('bcrypt');
   ok('Native bcrypt available');
 } catch {
   console.log('  note    bcrypt (native) is not installed — bcryptjs is in use. Same hashes, slower logins.');
+}
+
+// --- AI SEO suite ---------------------------------------------------------
+// Reported rather than checked-and-failed, because none of it is required:
+// every one of the nine analyses runs on the built-in crawler alone. What is
+// worth surfacing is WHICH questions this deployment can answer, so nobody
+// spends a week wondering why a backlink column is empty.
+try {
+  const providers = require('./lib/aiseo/providers');
+  const trackingCatalog = require('./lib/aiseo/trackingCatalog');
+
+  const availableChecks = trackingCatalog.availability().filter((c) => c.available).length;
+  const totalChecks = trackingCatalog.all().length;
+  if (availableChecks === totalChecks) {
+    ok(`AI SEO tracking board: all ${totalChecks} checks runnable`);
+  } else {
+    const blocked = trackingCatalog.availability().filter((c) => !c.available);
+    warn(`AI SEO tracking board: ${availableChecks} of ${totalChecks} checks runnable`,
+      blocked.map((c) => `${c.key} needs ${c.missing.map((m) => m.label).join(', ')}`).join('; '));
+  }
+
+  if (providers.has('azure')) {
+    ok('AI SEO: Azure OpenAI configured', 'prompt research, edit suggestions, schema drafting and mention triage are available');
+  } else {
+    warn('AI SEO: no Azure OpenAI credential',
+      'every score, measurement and finding still works — it is computed locally. Only the AI-written half (prompts, edit suggestions, schema drafts, mention triage) is unavailable.');
+  }
+
+  if (!providers.has('public')) {
+    warn('AI SEO: keyless public sources disabled (AISEO_DISABLE_PUBLIC_SOURCES=1)',
+      'keyword expansion via Google autocomplete and all reputation scanning report themselves as disabled');
+  } else if (providers.isEnhanced('reddit') === false) {
+    console.log('  note    AI SEO: no Reddit credential. Reddit is still scraped successfully — the RSS tier');
+    console.log('          answers where the JSON endpoint 403s — but it is rate-limited, carries no post');
+    console.log('          scores, and returns post bodies without their comment threads. A free script app');
+    console.log('          at reddit.com/prefs/apps removes all three limits. Raise REDDIT_DELAY_MS if scans');
+    console.log('          report rate limits.');
+  }
+
+  const commercial = providers.all().filter((p) => ['keyword-tool', 'backlinks', 'rank-tracker'].includes(p.kind));
+  const configured = commercial.filter((p) => p.available);
+  if (configured.length) {
+    ok(`AI SEO: ${configured.map((p) => p.label).join(', ')} configured`);
+  } else {
+    console.log('  note    AI SEO: no Semrush/Ahrefs/Moz/DataForSEO credential. Search volume, keyword');
+    console.log('          difficulty, backlink counts, competitor traffic and AI citation share are NOT');
+    console.log('          shown anywhere — they are not knowable here, and every affected page says so');
+    console.log('          rather than estimating them. See .env.example to enable an adapter.');
+  }
+} catch (err) {
+  warn('AI SEO suite could not be inspected', err.message);
 }
 
 console.log(`\n${problems} problem(s), ${warnings} warning(s).\n`);

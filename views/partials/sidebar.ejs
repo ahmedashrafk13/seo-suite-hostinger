@@ -20,6 +20,15 @@ const ICONS = {
   workflow: '<circle cx="5" cy="6" r="2.3"/><circle cx="19" cy="6" r="2.3"/><circle cx="12" cy="18" r="2.3"/><path d="M7 7.3L11 16M17 7.3L13 16"/>',
   settings: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.4M12 18.1v2.4M20.5 12h-2.4M5.9 12H3.5M17.7 6.3l-1.7 1.7M8 16l-1.7 1.7M17.7 17.7L16 16M8 8L6.3 6.3"/>',
   ai: '<path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z"/><path d="M19 15l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8.8-1.9z"/>',
+  research: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.5-4.5"/><path d="M11 8v6M8 11h6"/>',
+  optimizer: '<path d="M4 20V9M10 20V4M16 20v-6M22 20h-20"/><path d="M13 7l3-3 3 3"/>',
+  schema: '<rect x="9" y="2.5" width="6" height="5" rx="1.4"/><rect x="2.5" y="16.5" width="6" height="5" rx="1.4"/><rect x="15.5" y="16.5" width="6" height="5" rx="1.4"/><path d="M12 7.5v4M5.5 16.5v-2.5h13v2.5"/>',
+  robot: '<rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 4.5v3.5"/><circle cx="12" cy="3.2" r="1.4"/><path d="M9 13h.01M15 13h.01"/><path d="M9.5 16.2h5"/>',
+  graph: '<circle cx="12" cy="5" r="2.3"/><circle cx="5" cy="18" r="2.3"/><circle cx="19" cy="18" r="2.3"/><path d="M10.6 6.9L6.4 16M13.4 6.9L17.6 16M7.3 18h9.4"/>',
+  competitors: '<path d="M6 4h12v4a6 6 0 01-12 0V4z"/><path d="M12 14v4"/><path d="M8.5 21h7"/><path d="M6 5H3.5v2A3.5 3.5 0 006.4 10.4"/><path d="M18 5h2.5v2a3.5 3.5 0 01-2.9 3.4"/>',
+  reputation: '<path d="M20.5 12.5a7.5 7.5 0 01-10.9 6.7L4 20.5l1.4-5.3A7.5 7.5 0 1120.5 12.5z"/><path d="M9 11h.01M12 11h.01M15 11h.01"/>',
+  freshness: '<path d="M20.5 12a8.5 8.5 0 11-2.6-6.1"/><path d="M20.5 4v4.5H16"/><path d="M12 8v4.5l3 1.8"/>',
+  board: '<rect x="3" y="4" width="18" height="16" rx="2.4"/><path d="M3 9h18"/><path d="M8.5 13l2 2 3.5-4"/><path d="M17 13v3"/>',
 };
 function icon(name) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONS[name] || ''}</svg>`;
@@ -72,6 +81,67 @@ function icon(name) {
     </a>
   </div>
 
+  <%
+  /* AI SEO SUITE
+     Placed between Analyse and Act because that is where it sits in the work:
+     these nine analyses produce the findings that Alerts, Opportunities and
+     Tasks then work through. It is its own section rather than nine more items
+     under "Analyse" because the existing crawlers answer "is the site
+     technically sound" and these answer "can an AI engine find, read and cite
+     it" — a different question with a different set of fixes. */
+  %>
+  <div class="nav-section">AI SEO suite</div>
+  <div class="nav-group">
+    <a class="nav-link <%= active === 'aiseo' ? 'active' : '' %>" href="/ai-seo">
+      <span class="nav-icon"><%- icon('ai') %></span> Overview
+    </a>
+    <a class="nav-link" href="/ai-seo/research">
+      <span class="nav-icon"><%- icon('research') %></span> Keyword &amp; prompt research
+    </a>
+    <a class="nav-link" href="/ai-seo/optimizer">
+      <span class="nav-icon"><%- icon('optimizer') %></span> On-page score
+    </a>
+    <a class="nav-link" href="/ai-seo/schema">
+      <span class="nav-icon"><%- icon('schema') %></span> Schema &amp; structured data
+    </a>
+    <a class="nav-link" href="/ai-seo/brand-hub">
+      <span class="nav-icon"><%- icon('briefs') %></span> Brand hub &amp; llms.txt
+    </a>
+    <a class="nav-link" href="/ai-seo/readiness">
+      <span class="nav-icon"><%- icon('robot') %></span> AI-crawler readiness (page)
+    </a>
+    <a class="nav-link" href="/ai-seo/site-readiness">
+      <span class="nav-icon"><%- icon('robot') %></span> AI-crawler readiness (site)
+    </a>
+    <a class="nav-link" href="/ai-seo/architecture">
+      <span class="nav-icon"><%- icon('graph') %></span> Linking &amp; architecture
+    </a>
+    <a class="nav-link" href="/ai-seo/link-opportunities">
+      <span class="nav-icon"><%- icon('graph') %></span> Link opportunities for a URL
+    </a>
+    <a class="nav-link" href="/ai-seo/competitors">
+      <span class="nav-icon"><%- icon('competitors') %></span> Competitive intelligence
+    </a>
+    <a class="nav-link" href="/ai-seo/reputation">
+      <span class="nav-icon"><%- icon('reputation') %></span> Reputation signals
+    </a>
+    <a class="nav-link" href="/ai-seo/review-platforms">
+      <span class="nav-icon"><%- icon('reputation') %></span> Review platform coverage
+    </a>
+    <a class="nav-link" href="/ai-seo/freshness">
+      <span class="nav-icon"><%- icon('freshness') %></span> Freshness &amp; intent drift
+    </a>
+    <a class="nav-link" href="/ai-seo/ai-referrals">
+      <span class="nav-icon"><%- icon('board') %></span> AI referral traffic
+    </a>
+    <a class="nav-link" href="/ai-seo/monitoring">
+      <span class="nav-icon"><%- icon('board') %></span> Tracking board
+    </a>
+    <a class="nav-link <%= active === 'ai-assist' ? 'active' : '' %>" href="/ai-assist">
+      <span class="nav-icon"><%- icon('ai') %></span> AI Assist
+    </a>
+  </div>
+
   <div class="nav-section">Act</div>
   <div class="nav-group">
     <a class="nav-link <%= active === 'alerts' ? 'active' : '' %>" href="/alerts">
@@ -95,18 +165,6 @@ function icon(name) {
   <div class="nav-group">
     <a class="nav-link <%= active === 'reports' ? 'active' : '' %>" href="/reports">
       <span class="nav-icon"><%- icon('reports') %></span> Weekly reports
-    </a>
-  </div>
-
-  <div class="nav-section">AI</div>
-  <div class="nav-group">
-    <a class="nav-link <%= active === 'ai' ? 'active' : '' %>" href="/ai-suggestions">
-      <span class="nav-icon"><%- icon('ai') %></span> AI Suggestions
-      <span class="nav-badge">soon</span>
-    </a>
-    <a class="nav-link <%= active === 'ai-lab' ? 'active' : '' %>" href="/ai-lab">
-      <span class="nav-icon"><%- icon('ai') %></span> AI Lab
-      <span class="nav-badge">beta</span>
     </a>
   </div>
 

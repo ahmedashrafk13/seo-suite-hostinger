@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Two questions, both answered from Search Console history.</strong>
+        Freshness asks which pages have not been touched in a long time <em>and</em> are losing ground — the
+        second clause is what makes the answer usable, since a list of pages older than a year is most of any
+        real site. Decay is measured relative to the whole site, so a month when everything fell does not
+        produce forty page-level refresh tasks.
+      </p>
+      <p class="hint" style="margin-bottom:0">
+        <strong>Intent drift is the harder one.</strong> The topic has not changed but what people want from it
+        has: a guide that ranked for "what is X" now gets impressions for "X vs Y" and "X pricing". Traffic
+        often falls slowly enough that no alert fires, and the page reads perfectly well on inspection.
+        Measured as Jensen-Shannon divergence over the impression-weighted query mix between two snapshots —
+        symmetric, always finite, and bounded at 1 bit, so one threshold means the same thing on every page.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <% if (brand) { %>
+  <div class="card">
+    <div class="card-head"><h3>Analyse freshness and drift</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/ai-seo/freshness/run">
+        <input type="hidden" name="brand_id" value="<%= brand.id %>">
+        <div class="field-row">
+          <label class="field">
+            <span>Pages to examine <span class="muted">(highest-impression first)</span></span>
+            <select name="max_pages">
+              <option value="20">20</option>
+              <option value="40" selected>40</option>
+              <option value="80">80</option>
+              <option value="150">150 — slow</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Drift threshold <span class="muted">(bits, 0-1)</span></span>
+            <input type="number" name="drift_threshold" value="0.35" min="0.1" max="0.9" step="0.05">
+          </label>
+          <label class="field">
+            <span>Treat as stale after</span>
+            <select name="stale_days">
+              <option value="180">180 days</option>
+              <option value="365" selected>365 days</option>
+              <option value="730">2 years</option>
+            </select>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="want_ai" <%= aiAvailable ? 'checked' : 'disabled' %>>
+            Ask the model to read each drifted page — seasonal noise, a re-angle, or a split?
+            <% if (!aiAvailable) { %><span class="muted">— needs an Azure OpenAI credential</span><% } %>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check"><input type="checkbox" name="force" value="1"> Re-ask rather than reusing the cached reading</label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite ? '' : 'disabled' %>>Analyse</button>
+        </div>
+        <% if (!brand.gsc_property) { %>
+          <p class="hint">
+            This brand has no Search Console property paired, so neither decay nor drift can be measured.
+            <a href="/brands/<%= brand.id %>">Pair one</a> and let a nightly sync run — drift needs two query
+            snapshots, which is roughly two weeks of history.
+          </p>
+        <% } %>
+      </form>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

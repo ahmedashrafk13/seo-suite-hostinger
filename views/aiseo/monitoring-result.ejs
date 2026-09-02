@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%- include('_partials/runhead') %>
+
+<% const r = run.result; %>
+<% if (run.status === 'completed' && r) { %>
+
+<%
+const statusBadgeFor = function (s) {
+  if (s === 'good') return 'good';
+  if (s === 'warn') return 'medium';
+  if (s === 'fail') return 'critical';
+  if (s === 'error') return 'critical';
+  if (s === 'unavailable') return 'neutral';
+  return 'neutral';
+};
+%>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Checks run</div>
+      <div class="value"><%= r.counts.total - r.counts.unavailable %> / <%= r.counts.total %></div>
+      <div class="meta"><%= r.counts.unavailable %> unavailable · <%= r.counts.error %> errored</div>
+    </div>
+    <div class="stat">
+      <div class="label">Failing</div>
+      <div class="value"><%= r.counts.fail %></div>
+      <div class="meta"><%= r.counts.warn %> warning · <%= r.counts.good %> clear</div>
+    </div>
+    <div class="stat">
+      <div class="label">Could not measure</div>
+      <div class="value"><%= r.counts.unknown %></div>
+      <div class="meta">excluded from the score, not counted as passing</div>
+    </div>
+    <div class="stat">
+      <div class="label">Metrics captured</div>
+      <div class="value"><%= r.counts.metricsMeasured %></div>
+      <div class="meta">each one a point in its own time series</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>The sample these page-scoped checks ran against</h3></div>
+    <div class="card-body">
+      <p class="mt-0"><strong>Composition:</strong> <%= r.sample.basis || 'nothing was sampled' %>.</p>
+      <p class="hint mt-0">
+        <%= r.sample.urls.length %> URL<%= r.sample.urls.length === 1 ? '' : 's' %> out of
+        <%= fmtInt(r.sample.sitemapUrlsSeen) %> seen in the sitemap. A count like "3 pages have no H1" means
+        3 <em>of these</em> — not 3 on the whole site.
+      </p>
+      <div class="table-wrap scroll-y" style="max-height:240px">
+        <table class="data">
+          <thead><tr><th>#</th><th>URL</th></tr></thead>
+          <tbody>
+          <% r.sample.urls.forEach(function (u, i) { %>
+            <tr><td class="muted"><%= i + 1 %></td><td><a href="<%= u %>" target="_blank" rel="noopener"><%= u %></a></td></tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Board</h3></div>
+    <div class="card-body">
+      <div class="grid cols-4">
+        <% r.byGroup.forEach(function (g) { %>
+          <div class="setup-row">
+            <span class="setup-mark">
+              <% if (g.status === 'good') { %>&#10003;
+              <% } else if (g.status === 'fail') { %>&#10007;
+              <% } else if (g.status === 'warn') { %>!
+              <% } else { %>?<% } %>
+            </span>
+            <div class="setup-body">
+              <strong><%= g.group %></strong>
+              <div class="muted" style="font-size:11px">
+                <span class="badge <%= statusBadgeFor(g.status) %>"><%= g.status %></span>
+                <%= g.checks %> check<%= g.checks === 1 ? '' : 's' %>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+
+  <% if (r.scopeNote) { %>
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Scope: <%= r.scope === 'sitewide' ? 'sitewide' : 'sampled' %>.</strong>
+        <%= r.scopeNote %>
+      </p>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/findings') %>
+
+  <div class="card">
+    <div class="card-head"><h3>Every check, with its metrics</h3></div>
+    <div class="card-body">
+      <% let currentGroup = null; %>
+      <% r.checks.forEach(function (c) { %>
+        <% if (c.group !== currentGroup) { currentGroup = c.group; %>
+          <h4 style="margin-top:20px"><%= c.group %></h4>
+        <% } %>
+        <div class="alert-item">
+          <div class="alert-head">
+            <span class="badge <%= statusBadgeFor(c.status) %>"><%= c.status %></span>
+            <strong><%= c.element %></strong>
+            <% if (c.scope) { %><span class="badge neutral"><%= c.scope === 'page' ? 'sampled pages' : 'site-wide' %></span><% } %>
+            <% if (c.ms) { %><span class="muted" style="font-size:11px"><%= c.ms > 1000 ? (c.ms/1000).toFixed(1) + 's' : c.ms + 'ms' %></span><% } %>
+          </div>
+          <div class="alert-body">
+            <% if (c.whatItTracks) { %>
+              <p class="muted mt-0" style="font-size:12px"><%= c.whatItTracks %> — <%= c.whyItMatters %></p>
+            <% } %>
+
+            <% if (c.status === 'unavailable') { %>
+              <p class="mt-0"><span class="badge neutral">not run</span> <%= c.reason %></p>
+            <% } else if (c.status === 'unknown') { %>
+              <p class="mt-0"><span class="badge medium">could not measure</span> <%= c.reason %></p>
+            <% } else if (c.status === 'error') { %>
+              <p class="mt-0"><span class="badge critical">check failed</span> <%= c.reason %>
+                <span class="muted">— the rest of the sweep continued.</span></p>
+            <% } %>
+
+            <% if (c.metrics && c.metrics.length) { %>
+              <div class="table-wrap"><table class="data">
+                <thead><tr><th>Metric</th><th>Scope</th><th>Value</th><th>Verdict</th><th>Note</th></tr></thead>
+                <tbody>
+                <% c.metrics.forEach(function (m) { %>
+                  <tr>
+                    <td><code><%= m.key %></code></td>
+                    <td class="muted truncate" style="max-width:200px"><%= m.url ? shortUrl(m.url, 40) : 'site-wide' %></td>
+                    <td><%= m.value == null ? '—' : m.value %></td>
+                    <td><span class="badge <%= statusBadgeFor(m.status) %>"><%= m.status || 'unknown' %></span></td>
+                    <td class="muted" style="font-size:11px"><%= m.detail || '—' %></td>
+                  </tr>
+                <% }) %>
+                </tbody>
+              </table></div>
+            <% } %>
+
+            <% if (c.findings && c.findings.length) { %>
+              <ul class="meta-list">
+                <% c.findings.forEach(function (f) { %>
+                  <li>
+                    <span class="dot-sev <%= f.severity %>"></span>
+                    <strong><%= f.title %></strong>
+                    <% if (f.detail) { %><div class="muted" style="font-size:12px"><%= f.detail %></div><% } %>
+                  </li>
+                <% }) %>
+              </ul>
+            <% } %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+
+  <%- include('_partials/provenance', { prov: r.provenance }) %>
+<% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

@@ -86,29 +86,27 @@ router.get('/export/csv', async (req, res, next) => {
     };
     const all = tasksLib.list(userId, { ...filters, limit: 5000 });
 
-    const exampleUrlsFor = (t) => {
-      try {
-        const ev = t.evidence_json ? JSON.parse(t.evidence_json) : null;
-        return (ev && (ev.exampleUrls || ev.items)) || [];
-      } catch { return []; }
+    const evidenceFor = (t) => {
+      try { return t.evidence_json ? JSON.parse(t.evidence_json) : null; } catch { return null; }
     };
-    const affectedCountFor = (t, urls) => {
-      try {
-        const ev = t.evidence_json ? JSON.parse(t.evidence_json) : null;
-        return (ev && (ev.affectedCount ?? ev.failed)) ?? urls.length;
-      } catch { return urls.length; }
-    };
-    const totalCountFor = (t) => {
-      try {
-        const ev = t.evidence_json ? JSON.parse(t.evidence_json) : null;
-        return (ev && ev.total) ?? '';
-      } catch { return ''; }
+    // Prefer the rich {url, note} shape (same detail shown in the Technical
+    // audit / Internal linking sections — status, HTTP code, referring page,
+    // etc.) over a bare url list, which exists only as a fallback for tasks
+    // created before evidence.items carried that detail.
+    const itemsFor = (ev) => {
+      if (!ev) return [];
+      if (ev.items && ev.items.length && typeof ev.items[0] === 'object') return ev.items;
+      return (ev.exampleUrls || []).map((u) => ({ url: u, note: null }));
     };
 
     const taskRows = [];
-    const exampleRows = [];
+    const affectedRows = [];
+    const linkRecRows = [];
+    const cannibalRows = [];
     all.forEach((t) => {
-      const urls = exampleUrlsFor(t);
+      const ev = evidenceFor(t);
+      const items = itemsFor(ev);
+      const urls = items.map((i) => i.url).filter(Boolean);
       taskRows.push({
         id: t.id,
         title: t.title,
@@ -120,9 +118,9 @@ router.get('/export/csv', async (req, res, next) => {
         assignee: t.assignee || '',
         affected_url: t.affected_url || '',
         summary: t.detail || '',
-        affected_count: affectedCountFor(t, urls),
-        total_count: totalCountFor(t),
-        example_urls: urls.join('; '),
+        recommended_action: (ev && ev.action) || '',
+        affected_count: (ev && (ev.affectedCount ?? ev.failed)) ?? urls.length,
+        total_count: (ev && ev.total) ?? '',
         due_date: t.due_date || '',
         effort: t.effort || '',
         requires_approval: t.requires_approval ? 'Yes' : 'No',
@@ -132,7 +130,27 @@ router.get('/export/csv', async (req, res, next) => {
         updated_at: t.updated_at,
         completed_at: t.completed_at || '',
       });
-      urls.forEach((url) => exampleRows.push({ task_id: t.id, title: t.title, url }));
+      items.forEach((it) => affectedRows.push({
+        task_id: t.id, title: t.title, url: it.url || '', detail: it.note || '',
+        found_on: it.sources && it.sources.length ? it.sources.join('; ') : '',
+      }));
+      (ev && ev.recommendations || []).forEach((r) => linkRecRows.push({
+        task_id: t.id,
+        title: t.title,
+        source_url: r.source_url || '',
+        target_url: r.target_url || '',
+        anchor_text: r.anchor_text || '',
+        reason: r.reason || '',
+      }));
+      (ev && ev.cannibalization || []).forEach((c) => cannibalRows.push({
+        task_id: t.id,
+        title: t.title,
+        shared_keyword: c.shared_keyword || '',
+        page_a: c.page_a || '',
+        page_b: c.page_b || '',
+        severity: c.severity || '',
+        recommendation: c.recommendation || '',
+      }));
     });
 
     const workbook = buildWorkbook({
@@ -150,9 +168,9 @@ router.get('/export/csv', async (req, res, next) => {
             { header: 'Assignee', key: 'assignee', width: 16 },
             { header: 'Affected URL', key: 'affected_url', width: 40 },
             { header: 'Summary', key: 'summary', width: 50 },
+            { header: 'Recommended Action', key: 'recommended_action', width: 50 },
             { header: 'Affected Count', key: 'affected_count', width: 14 },
             { header: 'Total Count', key: 'total_count', width: 12 },
-            { header: 'Example URLs', key: 'example_urls', width: 50 },
             { header: 'Due Date', key: 'due_date', width: 14 },
             { header: 'Effort', key: 'effort', width: 10 },
             { header: 'Requires Approval', key: 'requires_approval', width: 16, dropdown: ['Yes', 'No'] },
@@ -164,14 +182,49 @@ router.get('/export/csv', async (req, res, next) => {
           ],
           rows: taskRows,
         },
+        // Every URL a task's finding actually affects, one row each, with the
+        // same "what's wrong with it" detail shown on the task page — not a
+        // semicolon-joined "Example URLs" cell and not capped to a sample.
         {
-          name: 'Examples',
+          name: 'Affected URLs',
           columns: [
             { header: 'Task ID', key: 'task_id', width: 10 },
             { header: 'Title', key: 'title', width: 40 },
             { header: 'URL', key: 'url', width: 60 },
+            { header: "What's wrong", key: 'detail', width: 55 },
+            { header: 'Found On / Duplicate Pages', key: 'found_on', width: 60 },
           ],
-          rows: exampleRows,
+          rows: affectedRows,
+        },
+        // Internal-linking recommendations exploded to one row per suggested
+        // link — source, target, exact anchor text and why — instead of
+        // living only inside a task's detail paragraph.
+        {
+          name: 'Link Recommendations',
+          columns: [
+            { header: 'Task ID', key: 'task_id', width: 10 },
+            { header: 'Title', key: 'title', width: 40 },
+            { header: 'Source URL', key: 'source_url', width: 55 },
+            { header: 'Target URL', key: 'target_url', width: 55 },
+            { header: 'Anchor Text', key: 'anchor_text', width: 35 },
+            { header: 'Reason', key: 'reason', width: 40 },
+          ],
+          rows: linkRecRows,
+        },
+        // Keyword cannibalisation pairs, one row per pair, with the pages
+        // competing for the keyword and the recommended resolution.
+        {
+          name: 'Cannibalization',
+          columns: [
+            { header: 'Task ID', key: 'task_id', width: 10 },
+            { header: 'Title', key: 'title', width: 40 },
+            { header: 'Shared Keyword', key: 'shared_keyword', width: 30 },
+            { header: 'Page A', key: 'page_a', width: 50 },
+            { header: 'Page B', key: 'page_b', width: 50 },
+            { header: 'Severity', key: 'severity', width: 12, dropdown: Object.keys(tasksLib.SEVERITY_PRIORITY) },
+            { header: 'Recommendation', key: 'recommendation', width: 50 },
+          ],
+          rows: cannibalRows,
         },
       ],
     });

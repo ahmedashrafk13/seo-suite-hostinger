@@ -1,0 +1,51 @@
+<%
+/* Findings, most severe first.
+
+   Info-severity findings are rendered in the same list rather than hidden,
+   because several of them are the honest "this could not be measured, and
+   here is why" notes — which are exactly what must not be filtered out of a
+   report. They are visually de-emphasised, not removed. */
+const findings = run.findings || [];
+const urgent = findings.filter(function (f) { return f.severity === 'critical' || f.severity === 'high'; });
+const info = findings.filter(function (f) { return f.severity === 'info'; });
+%>
+<div class="card">
+  <div class="card-head">
+    <h3>Findings</h3>
+    <div class="sev-legend">
+      <% if (urgent.length) { %><span class="badge critical"><%= urgent.length %> urgent</span><% } %>
+      <span class="badge neutral"><%= findings.length %> total</span>
+      <% if (info.length) { %><span class="badge info"><%= info.length %> informational</span><% } %>
+    </div>
+  </div>
+  <div class="card-body">
+    <% if (!findings.length) { %>
+      <div class="empty-state">
+        Nothing flagged. Read the detail below before treating that as a clean bill of health — an analysis
+        with a narrow basis can be quiet for the wrong reason.
+      </div>
+    <% } else { %>
+      <% findings.forEach(function (f) { %>
+        <div class="alert-item" style="opacity:<%= f.severity === 'info' ? '0.85' : '1' %>">
+          <div class="alert-head">
+            <span class="dot-sev <%= f.severity %>"></span>
+            <strong><%= f.title %></strong>
+            <span class="badge <%= f.severity === 'critical' ? 'critical' : (f.severity === 'high' ? 'high' : (f.severity === 'medium' ? 'medium' : (f.severity === 'info' ? 'info' : 'low'))) %>"><%= f.severity %></span>
+            <% if (f.affected_count > 1) { %><span class="badge neutral"><%= fmtInt(f.affected_count) %> affected</span><% } %>
+          </div>
+          <div class="alert-body">
+            <% if (f.detail) { %><p class="mt-0"><%= f.detail %></p><% } %>
+            <% if (f.affected_url) { %>
+              <p class="muted mt-0" style="font-size:12px">
+                <a href="<%= f.affected_url %>" target="_blank" rel="noopener"><%= f.affected_url %></a>
+              </p>
+            <% } %>
+            <% if (f.action) { %>
+              <p class="mt-0" style="margin-bottom:0"><strong>What to do:</strong> <%= f.action %></p>
+            <% } %>
+          </div>
+        </div>
+      <% }) %>
+    <% } %>
+  </div>
+</div>

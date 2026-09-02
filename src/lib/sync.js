@@ -184,6 +184,27 @@ async function syncGscAppearance(brand, { startDate, endDate }) {
   return { rows: rows.length };
 }
 
+// Discover / Google News / Image / Video performance — GSC's searchType
+// dimension. Same shape as syncGscDevices; stored under its own table since
+// searchType is a distinct breakdown (a page's Discover clicks are separate
+// from its normal "web" clicks, not a subset shown elsewhere).
+async function syncGscSearchType(brand, { startDate, endDate }) {
+  if (!brand.gsc_property) return { rows: 0, skipped: 'no GSC property linked' };
+  const rows = await google.searchAnalyticsAll(brand.user_id, brand.gsc_property, {
+    startDate, endDate, dimensions: ['date', 'searchType'], maxRows: 5000,
+  });
+  const stmt = db.prepare(`INSERT INTO gsc_search_type (brand_id, date, search_type, clicks, impressions, ctr, position)
+    VALUES (?,?,?,?,?,?,?)
+    ON CONFLICT(brand_id, date, search_type) DO UPDATE SET
+      clicks=excluded.clicks, impressions=excluded.impressions,
+      ctr=excluded.ctr, position=excluded.position`);
+  const tx = db.transaction((list) => {
+    list.forEach((r) => stmt.run(brand.id, r.keys[0], r.keys[1], r.clicks || 0, r.impressions || 0, r.ctr || 0, r.position || 0));
+  });
+  tx(rows);
+  return { rows: rows.length };
+}
+
 // Sitemap snapshot: GSC only exposes current state, so each sync replaces the
 // whole set for the brand rather than accumulating history.
 async function syncGscSitemaps(brand) {
@@ -297,7 +318,28 @@ async function syncGa4Devices(brand, { startDate, endDate }) {
     ));
   });
   tx(rows);
-  return { rows: rows.length };
+
+  // New-vs-returning cross-tab, stored separately (see db.js comment on
+  // ga4_device_segment_daily) — same window, one extra dimension.
+  const segRows = await google.ga4RunReport(brand.user_id, brand.ga4_property_id, {
+    startDate, endDate,
+    dimensions: ['date', 'deviceCategory', 'newVsReturning'],
+    metrics: ['sessions', 'totalUsers', 'conversions'],
+    limit: 25000,
+  });
+  const segStmt = db.prepare(`INSERT INTO ga4_device_segment_daily (brand_id, date, device_category, new_vs_returning, sessions, users, conversions)
+    VALUES (?,?,?,?,?,?,?)
+    ON CONFLICT(brand_id, date, device_category, new_vs_returning) DO UPDATE SET
+      sessions=excluded.sessions, users=excluded.users, conversions=excluded.conversions`);
+  const segTx = db.transaction((list) => {
+    list.forEach((r) => segStmt.run(
+      brand.id, google.ga4DateToIso(r.dimensions[0]), r.dimensions[1] || '(not set)', r.dimensions[2] || '(not set)',
+      r.metrics.sessions || 0, r.metrics.totalUsers || 0, r.metrics.conversions || 0
+    ));
+  });
+  segTx(segRows);
+
+  return { rows: rows.length + segRows.length };
 }
 
 async function syncGa4Geo(brand, { startDate, endDate }) {
@@ -319,7 +361,28 @@ async function syncGa4Geo(brand, { startDate, endDate }) {
     ));
   });
   tx(rows);
-  return { rows: rows.length };
+
+  // New-vs-returning cross-tab (country granularity — city would make the
+  // combination too sparse to be useful).
+  const segRows = await google.ga4RunReport(brand.user_id, brand.ga4_property_id, {
+    startDate, endDate,
+    dimensions: ['date', 'country', 'newVsReturning'],
+    metrics: ['sessions', 'totalUsers', 'conversions'],
+    limit: 25000,
+  });
+  const segStmt = db.prepare(`INSERT INTO ga4_geo_segment_daily (brand_id, date, country, new_vs_returning, sessions, users, conversions)
+    VALUES (?,?,?,?,?,?,?)
+    ON CONFLICT(brand_id, date, country, new_vs_returning) DO UPDATE SET
+      sessions=excluded.sessions, users=excluded.users, conversions=excluded.conversions`);
+  const segTx = db.transaction((list) => {
+    list.forEach((r) => segStmt.run(
+      brand.id, google.ga4DateToIso(r.dimensions[0]), r.dimensions[1] || '(not set)', r.dimensions[2] || '(not set)',
+      r.metrics.sessions || 0, r.metrics.totalUsers || 0, r.metrics.conversions || 0
+    ));
+  });
+  segTx(segRows);
+
+  return { rows: rows.length + segRows.length };
 }
 
 async function syncGa4Acquisition(brand, { startDate, endDate }) {
@@ -361,6 +424,162 @@ async function syncGa4Events(brand, { startDate, endDate }) {
       brand.id, google.ga4DateToIso(r.dimensions[0]), r.dimensions[1] || '(not set)',
       r.metrics.eventCount || 0, r.metrics.totalUsers || 0, r.metrics.eventValue || 0
     ));
+  });
+  tx(rows);
+  return { rows: rows.length };
+}
+
+// Weekly cohort retention: how many users from each week's first-session
+// cohort were still active in week 0/1/2/3 after. Uses the GA4 Data API's
+// cohortSpec rather than the plain dimensions/metrics report shape — see
+// google.ga4RunCohortReport. `weeks` controls how many cohort start-weeks are
+// requested; each covers a 4-week retention horizon (week 0-3).
+async function syncGa4Retention(brand, { weeks = 8 } = {}) {
+  if (!brand.ga4_property_id) return { rows: 0, skipped: 'no GA4 property linked' };
+
+  const cohorts = [];
+  for (let i = weeks - 1; i >= 0; i -= 1) {
+    const start = daysAgo(GSC_LAG_DAYS + (i * 7) + 27); // 4-week (28-day) cohort acquisition window
+    const end = daysAgo(GSC_LAG_DAYS + (i * 7) + 21);
+    cohorts.push({ dimension: 'firstSessionDate', name: `cohort_${isoDate(start)}`, dateRange: { startDate: isoDate(start), endDate: isoDate(end) } });
+  }
+
+  const rows = await google.ga4RunCohortReport(brand.user_id, brand.ga4_property_id, {
+    cohorts,
+    cohortsRange: { granularity: 'WEEKLY', startOffset: 0, endOffset: 3 },
+    dimensions: ['cohort', 'cohortNthWeek'],
+    metrics: ['cohortActiveUsers'],
+    limit: 1000,
+  });
+
+  const stmt = db.prepare(`INSERT INTO ga4_retention (brand_id, cohort_week, week_index, active_users, synced_at)
+    VALUES (?,?,?,?,datetime('now'))
+    ON CONFLICT(brand_id, cohort_week, week_index) DO UPDATE SET
+      active_users=excluded.active_users, synced_at=excluded.synced_at`);
+  const tx = db.transaction((list) => {
+    list.forEach((r) => stmt.run(brand.id, r.dimensions[0], Number(r.dimensions[1]) || 0, r.metrics.cohortActiveUsers || 0));
+  });
+  tx(rows);
+  return { rows: rows.length };
+}
+
+// Ecommerce monetization — zero/blank for brands with no ecommerce tracking
+// configured in GA4; that is an expected state, not a sync failure.
+async function syncGa4Monetization(brand, { startDate, endDate }) {
+  if (!brand.ga4_property_id) return { rows: 0, skipped: 'no GA4 property linked' };
+  const rows = await google.ga4RunReport(brand.user_id, brand.ga4_property_id, {
+    startDate, endDate,
+    dimensions: ['date'],
+    metrics: ['purchaseRevenue', 'itemRevenue', 'transactions'],
+    limit: 1000,
+  });
+  const stmt = db.prepare(`INSERT INTO ga4_monetization (brand_id, date, purchase_revenue, item_revenue, transactions)
+    VALUES (?,?,?,?,?)
+    ON CONFLICT(brand_id, date) DO UPDATE SET
+      purchase_revenue=excluded.purchase_revenue, item_revenue=excluded.item_revenue, transactions=excluded.transactions`);
+  const tx = db.transaction((list) => {
+    list.forEach((r) => stmt.run(
+      brand.id, google.ga4DateToIso(r.dimensions[0]),
+      r.metrics.purchaseRevenue || 0, r.metrics.itemRevenue || 0, r.metrics.transactions || 0
+    ));
+  });
+  tx(rows);
+  return { rows: rows.length };
+}
+
+// Predictive metrics — purchaseProbability, churnProbability,
+// predictedRevenuePer90Days. Verified against node_modules/googleapis@144.0.0
+// (analyticsdata v1beta types) as real GA4 Data API metric names. Google only
+// computes these for a property once it has enough purchase/conversion volume
+// and an eligible predictive audience enabled — for every other property the
+// API call itself fails ("not enough data" / metric not available), so this
+// is scoped in its own try/catch (mirroring how other best-effort syncs
+// already report a skip reason instead of bubbling a hard error) in addition
+// to the outer per-task catch in syncBrand.
+async function syncGa4Predictive(brand, { startDate, endDate }) {
+  if (!brand.ga4_property_id) return { rows: 0, skipped: 'no GA4 property linked' };
+  let rows;
+  try {
+    rows = await google.ga4RunReport(brand.user_id, brand.ga4_property_id, {
+      startDate, endDate,
+      dimensions: ['date'],
+      metrics: ['purchaseProbability', 'churnProbability', 'predictedRevenuePer90Days'],
+      limit: 1000,
+    });
+  } catch (err) {
+    return { rows: 0, skipped: `predictive metrics not available for this property: ${err.message}` };
+  }
+  const stmt = db.prepare(`INSERT INTO ga4_predictive (brand_id, date, purchase_probability, churn_probability, predicted_revenue_90d)
+    VALUES (?,?,?,?,?)
+    ON CONFLICT(brand_id, date) DO UPDATE SET
+      purchase_probability=excluded.purchase_probability, churn_probability=excluded.churn_probability,
+      predicted_revenue_90d=excluded.predicted_revenue_90d`);
+  const tx = db.transaction((list) => {
+    list.forEach((r) => stmt.run(
+      brand.id, google.ga4DateToIso(r.dimensions[0]),
+      r.metrics.purchaseProbability || 0, r.metrics.churnProbability || 0, r.metrics.predictedRevenuePer90Days || 0
+    ));
+  });
+  tx(rows);
+  return { rows: rows.length };
+}
+
+// Custom dimensions/metrics — generic per property, never hardcoded. Uses the
+// GA4 Data API's Metadata endpoint (analyticsdata.properties.getMetadata,
+// verified present in node_modules/googleapis@144.0.0) to discover whatever
+// custom dimensions/metrics the brand's property actually has configured,
+// then pulls them by date. Most properties have none configured, in which
+// case this no-ops cleanly rather than erroring.
+async function syncGa4CustomDimensions(brand, { startDate, endDate }) {
+  if (!brand.ga4_property_id) return { rows: 0, skipped: 'no GA4 property linked' };
+
+  let meta;
+  try {
+    meta = await google.ga4GetMetadata(brand.user_id, brand.ga4_property_id);
+  } catch (err) {
+    return { rows: 0, skipped: `could not read GA4 metadata: ${err.message}` };
+  }
+
+  const customDims = (meta.dimensions || []).filter((d) => d.customDefinition && d.apiName).map((d) => d.apiName);
+  const customMetrics = (meta.metrics || []).filter((m) => m.customDefinition && m.apiName).map((m) => m.apiName);
+
+  if (!customDims.length && !customMetrics.length) {
+    return { rows: 0, skipped: 'no custom dimensions/metrics configured for this property' };
+  }
+
+  // runReport needs at least one metric; fall back to sessions as a generic
+  // volume metric when the property only has custom dimensions defined.
+  const metrics = customMetrics.length ? customMetrics : ['sessions'];
+  let rows;
+  try {
+    rows = await google.ga4RunReport(brand.user_id, brand.ga4_property_id, {
+      startDate, endDate,
+      dimensions: ['date', ...customDims],
+      metrics,
+      limit: 10000,
+    });
+  } catch (err) {
+    return { rows: 0, skipped: `custom dimensions report failed: ${err.message}` };
+  }
+
+  const stmt = db.prepare(`INSERT INTO ga4_custom_dimensions
+      (brand_id, date, dimension_name, dimension_value, metric_name, metric_value)
+    VALUES (?,?,?,?,?,?)
+    ON CONFLICT(brand_id, date, dimension_name, dimension_value, metric_name) DO UPDATE SET
+      metric_value=excluded.metric_value`);
+  const tx = db.transaction((list) => {
+    list.forEach((r) => {
+      const date = google.ga4DateToIso(r.dimensions[0]);
+      const dimPairs = customDims.map((name, i) => ({ name, value: r.dimensions[i + 1] || '(not set)' }));
+      metrics.forEach((metricName) => {
+        const metricValue = r.metrics[metricName] || 0;
+        if (dimPairs.length) {
+          dimPairs.forEach((d) => stmt.run(brand.id, date, d.name, d.value, metricName, metricValue));
+        } else {
+          stmt.run(brand.id, date, '', '', metricName, metricValue);
+        }
+      });
+    });
   });
   tx(rows);
   return { rows: rows.length };
@@ -586,6 +805,7 @@ async function syncBrand(brand, { days = 90, includePsi = false } = {}) {
     ['gsc_countries', () => syncGscCountries(brand, window)],
     ['gsc_devices', () => syncGscDevices(brand, window)],
     ['gsc_appearance', () => syncGscAppearance(brand, window)],
+    ['gsc_search_type', () => syncGscSearchType(brand, window)],
     ['gsc_sitemaps', () => syncGscSitemaps(brand)],
     ['ga4_daily', () => syncGa4Daily(brand, window)],
     ['ga4_pages', () => syncGa4Pages(brand, window)],
@@ -593,6 +813,10 @@ async function syncBrand(brand, { days = 90, includePsi = false } = {}) {
     ['ga4_geo', () => syncGa4Geo(brand, window)],
     ['ga4_acquisition', () => syncGa4Acquisition(brand, window)],
     ['ga4_events', () => syncGa4Events(brand, window)],
+    ['ga4_retention', () => syncGa4Retention(brand)],
+    ['ga4_monetization', () => syncGa4Monetization(brand, window)],
+    ['ga4_predictive', () => syncGa4Predictive(brand, window)],
+    ['ga4_custom_dimensions', () => syncGa4CustomDimensions(brand, window)],
     ['uptime', () => checkUptime(brand).then((r) => ({ rows: 1, detail: r.ok ? `HTTP ${r.status}` : `DOWN: ${r.error || r.status}` }))],
   ];
   if (includePsi) tasks.push(['pagespeed', () => syncPageSpeed(brand, [brand.site_url])]);
@@ -685,8 +909,9 @@ function dataCoverage(brandId) {
 module.exports = {
   isoDate, daysAgo, defaultWindow, GSC_LAG_DAYS,
   syncGscDaily, syncGscPages, syncGscQueries, syncGscQueryPage,
-  syncGscCountries, syncGscDevices, syncGscAppearance, syncGscSitemaps, inspectSample, candidatePages,
+  syncGscCountries, syncGscDevices, syncGscAppearance, syncGscSearchType, syncGscSitemaps, inspectSample, candidatePages,
   syncGa4Daily, syncGa4Pages, syncGa4Devices, syncGa4Geo, syncGa4Acquisition, syncGa4Events,
+  syncGa4Retention, syncGa4Monetization, syncGa4Predictive, syncGa4CustomDimensions,
   syncPageSpeed, checkUptime,
   syncBrand, syncAllBrands,
   gscTotals, ga4Totals, dataCoverage,

@@ -10,9 +10,9 @@ function n(v) { return Math.round(Number(v) || 0).toLocaleString('en-US'); }
 <style>
   :root {
     --text: #1a2129; --text-2: #5a6672; --border: #e3e7eb;
-    --accent: #1c64f2; --critical: #c8252b; --critical-soft: #fdecec;
-    --high: #d9540c; --high-soft: #fdf0e6; --medium: #b07d00; --medium-soft: #fdf7e3;
-    --low: #1668b8; --low-soft: #eaf3fc; --good: #1a7f4b; --good-soft: #e8f6ee;
+    --accent: #1e4d6b; --critical: #c0273c; --critical-soft: #fbedef;
+    --high: #c2620c; --high-soft: #fdf1e5; --medium: #816200; --medium-soft: #fbf6e0;
+    --low: #1e4d6b; --low-soft: #e9f1f6; --good: #147a52; --good-soft: #e7f6ee;
   }
   * { box-sizing: border-box; }
   body {
@@ -90,7 +90,7 @@ function n(v) { return Math.round(Number(v) || 0).toLocaleString('en-US'); }
                 <strong><%= f.issue %></strong>
                 <% if (f.items && f.items.length) { %>
                   <ul class="urls">
-                    <% f.items.slice(0, 8).forEach(function(it){ %><li><%= it.url || it.note || '—' %><% if (it.url && it.note) { %> — <%= it.note %><% } %></li><% }) %>
+                    <% f.items.slice(0, 8).forEach(function(it){ %><li><%= it.url || it.note || '—' %><% if (it.url && it.note) { %> — <%= it.note %><% } %><% if (it.sources && it.sources.length) { %><div class="action">Found on: <%= it.sources.slice(0, 5).join(', ') %><%= it.sources.length > 5 ? ' (+' + (it.sources.length - 5) + ' more)' : '' %></div><% } %></li><% }) %>
                   </ul>
                   <% if (f.items.length > 8) { %><div class="action"><%= f.items.length - 8 %> more not shown.</div><% } %>
                 <% } %>

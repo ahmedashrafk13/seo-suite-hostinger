@@ -59,7 +59,13 @@ function classify(err) {
 }
 
 // One request, no redirect following.
-function requestOnce(url, { method = 'GET', timeout = 20000, headers = {}, maxBytes = DEFAULT_MAX_BYTES }) {
+// `body` was added for the JSON APIs the keyword-metrics adapters call
+// (DataForSEO, Google Ads). It is written before req.end() and its length is
+// declared, because both of those endpoints reject a chunked request without a
+// Content-Length. A GET with no body behaves exactly as it did before.
+function requestOnce(url, {
+  method = 'GET', timeout = 20000, headers = {}, maxBytes = DEFAULT_MAX_BYTES, body = null,
+}) {
   return new Promise((resolve, reject) => {
     let target;
     try {
@@ -82,7 +88,14 @@ function requestOnce(url, { method = 'GET', timeout = 20000, headers = {}, maxBy
         port: target.port || (isHttps ? 443 : 80),
         path: `${target.pathname}${target.search}`,
         method,
-        headers: { ...BROWSER_HEADERS, ...headers, host: target.host },
+        headers: {
+          ...BROWSER_HEADERS,
+          ...headers,
+          host: target.host,
+          ...(body != null
+            ? { 'content-length': String(Buffer.isBuffer(body) ? body.length : Buffer.byteLength(String(body), 'utf8')) }
+            : {}),
+        },
         agent: isHttps ? httpsAgent : httpAgent,
         // Redirects are followed by the caller so the chain stays visible.
         rejectUnauthorized: false,
@@ -142,6 +155,7 @@ function requestOnce(url, { method = 'GET', timeout = 20000, headers = {}, maxBy
     req.on('error', (err) => {
       reject(err instanceof HttpError ? err : new HttpError(err.message, classify(err)));
     });
+    if (body != null) req.write(Buffer.isBuffer(body) ? body : Buffer.from(String(body), 'utf8'));
     req.end();
   });
 }

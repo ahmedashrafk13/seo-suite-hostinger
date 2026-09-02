@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>One URL in, a list of pages that should link to it out.</strong>
+        Give it the page that needs internal links. It crawls the site, finds the pages topically closest to
+        that target, and — for each one — locates a phrase <em>already present in that page's own copy</em> that
+        can carry the link, with the sentence it sits in.
+      </p>
+      <p class="hint">
+        <strong>Why the anchor rule matters.</strong> A recommendation of the form "link from /blog/x with the
+        anchor 'commercial roof repair'" is worthless if that phrase is not on /blog/x — the implementer then has
+        to write a new sentence and decide where it goes, and a linking task has quietly become a writing brief.
+        So every anchor here is a verbatim substring of the source page's own rendered text. Anchors found only
+        in a nav, header, footer or other template region are rejected: a link added there is sitewide, not
+        editorial. Generic labels ("Learn More", "Read more") are rejected too — they carry no signal.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <div class="card">
+    <div class="card-head"><h3>Find links for a URL</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/ai-seo/link-opportunities/run">
+        <% if (brand) { %><input type="hidden" name="brand_id" value="<%= brand.id %>"><% } %>
+        <div class="field">
+          <label for="url">Target URL <span class="muted">(the page that needs links pointing at it)</span></label>
+          <input type="url" id="url" name="url" required placeholder="https://example.com/services/flagship-service/">
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Crawl up to</span>
+            <select name="max_pages">
+              <option value="40">40 pages — quick</option>
+              <option value="120" selected>120 pages</option>
+              <option value="250">250 pages</option>
+              <option value="400">400 pages — slow, thorough</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Return at most</span>
+            <select name="limit">
+              <option value="20">20 rows</option>
+              <option value="50" selected>50 rows</option>
+              <option value="100">100 rows</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Minimum relevance</span>
+            <select name="min_relevance">
+              <option value="0.03">0.03 — permissive, more rows</option>
+              <option value="0.08" selected>0.08 — balanced</option>
+              <option value="0.15">0.15 — strict, only close matches</option>
+              <option value="0.25">0.25 — very strict</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint mt-0">
+          Relevance is entity overlap with the target (weighted 0.65) plus vocabulary similarity (0.35). Entity
+          overlap is the selective half: two pages that both discuss "Basel III" and "capital adequacy" are
+          genuinely related, whereas two pages that both contain "training" are not.
+        </p>
+
+        <div class="field">
+          <label for="extra_phrases">Additional anchor phrases
+            <span class="muted">(one per line — optional)</span>
+          </label>
+          <textarea id="extra_phrases" name="extra_phrases" rows="3"
+                    placeholder="commercial roof survey&#10;flat roof membrane replacement"></textarea>
+          <p class="hint mt-0">
+            The target page's own H1, title, slug, H2s and repeated phrases are used automatically. Add anything
+            else you would accept as an anchor. A supplied phrase is still only offered where it appears verbatim
+            in a source page — supplying it is not licence to invent one.
+          </p>
+        </div>
+
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite ? '' : 'disabled' %>>Find link opportunities</button>
+          <a class="btn ghost" href="/ai-seo/architecture">Whole-site architecture instead</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>How this differs from the two existing linking tools.</strong>
+        <a href="/linking">/linking</a> is a full-site crawl producing a spreadsheet of every pair on the site —
+        right for an audit, no help when the question is "this page needs links, from where".
+        <a href="/ai-seo/architecture">Linking &amp; architecture</a> builds the whole link graph and proposes
+        links across all of it, ordered by global overlap, so one page's opportunities are scattered through
+        sixty rows about other pages. This is the target-first view of the same data.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

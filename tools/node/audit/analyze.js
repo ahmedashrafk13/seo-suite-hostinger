@@ -465,10 +465,13 @@ function analyze({
   // template links to fix", not 970 jobs.
   const emptyAnchor = onpage.reduce((a, p) => a + p.empty_anchor, 0);
   const eaTargets = new Map();
-  onpage.forEach((p) => p.empty_anchor_urls.forEach((u) => eaTargets.set(u, (eaTargets.get(u) || 0) + 1)));
+  onpage.forEach((p) => p.empty_anchor_urls.forEach((u) => {
+    if (!eaTargets.has(u)) eaTargets.set(u, []);
+    eaTargets.get(u).push(p.url);
+  }));
   const eaItems = Array.from(eaTargets.entries())
-    .sort((a, b) => b[1] - a[1])
-    .map(([u, c]) => ({ url: u, note: `linked with no anchor text on ${c} page(s)` }));
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([u, srcs]) => ({ url: u, note: `linked with no anchor text on ${srcs.length} page(s)`, sources: srcs.slice(0, 25) }));
   findings.push(finding('empty_anchor', 'Links with no anchor text', 'notice',
     emptyAnchor
       ? `${emptyAnchor} link(s) have no anchor text across ${eaTargets.size} unique link target(s)`

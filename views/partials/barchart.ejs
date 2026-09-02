@@ -8,7 +8,7 @@ const _label = typeof label !== 'undefined' ? label : '';
 const _rows = (typeof rows !== 'undefined' ? rows : []).slice(0, typeof max !== 'undefined' ? max : 8);
 const _nameKey = typeof nameKey !== 'undefined' ? nameKey : 'entity';
 const _valueKey = typeof valueKey !== 'undefined' ? valueKey : 'clicks';
-const _color = typeof color !== 'undefined' ? color : '#2563eb';
+const _color = typeof color !== 'undefined' ? color : '#1e4d6b';
 const _fmt = typeof fmt !== 'undefined' ? fmt : 'int';
 const _uid = `bc${Math.random().toString(36).slice(2, 9)}`;
 %>
@@ -48,7 +48,7 @@ const _uid = `bc${Math.random().toString(36).slice(2, 9)}`;
             },
             xaxis: {
               categories: categories, max: peak * 1.28,
-              labels: { style: { fontSize: '11px', colors: '#94a3b8' }, formatter: fmtV },
+              labels: { style: { fontSize: '11px', colors: '#9aa2b4' }, formatter: fmtV },
               axisBorder: { show: false }, axisTicks: { show: false },
             },
             yaxis: { labels: { style: { fontSize: '12px', colors: '#334155' } } },

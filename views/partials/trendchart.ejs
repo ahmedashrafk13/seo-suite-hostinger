@@ -6,7 +6,7 @@
    lower=better). */
 const _pts = (typeof points !== 'undefined' ? points : []).filter((p) => p && p.value != null);
 const _label = typeof label !== 'undefined' ? label : '';
-const _color = typeof color !== 'undefined' ? color : '#2563eb';
+const _color = typeof color !== 'undefined' ? color : '#1e4d6b';
 const _fmt = typeof fmt !== 'undefined' ? fmt : 'int';
 const _invert = typeof invert !== 'undefined' ? invert : false;
 function _fmtV(v) {
@@ -89,10 +89,10 @@ const _canGroup = _pts.length >= 10;
           },
           series: [{ name: <%- JSON.stringify(_label) %>, data: dailyValues }],
           xaxis: {
-            categories: dailyDates, labels: { style: { fontSize: '11px', colors: '#94a3b8' }, rotate: 0 },
+            categories: dailyDates, labels: { style: { fontSize: '11px', colors: '#9aa2b4' }, rotate: 0 },
             axisBorder: { show: false }, axisTicks: { show: false }, tooltip: { enabled: false },
           },
-          yaxis: { labels: { style: { fontSize: '11px', colors: '#94a3b8' }, formatter: fmtV } },
+          yaxis: { labels: { style: { fontSize: '11px', colors: '#9aa2b4' }, formatter: fmtV } },
           grid: { borderColor: 'var(--border, #e5e9f0)', strokeDashArray: 3, padding: { left: 8, right: 8 } },
           stroke: { curve: 'smooth', width: 2.5 },
           colors: [color],

@@ -6,7 +6,7 @@
    that day's date + value and highlights the nearest point with a dot. */
 const vals = (typeof points !== 'undefined' && points ? points : []).map((n) => Number(n) || 0);
 const sparkDates = (typeof dates !== 'undefined' && dates ? dates : []);
-const col = typeof sparkColor !== 'undefined' && sparkColor ? sparkColor : '#1c64f2';
+const col = typeof sparkColor !== 'undefined' && sparkColor ? sparkColor : '#1e4d6b';
 const W = 100, H = 30;
 const uid = `spk${Math.random().toString(36).slice(2, 9)}`;
 if (vals.length >= 2) {

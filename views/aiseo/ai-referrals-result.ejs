@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%- include('_partials/runhead') %>
+
+<% const r = run.result; %>
+<% if (run.status === 'completed' && r && r.empty) { %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body"><%= r.reason %></div>
+  </div>
+<% } else if (run.status === 'completed' && r) { %>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Sessions from AI assistants</div>
+      <div class="value"><%= fmtInt(r.totals.aiSessions) %></div>
+      <div class="meta"><%= r.window.days %> days, <%= r.window.startDate %> to <%= r.window.endDate %></div>
+    </div>
+    <div class="stat">
+      <div class="label">Share of all traffic</div>
+      <div class="value"><%= r.totals.share %>%</div>
+      <div class="meta">of <%= fmtInt(r.totals.totalSessions) %> sessions</div>
+    </div>
+    <div class="stat">
+      <div class="label">Assistants sending traffic</div>
+      <div class="value"><%= r.engines.length %></div>
+      <div class="meta"><%= r.engines.length ? r.engines.map(function (e) { return e.label; }).join(', ') : 'none' %></div>
+    </div>
+    <div class="stat">
+      <div class="label">Conversions from AI traffic</div>
+      <div class="value"><%= fmtInt(r.totals.aiConversions) %></div>
+      <div class="meta"><%= fmtInt(r.totals.aiUsers) %> distinct users</div>
+    </div>
+  </div>
+
+  <%- include('_partials/findings') %>
+
+  <div class="card">
+    <div class="card-head"><h3>By assistant</h3></div>
+    <div class="card-body">
+      <% if (!r.engines.length) { %>
+        <p class="hint mt-0">
+          No assistant sent a session in this window. Before reading that as an absence of AI visibility, check
+          the AI-crawler readiness report: a retrieval fetcher that cannot read the site cannot cite it, and
+          that is the most common cause of a flat zero.
+        </p>
+      <% } else { %>
+      <div class="table-wrap"><table class="data">
+        <thead><tr>
+          <th>Assistant</th><th>Sessions</th><th>Users</th><th>Conversions</th>
+          <th>Days it sent traffic</th><th>Share of AI traffic</th>
+        </tr></thead>
+        <tbody>
+        <% r.engines.forEach(function (e) { %>
+          <tr>
+            <td><strong><%= e.label %></strong></td>
+            <td><%= fmtInt(e.sessions) %></td>
+            <td><%= fmtInt(e.users) %></td>
+            <td><%= fmtInt(e.conversions) %></td>
+            <td><%= e.activeDays %> of <%= r.window.days %></td>
+            <td><%= r.totals.aiSessions ? Math.round((e.sessions / r.totals.aiSessions) * 100) : 0 %>%</td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <% } %>
+
+      <% if (r.ambiguousEngines && r.ambiguousEngines.length) { %>
+        <h4 style="margin-top:18px">Counted separately, not included above</h4>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Source</th><th>Sessions</th><th>Users</th><th>Conversions</th></tr></thead>
+          <tbody>
+          <% r.ambiguousEngines.forEach(function (e) { %>
+            <tr>
+              <td><%= e.label %></td>
+              <td><%= fmtInt(e.sessions) %></td>
+              <td><%= fmtInt(e.users) %></td>
+              <td><%= fmtInt(e.conversions) %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+        <p class="hint" style="margin-bottom:0">
+          These sources carry both assistant traffic and ordinary search traffic under one name, and GA4 offers
+          no way to split them. Folding them into the headline number would inflate it with plain search
+          clicks — which is the exact error this report exists to avoid — so they are shown and excluded.
+        </p>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (r.trend) { %>
+  <div class="card">
+    <div class="card-head"><h3>Direction of travel</h3></div>
+    <div class="card-body">
+      <ul class="kv">
+        <li><span>First half of the window</span><span><%= fmtInt(r.trend.earlier) %> sessions</span></li>
+        <li><span>Second half</span><span><%= fmtInt(r.trend.later) %> sessions</span></li>
+        <li><span>Change</span><span>
+          <%= r.trend.delta >= 0 ? '+' : '' %><%= fmtInt(r.trend.delta) %>
+          <%= r.trend.pct == null ? '' : '(' + (r.trend.pct >= 0 ? '+' : '') + r.trend.pct + '%)' %>
+        </span></li>
+      </ul>
+      <p class="hint" style="margin-bottom:0">
+        Two halves compared, not a fitted trend line. AI referral counts are small on most sites, and a
+        regression slope over a handful of sessions a week would imply a precision the data does not have.
+      </p>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (r.landingPages && r.landingPages.length) { %>
+  <div class="card">
+    <div class="card-head"><h3>Pages the assistants send people to (<%= r.landingPages.length %>)</h3></div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Landing page</th><th>Sessions</th><th>Conversions</th><th>Cited by</th></tr></thead>
+        <tbody>
+        <% r.landingPages.forEach(function (p) { %>
+          <tr>
+            <td class="truncate"><code><%= p.path %></code></td>
+            <td><%= fmtInt(p.sessions) %></td>
+            <td><%= fmtInt(p.conversions) %></td>
+            <td class="muted" style="font-size:12px"><%= p.engines.join(', ') %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint" style="margin-bottom:0">
+        This is the closest thing to a citation list available without a paid tracker: every page here was
+        quoted or linked in an AI answer that someone then clicked. Pages that earn citations are the template
+        for the ones that do not — compare their structure in the on-page optimiser before writing anything new.
+      </p>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="card">
+    <div class="card-head"><h3>What these numbers do not include</h3></div>
+    <div class="card-body">
+      <ul class="tight">
+        <% r.knownGaps.forEach(function (g) { %><li><%= g %></li><% }) %>
+      </ul>
+      <p class="hint" style="margin-bottom:0">
+        Stated here rather than buried, because the gap between "AI referral sessions" and "AI visibility" is
+        wide and every one of these makes the measured figure lower than the truth. Treat the number as the
+        floor it is: real, attributable, and certainly an undercount.
+      </p>
+    </div>
+  </div>
+
+<% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

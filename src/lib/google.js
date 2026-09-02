@@ -190,6 +190,38 @@ async function ga4RunReport(userId, propertyId, { startDate, endDate, dimensions
   });
 }
 
+// GA4 cohort/retention report. Unlike ga4RunReport, a cohort request has no
+// dateRanges — the date range lives inside each cohort's dateRange, and the
+// dimension/metric set is fixed to firstSessionDate/cohort + cohortActiveUsers
+// by the caller. Returned rows are normalised the same way as ga4RunReport.
+async function ga4RunCohortReport(userId, propertyId, { cohorts, cohortsRange, dimensions = ['cohort', 'cohortNthWeek'], metrics = ['cohortActiveUsers'], limit = 1000 }) {
+  const client = await authedClient(userId);
+  const analyticsdata = google.analyticsdata({ version: 'v1beta', auth: client });
+  const property = String(propertyId).startsWith('properties/') ? String(propertyId) : `properties/${propertyId}`;
+  const res = await analyticsdata.properties.runReport({
+    property,
+    requestBody: {
+      dimensions: dimensions.map((name) => ({ name })),
+      metrics: metrics.map((name) => ({ name })),
+      cohortSpec: {
+        cohorts,
+        cohortsRange,
+      },
+      limit,
+    },
+  });
+  const headers = (res.data.metricHeaders || []).map((h) => h.name);
+  return (res.data.rows || []).map((row) => {
+    const metricObj = {};
+    headers.forEach((name, i) => {
+      const raw = row.metricValues && row.metricValues[i] ? row.metricValues[i].value : '0';
+      const n = Number(raw);
+      metricObj[name] = Number.isFinite(n) ? n : 0;
+    });
+    return { dimensions: (row.dimensionValues || []).map((d) => d.value), metrics: metricObj };
+  });
+}
+
 // GA4 Realtime Data API — active users right now, mirroring the "Active users
 // in last 30 minutes" widget on the GA4 Home report. No date range: this API
 // only ever answers "right now."
@@ -215,6 +247,23 @@ async function ga4RunRealtimeReport(userId, propertyId, { dimensions = [], metri
     });
     return { dimensions: (row.dimensionValues || []).map((d) => d.value), metrics: metricObj };
   });
+}
+
+// GA4 Metadata API — lists every dimension/metric available for a property,
+// including custom dimensions/metrics (customDefinition: true). Verified
+// against node_modules/googleapis@144.0.0: analyticsdata.properties.getMetadata
+// exists (src/apis/analyticsdata/v1beta.d.ts, Params$Resource$Properties$Getmetadata)
+// and returns Schema$Metadata { dimensions: Schema$DimensionMetadata[], metrics:
+// Schema$MetricMetadata[] }, each with apiName/uiName/customDefinition.
+async function ga4GetMetadata(userId, propertyId) {
+  const client = await authedClient(userId);
+  const analyticsdata = google.analyticsdata({ version: 'v1beta', auth: client });
+  const property = String(propertyId).startsWith('properties/') ? String(propertyId) : `properties/${propertyId}`;
+  const res = await analyticsdata.properties.getMetadata({ name: `${property}/metadata` });
+  return {
+    dimensions: res.data.dimensions || [],
+    metrics: res.data.metrics || [],
+  };
 }
 
 // GA4 reports `date` as YYYYMMDD; everything else in this app uses YYYY-MM-DD.
@@ -254,6 +303,23 @@ async function inspectUrl(userId, siteUrl, inspectionUrl) {
     requestBody: { siteUrl, inspectionUrl, languageCode: 'en-US' },
   });
   return res.data.inspectionResult || null;
+}
+
+// ------------------------------------------------------------- URL Removals
+// NOT AVAILABLE: Search Console's "Removals" report (temporary URL removal
+// requests) is served by a separate "Removals API" that Google has never
+// published in the discovery documents googleapis' code generator reads
+// from. Checked node_modules/googleapis@144.0.0 (the version installed
+// here): src/apis/searchconsole/v1.js only registers five resources —
+// searchanalytics, sitemaps, sites, urlInspection, urlTestingTools — there
+// is no urlNotifications/removals resource shipped anywhere in the package.
+// (The Indexing API's urlNotifications.publish is a different, unrelated
+// endpoint for a different product and cannot submit/list removal requests.)
+// So there is no real client method to wrap here — inventing one would just
+// 404. Leaving this stub so the intent is documented and callers get a
+// clear, typed error instead of a crash if anyone wires it up later.
+async function listRemovals() {
+  throw new Error('GSC URL Removals is not available: no removals resource exists in the installed googleapis package (v144.0.0 checked). Google has not published this API for public client generation.');
 }
 
 // ------------------------------------------------------ PageSpeed Insights
@@ -317,10 +383,13 @@ module.exports = {
   searchAnalyticsQuery,
   searchAnalyticsAll,
   ga4RunReport,
+  ga4RunCohortReport,
   ga4RunRealtimeReport,
+  ga4GetMetadata,
   ga4DateToIso,
   ga4Probe,
   listSitemaps,
   inspectUrl,
+  listRemovals,
   pageSpeed,
 };

@@ -7,16 +7,16 @@
 <%- include('../partials/topbar') %>
 
     <div class="toolbar">
-      <a class="btn ghost sm" href="/ai-lab">&larr; AI Lab</a>
+      <a class="btn ghost sm" href="/ai-assist">&larr; AI Assist</a>
       <div class="spacer"></div>
       <a class="btn secondary sm" href="/tasks?brand=<%= brand.id %>" target="_blank" rel="noopener">View real task board &rarr;</a>
     </div>
 
     <div class="card">
       <div class="card-head">
-        <h3>AI Task Recommendations (Beta) — <%= brand.name %></h3>
+        <h3>AI Task Recommendations — <%= brand.name %></h3>
         <% if (tasks.length) { %>
-        <form method="POST" action="/ai-lab/<%= brand.id %>/tasks/generate">
+        <form method="POST" action="/ai-assist/<%= brand.id %>/tasks/generate">
           <button class="btn sm" type="submit"><%= row ? 'Regenerate (new billed call)' : 'Generate with AI' %></button>
           <% if (row) { %><input type="hidden" name="force" value="1"><% } %>
         </form>
@@ -24,20 +24,19 @@
       </div>
       <div class="card-body">
         <% if (!tasks.length) { %>
-          <div class="empty-state">No open tasks for this brand — nothing to compare.</div>
+          <div class="empty-state">No open tasks for this brand — nothing to generate from.</div>
         <% } else { %>
           <% if (row) { %>
             <p class="hint">Generated <%= fmtDateTime(row.created_at) %> · <%= fmtInt(row.prompt_tokens) %> prompt / <%= fmtInt(row.completion_tokens) %> completion tokens · $<%= Number(row.cost_usd).toFixed(4) %></p>
           <% } %>
           <div class="table-wrap"><table class="data">
-            <thead><tr><th>Task</th><th>Severity</th><th>Existing recommended action</th><th>AI-rewritten action</th></tr></thead>
+            <thead><tr><th>Task</th><th>Severity</th><th>Recommended action</th></tr></thead>
             <tbody>
             <% tasks.forEach(function(t){ %>
               <tr>
                 <td><a href="/tasks/<%= t.id %>" target="_blank" rel="noopener"><%= t.title %></a></td>
                 <td><span class="badge <%= t.severity %>"><%= t.severity %></span></td>
-                <td><%= (t.detail || '').slice(0, 200) %></td>
-                <td><%= (row && row.notes && row.notes[String(t.id)]) || (row ? '—' : 'Not generated yet') %></td>
+                <td><%= (row && row.notes && row.notes[String(t.id)]) || (row ? '—' : (t.detail || '').slice(0, 200)) %></td>
               </tr>
             <% }) %>
             </tbody>

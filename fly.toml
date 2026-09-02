@@ -1,0 +1,72 @@
+# Fly.io configuration for the SEO Automation Suite.
+#
+# Change `app` to the name you created with `fly launch --no-deploy`, and
+# `primary_region` to the region nearest your users.
+
+app = "seo-suite-hostinger"
+primary_region = "ams"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# The database, uploaded reports and backups all live here. This is the only
+# thing that survives a deploy — a new release replaces the image, not the
+# volume. DATA_DIR and REPORTS_DIR are set in the Dockerfile to point at it.
+[[mounts]]
+  source = "seo_suite_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+  # THESE TWO LINES ARE THE IMPORTANT ONES.
+  #
+  # Fly's default is to suspend a machine when it goes idle and wake it on the
+  # next request. That default would reintroduce the exact bug the Hostinger
+  # build had to work around: a suspended process runs no timers, so the
+  # hourly difficulty backfill, the nightly sync and every alert would simply
+  # never fire, with nothing in the logs to say so.
+  #
+  # Long analyses are the second reason. A run started from the browser
+  # continues in the background for minutes after the HTTP response returns
+  # (src/lib/aiseo/runner.js); a machine that suspends once the request ends
+  # would kill it mid-crawl and leave a row stuck at 'running'.
+  auto_stop_machines = false
+  min_machines_running = 1
+
+  # NEVER raise this above 1. The app stores everything in one SQLite file on
+  # the volume above, and a volume attaches to a single machine. Two machines
+  # would each get their own database, so half the logins and half the runs
+  # would vanish depending on which one served the request.
+  max_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    # Generous, because the limit that matters is not HTTP concurrency but
+    # AISEO_MAX_CONCURRENT (default 2), which the app enforces itself to stay
+    # inside the machine's memory.
+    soft_limit = 40
+    hard_limit = 60
+
+  # The app already exposes /healthz (src/app.js:218). Pointing Fly at it means
+  # a machine that booted but cannot reach its database is replaced rather than
+  # left serving errors.
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/healthz"
+
+# 512MB rather than 256MB. The crawlers spawn child Node processes and parse
+# whole pages with cheerio; 256MB is enough to boot and not enough to finish a
+# site-wide readiness sweep.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+# A restart policy that suits long jobs: let a crash restart, but do not let a
+# slow analysis look like a hang.
+[deploy]
+  strategy = "immediate"

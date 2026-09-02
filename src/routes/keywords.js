@@ -108,6 +108,9 @@ router.get('/brief/:briefId', (req, res, next) => {
     res.render('brief-detail', {
       title: `Brief — ${row.primary_keyword}`, active: 'briefs', pageTitle: 'Content brief',
       row, d: row.data,
+      // Stored briefs are frozen snapshots; the view warns when one predates
+      // the current generator so nobody writes from stale output.
+      currentSchemaVersion: contentBrief.SCHEMA_VERSION,
       flash: req.query.msg || null,
       flashError: req.query.error || null,
     });

@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%
+/* The fixed set of facts an AI engine needs in order to answer "what is this
+   company, and can I trust it". Fixed rather than free-form because "what is
+   missing" must not depend on what someone happened to think of. Extra facts
+   can still be added — the last rows are blank. */
+const FIELDS = [
+  { key: 'legal_name', label: 'Registered legal name', section: 'identity', help: 'Links the brand to public records. A trading name alone often cannot be verified.' },
+  { key: 'organization_type', label: 'Schema.org organisation type', section: 'identity', help: 'Organization, LocalBusiness, EducationalOrganization, FinancialService, ProfessionalService…' },
+  { key: 'what_we_do', label: 'What the organisation does', section: 'identity', help: 'One or two plain sentences. This is the single most-quoted fact about a brand.' },
+  { key: 'who_we_serve', label: 'Who it serves', section: 'identity', help: 'Decides whether the brand is returned for "for small businesses"-style qualifiers.' },
+  { key: 'founded', label: 'Founded (year or ISO date)', section: 'identity' },
+  { key: 'service_area', label: 'Where it operates', section: 'operations', help: 'The most common reason a brand is left out of a location-qualified answer.' },
+  { key: 'pricing_basis', label: 'How pricing works', section: 'operations', help: 'Assistants are asked about cost constantly. Silence here is filled by a forum post or a competitor.' },
+  { key: 'accreditations', label: 'Accreditations or registrations', section: 'trust', help: 'The verifiable trust signal an engine can check against a register.' },
+  { key: 'regulated_by', label: 'Regulated by', section: 'trust' },
+  { key: 'social_profiles', label: 'Official profile URLs', section: 'trust', help: 'Space or comma separated. Feeds sameAs — the strongest entity-disambiguation signal in markup.' },
+  { key: 'logo_url', label: 'Logo URL', section: 'trust' },
+  { key: 'support_email', label: 'Contact email', section: 'contact' },
+  { key: 'phone', label: 'Phone', section: 'contact' },
+  { key: 'street_address', label: 'Street address', section: 'contact' },
+  { key: 'city', label: 'City', section: 'contact' },
+  { key: 'region', label: 'Region / state', section: 'contact' },
+  { key: 'postal_code', label: 'Postal code', section: 'contact' },
+  { key: 'country', label: 'Country (ISO code)', section: 'contact' },
+];
+const existing = new Map(((review && review.facts) || []).map(function (f) { return [f.fact_key, f]; }));
+const extras = ((review && review.facts) || []).filter(function (f) {
+  return !FIELDS.some(function (x) { return x.key === f.fact_key; });
+});
+%>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>One set of facts, three renderings.</strong> What you declare here becomes the
+        <code>llms.txt</code> below, the <code>Organization</code> schema the Schema page generates, and the
+        checklist that says what an AI engine still cannot establish about this brand. Writing it once is the
+        point: three places that can disagree is how a brand ends up contradicting itself.
+      </p>
+      <p class="hint" style="margin-bottom:0">
+        <strong>About llms.txt, plainly:</strong> it is an emerging convention, it is not a ranking factor
+        anywhere, and Google has stated it does not use it. Some retrieval pipelines do read it, it costs
+        nothing, and writing one forces the canonical facts to be settled. That is the whole case for it —
+        this suite reports its absence as an opportunity, never as an error.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <% if (brand && review) { %>
+    <div class="stat-row">
+      <div class="stat">
+        <div class="label">Canonical-fact completeness</div>
+        <div class="value"><%= review.completeness %>%</div>
+        <div class="meta"><%= review.missingEssential.length %> essential fact<%= review.missingEssential.length === 1 ? '' : 's' %> still missing</div>
+      </div>
+      <div class="stat">
+        <div class="label">Facts declared</div>
+        <div class="value"><%= review.facts.length %></div>
+      </div>
+      <div class="stat">
+        <div class="label">llms.txt live on the site</div>
+        <div class="value sm"><%= review.live.present ? 'yes' : 'no' %></div>
+        <div class="meta"><%= review.live.url %><%= review.live.present ? ' · ' + fmtInt(review.live.bytes) + ' bytes' : ' · HTTP ' + (review.live.status || '—') %></div>
+      </div>
+      <div class="stat">
+        <div class="label">Pages in the content map</div>
+        <div class="value"><%= (review.sections || []).reduce(function (a, sec) { return a + (sec.links ? sec.links.length : 0); }, 0) %></div>
+        <div class="meta">
+          from the sitemap, across <%= (review.sections || []).length %> section<%= (review.sections || []).length === 1 ? '' : 's' %>
+          <% if (review.sections && review.sections.sitemapUrls) { %>
+            · <%= fmtInt(review.sections.sitemapUrls) %> URLs read
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <% if (review.missingEssential.length) { %>
+    <div class="card">
+      <div class="card-head"><h3>What an AI engine still cannot establish</h3></div>
+      <div class="card-body">
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Missing fact</th><th>Why it matters</th></tr></thead>
+          <tbody>
+          <% review.missingEssential.forEach(function (m) { %>
+            <tr><td><strong><%= m.label %></strong></td><td class="muted"><%= m.why %></td></tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+    <% } %>
+
+    <div class="card">
+      <div class="card-head"><h3>Canonical facts</h3></div>
+      <div class="card-body">
+        <form method="POST" action="/ai-seo/brand-hub/facts">
+          <input type="hidden" name="brand_id" value="<%= brand.id %>">
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th style="width:22%">Fact</th><th style="width:44%">Value</th><th style="width:34%">Source URL <span class="muted">(the page that states it authoritatively)</span></th></tr></thead>
+            <tbody>
+            <% FIELDS.forEach(function (f) { const cur = existing.get(f.key); %>
+              <tr>
+                <td>
+                  <strong><%= f.label %></strong>
+                  <input type="hidden" name="fact_key" value="<%= f.key %>">
+                  <input type="hidden" name="fact_section" value="<%= f.section %>">
+                  <% if (f.help) { %><div class="muted" style="font-size:11px"><%= f.help %></div><% } %>
+                </td>
+                <td><input type="text" name="fact_value" value="<%= cur ? cur.fact_value : '' %>"></td>
+                <td><input type="url" name="fact_source" value="<%= cur && cur.source_url ? cur.source_url : '' %>" placeholder="https://…"></td>
+              </tr>
+            <% }) %>
+            <% extras.forEach(function (f) { %>
+              <tr>
+                <td>
+                  <input type="text" name="fact_key" value="<%= f.fact_key %>">
+                  <input type="hidden" name="fact_section" value="<%= f.section %>">
+                </td>
+                <td><input type="text" name="fact_value" value="<%= f.fact_value || '' %>"></td>
+                <td><input type="url" name="fact_source" value="<%= f.source_url || '' %>"></td>
+              </tr>
+            <% }) %>
+            <% for (let i = 0; i < 3; i += 1) { %>
+              <tr>
+                <td>
+                  <input type="text" name="fact_key" placeholder="another_fact_name">
+                  <input type="hidden" name="fact_section" value="general">
+                </td>
+                <td><input type="text" name="fact_value" placeholder="its value"></td>
+                <td><input type="url" name="fact_source" placeholder="https://…"></td>
+              </tr>
+            <% } %>
+            </tbody>
+          </table></div>
+          <p class="hint">
+            Emptying a value <strong>removes</strong> the fact rather than storing a blank — an emptied field
+            means "we no longer assert this", and a blank line in llms.txt asserts nothing usefully.
+          </p>
+          <div class="btn-row">
+            <button type="submit" class="btn" <%= perms.canWrite ? '' : 'disabled' %>>Save facts</button>
+            <a class="btn secondary" href="/ai-seo/brand-hub/llms.txt?brand=<%= brand.id %>" target="_blank" rel="noopener">Preview llms.txt</a>
+            <a class="btn secondary" href="/ai-seo/brand-hub/llms.txt?brand=<%= brand.id %>&download=1">Download llms.txt</a>
+            <% if (aiAvailable) { %>
+              <a class="btn ghost" href="/ai-seo/brand-hub?brand=<%= brand.id %>&ai=1">Ask the model to review these facts</a>
+            <% } %>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <% if (review.ai) { %>
+    <div class="card">
+      <div class="card-head"><h3>Model's review of the declared facts</h3></div>
+      <div class="card-body">
+        <%- include('_partials/aiblock', { ai: review.ai }) %>
+        <% if (review.ai.ok && review.ai.data) { %>
+          <% const d = review.ai.data; %>
+          <% if (d.readinessVerdict) { %><p class="mt-0"><strong>Verdict:</strong> <%= d.readinessVerdict %></p><% } %>
+          <% if (d.missing && d.missing.length) { %>
+            <h4>Basics it says are absent</h4>
+            <ul class="meta-list">
+              <% d.missing.forEach(function (m) { %><li><strong><%= m.fact %></strong> — <%= m.whyItMatters %></li><% }) %>
+            </ul>
+          <% } %>
+          <% if (d.unverifiable && d.unverifiable.length) { %>
+            <h4>Stated in a way nobody could confirm</h4>
+            <div class="table-wrap"><table class="data">
+              <thead><tr><th>Fact</th><th>Problem</th><th>What would make it checkable</th></tr></thead>
+              <tbody>
+              <% d.unverifiable.forEach(function (u) { %>
+                <tr><td><%= u.factKey %></td><td class="muted"><%= u.problem %></td><td><%= u.whatWouldMakeItCheckable %></td></tr>
+              <% }) %>
+              </tbody>
+            </table></div>
+          <% } %>
+          <% if (d.vague && d.vague.length) { %>
+            <h4>Too vague to be useful</h4>
+            <ul class="meta-list">
+              <% d.vague.forEach(function (v) { %><li><strong><%= v.factKey %></strong> — <%= v.problem %></li><% }) %>
+            </ul>
+          <% } %>
+        <% } %>
+      </div>
+    </div>
+    <% } %>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Generated llms.txt</h3>
+        <span class="muted" style="font-size:12px">Publish this at <%= (function(){ try { return new URL(brand.site_url).origin; } catch (e) { return brand.site_url; } }()) %>/llms.txt</span>
+      </div>
+      <div class="card-body">
+        <p class="hint mt-0">
+          <strong>The content map is built from the sitemap, not from Search Console.</strong>
+          It used to be the top pages by clicks over 90 days, and that was wrong for what this file is for in two
+          ways. <em>Coverage:</em> Search Console only knows the pages Google has already shown, so a new section,
+          a page that has never ranked, and every page on a site with no GSC history were all absent — and a
+          retrieval system reading the file concluded they did not exist. <em>Structure:</em> a flat
+          "most-visited pages" list expresses no architecture, whereas the sitemap's own URL paths are the site's
+          declared sections. Search Console is still used, but only to ORDER pages within each section and to
+          annotate the busiest ones. Coverage from the sitemap; prominence from GSC.
+        </p>
+        <% if (review.sections && review.sections.basis) { %>
+          <p class="hint mt-0"><strong>Basis:</strong> <%= review.sections.basis %>.</p>
+        <% } %>
+        <% if (review.sections && review.sections.truncated) { %>
+          <p class="hint mt-0">
+            <span class="badge medium">truncated</span>
+            The sitemap holds more URLs than are listed. Each section header states its own total, so the file
+            never reads as a complete inventory when it is not.
+          </p>
+        <% } %>
+        <% if (review.sections && review.sections.length && review.sections[0] && review.sections[0].empty) { %>
+          <div class="notice warn">
+            <span class="notice-icon">&#9888;</span>
+            <div class="notice-body"><%= review.sections[0].basis %></div>
+          </div>
+        <% } %>
+        <p class="pre" style="font-size:12px;white-space:pre-wrap;max-height:520px;overflow:auto"><%= review.rendered %></p>
+        <div class="btn-row">
+          <a class="btn ghost sm" href="/ai-seo/brand-hub?brand=<%= brand.id %>&gsc=0">Rebuild without Search Console ordering</a>
+        </div>
+        <p class="hint mt-0">
+          Rebuilding without Search Console orders each section by last-modified date instead of by clicks. That
+          is what you want when checking that <em>coverage</em> is complete rather than traffic-weighted.
+        </p>
+      </div>
+    </div>
+
+    <% if (review.live.present) { %>
+    <div class="card">
+      <div class="card-head"><h3>What is currently live at /llms.txt</h3></div>
+      <div class="card-body">
+        <p class="pre" style="font-size:12px;white-space:pre-wrap;max-height:360px;overflow:auto"><%= review.live.body %></p>
+      </div>
+    </div>
+    <% } %>
+  <% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

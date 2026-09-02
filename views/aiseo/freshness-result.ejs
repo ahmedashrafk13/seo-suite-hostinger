@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%- include('_partials/runhead') %>
+
+<% const r = run.result; %>
+<% if (run.status === 'completed' && r && r.empty) { %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body"><%= r.reason %></div>
+  </div>
+<% } else if (run.status === 'completed' && r) { %>
+
+<%
+const VERDICTS = {
+  'intent-drift':   { label: 'Intent drift',      badge: 'critical', note: 'The question being asked has moved.' },
+  decaying:         { label: 'Decaying',          badge: 'high',     note: 'Losing clicks faster than the site.' },
+  stale:            { label: 'Stale',             badge: 'medium',   note: 'Old and not growing.' },
+  'unknown-age':    { label: 'No date',           badge: 'medium',   note: 'Nothing states when it was last changed.' },
+  'old-but-healthy':{ label: 'Old but healthy',   badge: 'good',     note: 'Leave it alone.' },
+  ok:               { label: 'Fine',              badge: 'good',     note: 'Performing, no drift.' },
+};
+%>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Pages examined</div>
+      <div class="value"><%= r.counts.examined %></div>
+      <div class="meta">30+ impressions in the last 90 days</div>
+    </div>
+    <div class="stat">
+      <div class="label">Intent drift</div>
+      <div class="value"><%= r.counts.drift %></div>
+      <div class="meta">threshold <%= r.thresholds.driftThreshold %> bits</div>
+    </div>
+    <div class="stat">
+      <div class="label">Decaying</div>
+      <div class="value"><%= r.counts.decaying %></div>
+      <div class="meta">at least 25pp worse than the site trend</div>
+    </div>
+    <div class="stat">
+      <div class="label">Stale</div>
+      <div class="value"><%= r.counts.stale %></div>
+      <div class="meta"><%= r.counts.oldButHealthy %> old but still growing — deliberately not flagged</div>
+    </div>
+  </div>
+
+  <% if (!r.canMeasureDrift) { %>
+    <div class="notice info">
+      <span class="notice-icon">&#8505;</span>
+      <div class="notice-body">
+        <strong>Drift is not measurable yet.</strong> It compares two query-level snapshots and only
+        <%= r.periods.length %> exists for this brand. The nightly sync writes them, so this becomes available
+        after the next one. Decay and staleness were measured normally.
+      </div>
+    </div>
+  <% } %>
+
+  <% if (!r.lastmod.trustworthy) { %>
+    <div class="notice warn">
+      <span class="notice-icon">&#9888;</span>
+      <div class="notice-body">
+        <strong>Sitemap dates are unusable for this site:</strong> <%= r.lastmod.reason %>.
+        Ages below therefore come from each page's own schema, <code>&lt;time&gt;</code> element or visible
+        "last updated" line, and are reported as unknown where none exists — rather than being treated as recent.
+      </div>
+    </div>
+  <% } %>
+
+  <%- include('_partials/findings') %>
+
+  <% if (perms.canWrite && (r.counts.drift + r.counts.decaying + r.counts.stale) > 0) { %>
+  <div class="card">
+    <div class="card-head"><h3>Schedule the refresh work</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/ai-seo/freshness/<%= run.id %>/schedule">
+        <p class="hint mt-0">
+          Creates one dated task per flagged page — drift first, then decay, then age, and within each by the
+          impressions at stake. Due dates are staggered by your weekly capacity, because twelve tasks all due
+          the same day is the same as none of them having a due date.
+        </p>
+        <div class="field-row">
+          <label class="field">
+            <span>Pages you can refresh per week</span>
+            <input type="number" name="weekly_capacity" value="3" min="1" max="20">
+          </label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn">Schedule <%= r.counts.drift + r.counts.decaying + r.counts.stale %> refresh tasks</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="card">
+    <div class="card-head"><h3>Page by page</h3></div>
+    <div class="card-body">
+      <div class="table-wrap scroll-y" style="max-height:700px">
+        <table class="data">
+          <thead><tr>
+            <th>Page</th><th>Verdict</th><th>Why</th><th>Clicks 90d</th>
+            <th>Change vs site</th><th>Drift</th><th>Age</th><th>Citability</th>
+          </tr></thead>
+          <tbody>
+          <% r.pages.forEach(function (p) { const v = VERDICTS[p.verdict] || { label: p.verdict, badge: 'neutral' }; %>
+            <tr>
+              <td style="max-width:300px">
+                <a href="<%= p.page %>" target="_blank" rel="noopener"><%= shortUrl(p.page, 60) %></a>
+                <% if (p.title) { %><div class="muted" style="font-size:11px"><%= p.title %></div><% } %>
+                <% if (!p.fetchOk) { %><div><span class="badge medium">could not fetch: <%= p.fetchError %></span></div><% } %>
+              </td>
+              <td><span class="badge <%= v.badge %>"><%= v.label %></span></td>
+              <td class="muted" style="font-size:11px;max-width:260px"><%= p.why %></td>
+              <td><%= fmtInt(p.clicks) %><div class="muted" style="font-size:11px"><%= fmtInt(p.impressions) %> impr</div></td>
+              <td>
+                <% if (p.decay && p.decay.relativeClickChange != null) { %>
+                  <span class="delta <%= p.decay.relativeClickChange < 0 ? 'down' : 'up' %>">
+                    <%= p.decay.relativeClickChange > 0 ? '+' : '' %><%= p.decay.relativeClickChange %>pp
+                  </span>
+                  <div class="muted" style="font-size:11px">page <%= p.decay.clickChange %>% / site <%= p.decay.siteClickChange %>%</div>
+                <% } else { %>—<% } %>
+              </td>
+              <td>
+                <% if (p.drift && p.drift.measurable && p.drift.divergence != null) { %>
+                  <%= p.drift.divergence %>
+                  <% if (p.drift.intentChanged) { %>
+                    <div class="muted" style="font-size:11px"><%= p.drift.intentFrom %> &rarr; <%= p.drift.intentTo %></div>
+                  <% } %>
+                <% } else if (p.drift) { %>
+                  <span class="muted" title="<%= p.drift.reason || '' %>">n/a</span>
+                <% } else { %>—<% } %>
+              </td>
+              <td>
+                <%= p.ageDays == null ? '—' : p.ageDays + 'd' %>
+                <% if (p.dateSource) { %><div class="muted" style="font-size:11px"><%= p.dateSource %></div><% } %>
+              </td>
+              <td><%= p.citability == null ? '—' : p.citability %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <% const drifted = r.pages.filter(function (p) { return p.verdict === 'intent-drift'; }); %>
+  <% if (drifted.length) { %>
+  <div class="card">
+    <div class="card-head"><h3>What changed on the drifted pages</h3></div>
+    <div class="card-body">
+      <%
+      const readingByPage = new Map((r.aiReadings || []).map(function (x) { return [x.page, x]; }));
+      %>
+      <% drifted.forEach(function (p) { const reading = readingByPage.get(p.page); %>
+        <div class="alert-item">
+          <div class="alert-head">
+            <strong><a href="<%= p.page %>" target="_blank" rel="noopener"><%= shortUrl(p.page, 80) %></a></strong>
+            <span class="badge critical"><%= p.drift.divergence %> bits</span>
+            <% if (p.drift.intentChanged) { %><span class="badge accent"><%= p.drift.intentFrom %> &rarr; <%= p.drift.intentTo %></span><% } %>
+            <% if (reading && reading.ok && reading.data) { %>
+              <span class="badge <%= reading.data.verdict === 'seasonal-or-noise' ? 'neutral' : (reading.data.verdict === 'topic-split' ? 'high' : 'medium') %>">
+                <%= reading.data.verdict %> (<%= reading.data.confidence %> confidence)
+              </span>
+            <% } %>
+          </div>
+          <div class="alert-body">
+            <div class="grid cols-2">
+              <div>
+                <h4 style="margin-top:0">Now showing for</h4>
+                <% if (!p.drift.gained.length) { %><p class="muted">No newly-appearing queries.</p><% } else { %>
+                  <div class="table-wrap"><table class="data">
+                    <thead><tr><th>Query</th><th>Impressions</th></tr></thead>
+                    <tbody>
+                    <% p.drift.gained.slice(0, 10).forEach(function (g) { %>
+                      <tr><td><%= g.query %></td><td><%= fmtInt(g.impressions) %></td></tr>
+                    <% }) %>
+                    </tbody>
+                  </table></div>
+                <% } %>
+              </div>
+              <div>
+                <h4 style="margin-top:0">No longer showing for</h4>
+                <% if (!p.drift.lost.length) { %><p class="muted">Nothing dropped out.</p><% } else { %>
+                  <div class="table-wrap"><table class="data">
+                    <thead><tr><th>Query</th><th>Impressions before</th></tr></thead>
+                    <tbody>
+                    <% p.drift.lost.slice(0, 10).forEach(function (g) { %>
+                      <tr><td><%= g.query %></td><td><%= fmtInt(g.impressions) %></td></tr>
+                    <% }) %>
+                    </tbody>
+                  </table></div>
+                <% } %>
+              </div>
+            </div>
+
+            <% if (p.drift.intentRecent.length) { %>
+              <p class="mt-0" style="margin-top:10px">
+                <strong>Intent mix now:</strong>
+                <%= p.drift.intentRecent.map(function (i) { return i.intent + ' ' + i.share + '%'; }).join(' · ') %>
+                <br>
+                <strong>Before:</strong>
+                <%= p.drift.intentPrior.map(function (i) { return i.intent + ' ' + i.share + '%'; }).join(' · ') %>
+              </p>
+            <% } %>
+
+            <% if (reading) { %>
+              <%- include('_partials/aiblock', { ai: reading }) %>
+              <% if (reading.ok && reading.data) { %>
+                <p class="mt-0"><strong>What changed:</strong> <%= reading.data.whatChanged %></p>
+                <p class="mt-0"><strong>Recommended:</strong> <%= reading.data.recommendedAction %></p>
+                <% if (reading.data.suggestedHeadings && reading.data.suggestedHeadings.length) { %>
+                  <p class="mt-0"><strong>Headings to add:</strong> <%= reading.data.suggestedHeadings.join(' · ') %></p>
+                <% } %>
+                <p class="mt-0" style="margin-bottom:0">
+                  <strong>Urgency:</strong> <span class="badge <%= reading.data.refreshUrgency === 'now' ? 'critical' : (reading.data.refreshUrgency === 'this-quarter' ? 'medium' : 'neutral') %>"><%= reading.data.refreshUrgency %></span>
+                </p>
+              <% } %>
+            <% } %>
+          </div>
+        </div>
+      <% }) %>
+      <p class="hint" style="margin-bottom:0">
+        Compare the two query lists before editing — together they name the new question precisely, which is
+        more useful than any summary of them. Re-angle rather than rewrite: the subject is still right.
+      </p>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/provenance', { prov: r.provenance }) %>
+<% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

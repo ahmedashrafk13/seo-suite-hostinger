@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Two kinds of demand, discovered separately.</strong>
+        Search-box queries come from Search Console — real impressions for this exact site, not an estimate —
+        extended with Google's own autocomplete, an alphabet sweep of it, and the engine's own related-search
+        suggestions. Assistant prompts are written by the AI model, because the sentences people type into
+        ChatGPT are whole questions with a stated situation and cannot be derived from a keyword list.
+      </p>
+      <p class="hint">
+        <strong>Volume and difficulty, with the source named on every value.</strong>
+        Volume is taken from the best source configured — Google Ads Keyword Planner, DataForSEO or Semrush —
+        and where none is configured the two honest alternatives are shown in their own columns instead: Search
+        Console impressions (a measurement of this site) and Google Trends relative interest for the country you
+        pick (0-100, the shape of demand rather than its size). Difficulty is the vendor's where a credential
+        provides one, otherwise computed from a keyless sample of a non-Google result page with the formula and
+        every component shown. Nothing is ever invented, and nothing labelled "measured" is not.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <% if (brand) { %>
+  <div class="card">
+    <div class="card-head"><h3>Run research</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/ai-seo/research/run">
+        <input type="hidden" name="brand_id" value="<%= brand.id %>">
+        <div class="field">
+          <label for="seeds">Seed topics <span class="muted">(one per line — leave empty to use this site's own top non-branded queries)</span></label>
+          <textarea id="seeds" name="seeds" rows="4" placeholder="compliance certification&#10;aml training&#10;basel iii course"><%= brand.seed_topics || '' %></textarea>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Search Console window</span>
+            <select name="days">
+              <option value="28">28 days</option>
+              <option value="90" selected>90 days</option>
+              <option value="180">180 days</option>
+              <option value="365">365 days</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Country <span class="muted">(volume, difficulty and autocomplete)</span></span>
+            <select name="country">
+              <% marketList.forEach(function (m) { %>
+                <option value="<%= m.code %>" <%= m.code === selectedMarket ? 'selected' : '' %>><%= m.name %></option>
+              <% }) %>
+            </select>
+          </label>
+          <label class="field">
+            <span>Difficulty for the top</span>
+            <select name="difficulty_limit">
+              <option value="0">none — skip difficulty</option>
+              <option value="6">6 keywords — fastest</option>
+              <option value="12" selected>12 keywords</option>
+              <option value="25">25 keywords</option>
+              <option value="40">40 keywords — slow</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint mt-0">
+          The country reaches every geo-aware source in the identifier it expects: Google's <code>gl</code>/<code>hl</code>
+          for autocomplete, a <code>geo</code> code for Trends, a region for the result sample, and a location
+          code for any paid adapter. Passing the wrong one silently returns worldwide data labelled as a
+          country, which is the worst failure available here.
+        </p>
+        <p class="hint mt-0">
+          Difficulty is capped because, with no vendor credential, each keyword costs one paced request to a
+          result page. Whatever the cap leaves out is reported rather than left blank-looking — a keyword with no
+          difficulty shows an em dash, never a zero.
+        </p>
+        <div class="checkbox-row">
+          <label class="check"><input type="checkbox" name="include_suggest" checked> Expand seeds through Google autocomplete <span class="muted">(question, comparison, commercial and local modifiers)</span></label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="alphabet_sweep" checked>
+            Also sweep the alphabet
+            <span class="muted">— "&lt;seed&gt; a", "&lt;seed&gt; b" … Google completes each prefix differently, and this is where the long-tail phrasings a modifier list cannot anticipate come from. It is the technique behind every keyword tool's long tail, and it is free.</span>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="include_related" checked>
+            Add related searches
+            <span class="muted">— autocomplete completes what you typed; related searches are the engine's own list of other ways to ask the same thing, which is where a topic's synonyms and adjacent framings come from. Autocomplete alone was missing half of "keyword suggestions based on Google data".</span>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="include_metrics" checked>
+            Look up search volume and keyword difficulty
+            <span class="muted">— tries Keyword Planner, DataForSEO and Semrush in order, then falls back to Google Trends relative interest and a SERP-based difficulty proxy. Every rung tried is reported on the result page, including the ones that were not configured.</span>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="include_prompts" <%= aiAvailable ? 'checked' : 'disabled' %>>
+            Write the AI-assistant prompts for these topics
+            <% if (!aiAvailable) { %><span class="muted">— needs an Azure OpenAI credential</span><% } %>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check"><input type="checkbox" name="force" value="1"> Regenerate the AI half rather than reusing the cached answer</label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite ? '' : 'disabled' %>>Run research</button>
+          <%
+          /* Same textarea, different endpoint. `formaction` on a second submit
+             button means the seeds are saved from the field the user just
+             typed into, rather than from a hidden copy that would go stale the
+             moment they edited it. `name="seed_topics"` on the textarea is
+             what /seeds reads. */
+          %>
+          <button type="submit" class="btn secondary" formaction="/ai-seo/research/seeds"
+                  <%= perms.canWrite ? '' : 'disabled' %>
+                  title="Store these seeds on the brand so the next run and the scheduled sweep reuse them">
+            Save seeds to brand
+          </button>
+        </div>
+        <% if (!brand.gsc_property) { %>
+          <p class="hint">
+            This brand has no Search Console property paired, so the measured half will be empty and everything
+            will rest on autocomplete and the model. <a href="/brands/<%= brand.id %>">Pair a property</a> to fix that.
+          </p>
+        <% } %>
+        <input type="hidden" name="seed_topics" id="seed_topics_mirror" value="<%= brand.seed_topics || '' %>">
+      </form>
+      <script>
+      // "Save seeds to brand" posts to a different endpoint, which reads
+      // `seed_topics`. Mirroring the textarea into a hidden field on submit
+      // keeps one visible control instead of two that can disagree.
+      (function () {
+        var ta = document.getElementById('seeds');
+        var mirror = document.getElementById('seed_topics_mirror');
+        if (!ta || !mirror) return;
+        var sync = function () { mirror.value = ta.value; };
+        ta.addEventListener('input', sync);
+        if (ta.form) ta.form.addEventListener('submit', sync);
+        sync();
+      }());
+      </script>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

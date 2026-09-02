@@ -585,17 +585,30 @@ async function sendTaskAssignment(recipient, { task, assignedBy, brandName, url,
 // One message covering every task assigned to one person. Written to stand on
 // its own: the recipient is usually a developer or writer with no account
 // here, so the email has to carry the work, not merely announce it.
+// Full task cards (title, detail, recommended action, up to 10 affected
+// items each) are the right amount of detail for a normal handful of tasks,
+// but bulk-assign can queue dozens of tasks to one person at once — and
+// rendering every one as a full card would produce a multi-hundred-KB email.
+// That's past Gmail's ~102KB clip threshold (breaks the layout AND the
+// "open this task" links past the clip point) and a spam-filter red flag in
+// its own right from sheer size and link count. Past this cap, only the
+// first N get full cards; the rest get one compact line each.
+const DIGEST_FULL_CARD_LIMIT = 20;
+
 async function sendAssignmentDigest(recipient, { tasks = [], personName, assignedBy, baseUrl }) {
   const to = String(recipient || '').trim();
   if (!to) return { sent: false, reason: 'no recipient' };
   if (!tasks.length) return { sent: false, reason: 'no tasks' };
 
   const one = tasks.length === 1;
+  const shown = tasks.slice(0, DIGEST_FULL_CARD_LIMIT);
+  const overflow = tasks.slice(DIGEST_FULL_CARD_LIMIT);
   const subject = one
     ? `[${String(tasks[0].severity || 'medium').toUpperCase()}] ${tasks[0].title}${tasks[0].brandName ? ` — ${tasks[0].brandName}` : ''}`
     : `${tasks.length} tasks assigned to you${assignedBy ? ` by ${assignedBy}` : ''}`;
 
   const line = (t) => {
+    const items = t.items || [];
     const bits = [
       `• ${t.title}`,
       `  Severity: ${t.severity || 'medium'}${t.brandName ? `  |  Site: ${t.brandName}` : ''}`,
@@ -603,12 +616,20 @@ async function sendAssignmentDigest(recipient, { tasks = [], personName, assigne
       t.effort ? `  Effort: ${t.effort}` : null,
       t.affectedUrl ? `  URL: ${t.affectedUrl}` : null,
       t.detail ? `  ${String(t.detail).split('\n').join('\n  ')}` : null,
+      t.action ? `  Recommended action: ${t.action}` : null,
+      ...(items.length ? [
+        '  Affected:',
+        ...items.map((i) => `    - ${i.url || ''}${i.note ? ` — ${i.note}` : ''}`),
+        ...(t.itemsTotal > items.length ? [`    … and ${t.itemsTotal - items.length} more — see the full task or the Excel export.`] : []),
+      ] : []),
       t.note ? `  Note: ${t.note}` : null,
       t.requiresApproval ? '  Needs SEO sign-off before it goes live.' : null,
       baseUrl ? `  Open: ${baseUrl}/tasks/${t.id}` : null,
     ].filter(Boolean);
     return bits.join('\n');
   };
+
+  const overflowLine = (t) => `• ${t.title} (${t.severity || 'medium'})${baseUrl ? ` — ${baseUrl}/tasks/${t.id}` : ''}`;
 
   const text = [
     personName ? `Hi ${personName},` : 'Hi,',
@@ -617,7 +638,12 @@ async function sendAssignmentDigest(recipient, { tasks = [], personName, assigne
       ? `You have been assigned the following task${assignedBy ? ` by ${assignedBy}` : ''}:`
       : `You have been assigned ${tasks.length} tasks${assignedBy ? ` by ${assignedBy}` : ''}:`,
     '',
-    tasks.map(line).join('\n\n'),
+    shown.map(line).join('\n\n'),
+    ...(overflow.length ? [
+      '',
+      `+ ${overflow.length} more task${overflow.length === 1 ? '' : 's'} (full detail in-app or in the Excel export):`,
+      overflow.map(overflowLine).join('\n'),
+    ] : []),
   ].join('\n');
 
   const card = (t) => `
@@ -631,6 +657,14 @@ async function sendAssignmentDigest(recipient, { tasks = [], personName, assigne
         ${t.affectedUrl ? `<tr><td style="padding:2px 12px 2px 0;color:#868e96">URL</td><td style="padding:2px 0;word-break:break-all">${escapeHtml(t.affectedUrl)}</td></tr>` : ''}
       </table>
       ${t.detail ? `<div style="font-size:13px;color:#495057;line-height:1.55;white-space:pre-wrap">${escapeHtml(t.detail)}</div>` : ''}
+      ${t.action ? `<div style="font-size:13px;color:#1c7ed6;margin-top:8px"><strong>Recommended action:</strong> ${escapeHtml(t.action)}</div>` : ''}
+      ${(t.items || []).length ? `<div style="margin-top:8px">
+        <div style="font-size:12px;color:#868e96;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Affected (${t.itemsTotal})</div>
+        <ul style="margin:0;padding-left:16px;font-size:12.5px;color:#495057">
+          ${t.items.map((i) => `<li style="word-break:break-all;margin-bottom:2px">${escapeHtml(i.url || '')}${i.note ? ` — ${escapeHtml(i.note)}` : ''}</li>`).join('')}
+        </ul>
+        ${t.itemsTotal > t.items.length ? `<div style="font-size:12px;color:#868e96;margin-top:2px">…and ${t.itemsTotal - t.items.length} more — see the full task or the Excel export.</div>` : ''}
+      </div>` : ''}
       ${t.note ? `<div style="background:#f8f9fa;border-radius:5px;padding:9px 11px;font-size:13px;margin-top:9px"><strong>Note:</strong> ${escapeHtml(t.note)}</div>` : ''}
       ${t.requiresApproval ? '<div style="font-size:12.5px;color:#8a5a00;margin-top:8px">Needs SEO sign-off before it goes live.</div>' : ''}
       ${baseUrl ? `<div style="margin-top:10px"><a href="${escapeHtml(`${baseUrl}/tasks/${t.id}`)}" style="font-size:13px;color:#1c7ed6">Open this task</a></div>` : ''}
@@ -641,7 +675,13 @@ async function sendAssignmentDigest(recipient, { tasks = [], personName, assigne
     <p style="font-size:14.5px;line-height:1.6">
       ${one ? 'You have been assigned the following task' : `You have been assigned <strong>${tasks.length} tasks</strong>`}${assignedBy ? ` by <strong>${escapeHtml(assignedBy)}</strong>` : ''}.
     </p>
-    ${tasks.map(card).join('')}
+    ${shown.map(card).join('')}
+    ${overflow.length ? `<div style="font-size:13px;color:#495057;margin-top:6px">
+      <strong>+ ${overflow.length} more task${overflow.length === 1 ? '' : 's'}</strong> — full detail in-app or in the Excel export:
+      <ul style="margin:6px 0 0;padding-left:18px">
+        ${overflow.map((t) => `<li style="margin-bottom:3px">${escapeHtml(t.title)} (${escapeHtml(String(t.severity || 'medium'))})${baseUrl ? ` — <a href="${escapeHtml(`${baseUrl}/tasks/${t.id}`)}" style="color:#1c7ed6">open</a>` : ''}</li>`).join('')}
+      </ul>
+    </div>` : ''}
     <p style="font-size:12px;color:#868e96;margin-top:18px">
       You are receiving this because work was assigned to you in the SEO suite. Replies go to the person who assigned it.
     </p>

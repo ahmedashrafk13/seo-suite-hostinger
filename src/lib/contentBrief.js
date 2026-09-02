@@ -28,6 +28,18 @@ const csvStore = require('./csvStore');
 const analytics = require('./analytics');
 const clustering = require('./clustering');
 
+// Stored briefs are frozen JSON snapshots, so a brief generated before a fix
+// landed keeps its old output forever. Bump this whenever the generated shape
+// or the quality of a generated field changes materially, so the view can tell
+// a reader their brief predates the current generator instead of silently
+// showing stale output. The v2 comment claimed the stamp did this; nothing
+// actually compared it until now.
+//
+//   v2 — added schemaVersion, warnings, meta description, field sources
+//   v3 — title/heading generation corrected (see the fixes below), fieldSources
+//        no longer reports 'data' for unmeasurable fields
+const SCHEMA_VERSION = 3;
+
 const STOPWORDS = new Set('a an and are as at be but by for from how i in into is it of on or that the to was what when where which who why with your you my me we our us do does can could should would will'.split(' '));
 
 // Words that are grammatically fine but carry no discriminating signal for
@@ -79,6 +91,21 @@ const ACRONYMS = new Set(`
 
 // Words kept lower case inside a title unless they are the first word.
 const TITLE_MINOR_WORDS = new Set('a an and as at but by for from in into nor of on or per the to vs via with'.split(' '));
+
+// Real Search Console query strings carry stray punctuation: a leading quote
+// left over from a phrase search, trailing separators, doubled spaces. Left in
+// place it leaks straight into a title tag — the live brand's brief opened its
+// recommended title with a bare `"` character, and the same string was reused
+// verbatim as an H2. Intra-word apostrophes are preserved ("company's").
+function cleanQueryText(query) {
+  return String(query || '')
+    .replace(/["“”]/g, ' ')
+    .replace(/(^|\s)['’]+/g, '$1')
+    .replace(/['’]+(\s|$)/g, '$1')
+    .replace(/\s*[,;:|/\\]+\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 function titleCase(s) {
   const words = String(s || '').split(/(\s+)/);
@@ -266,9 +293,33 @@ function rewriteTitleForKeyword(oldTitle, oldKeyword, newKeywordTitleCased, bran
   });
   if (unusable) return null;
 
-  const rebuilt = [before, newKeywordTitleCased, after].filter(Boolean).join(' ');
-  const joined = `${brandPrefix}${rebuilt}${brandSuffix}`.replace(/\s+/g, ' ').trim();
-  return dropRepeatedWords(joined);
+  // Collapse the seam by trimming the WRAPPER, never the keyword.
+  //
+  // The keyword is verbatim data and must survive intact. Running a word-level
+  // dedup across the whole assembled string mutated it instead: rewriting
+  // "New York City Website Development" for "custom web development services in
+  // new york" left "New" behind as a wrapper (the keyword span began at
+  // "York"), and the dedup then deleted the keyword's OWN "New" as a duplicate
+  // — shipping "New Custom Web Development Services in York" and splitting the
+  // place name in half. Dropping the redundant wrapper word instead yields
+  // "Custom Web Development Services in New York", which is what was meant.
+  const keywordStems = new Set(tokenize(newKeywordTitleCased).map((t) => clustering.stem(t, 'en')));
+  const beforeClean = dropWrapperWordsCoveredBy(before, keywordStems);
+  const afterClean = dropWrapperWordsCoveredBy(after, keywordStems);
+  const rebuilt = trimTitleEdges([beforeClean, newKeywordTitleCased, afterClean].filter(Boolean).join(' '));
+  if (!rebuilt) return null;
+  return `${brandPrefix}${rebuilt}${brandSuffix}`.replace(/\s+/g, ' ').trim();
+}
+
+// Removes wrapper words the new keyword already carries, so the seam collapses
+// without touching the keyword itself. Stopwords and short words are structural
+// and always kept — dropping them would break the wrapper's grammar.
+function dropWrapperWordsCoveredBy(wrapper, keywordStems) {
+  return String(wrapper || '').split(/\s+/).filter(Boolean).filter((w) => {
+    const bare = w.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!bare || bare.length <= 2 || STOPWORDS.has(bare)) return true;
+    return !keywordStems.has(clustering.stem(bare, 'en'));
+  }).join(' ');
 }
 
 // Generic packaging a copywriter wraps around any keyword. Anything outside
@@ -279,21 +330,64 @@ const ALLOWED_WRAPPER_WORDS = new Set(`
   online free custom quality reliable premier
 `.trim().split(/\s+/));
 
-// Collapses a distinctive word repeated at the swap seam
-// ("... Services USA Services" -> "... Services USA"). Only removes a LATER
+// Collapses a distinctive word repeated inside the title's core
+// ("... Services USA Services" -> "... Services USA"), matched on the STEM so
+// near-duplicates collapse too — "Company"/"Companies" both stem to "company",
+// which is what let the live brand ship the title "Website Development Company
+// Providing Websites for Companies Providing". Only ever removes a LATER
 // duplicate of an earlier word, so meaning is never changed by reordering.
+//
+// NEVER call this across a brand affix. A brand's own name is not redundant
+// just because it repeats a keyword word, and passing the fully assembled
+// title collapsed "Web Development Services | American Web Builders" into
+// "... | American Builders", and "Design Services in Austin | Austin Design Co"
+// into "... | Co" — corrupting the brand's name inside a recommended title tag.
+// Every current caller passes bare keyword or query text, never an assembled
+// title; rewriteTitleForKeyword collapses its seam with
+// dropWrapperWordsCoveredBy instead, which cannot touch the keyword either.
 function dropRepeatedWords(title) {
   const seen = new Set();
   const out = [];
   String(title).split(/\s+/).forEach((w) => {
     const bare = w.toLowerCase().replace(/[^a-z0-9]/g, '');
     if (bare && bare.length > 2 && !STOPWORDS.has(bare)) {
-      if (seen.has(bare)) return;
-      seen.add(bare);
+      const key = clustering.stem(bare, 'en');
+      if (seen.has(key)) return;
+      seen.add(key);
     }
     out.push(w);
   });
-  return out.join(' ').replace(/\s+([|:—–-])\s*$/, '').trim();
+  return trimDanglingWords(out.join(' '));
+}
+
+// Strips trailing separators and joining words that carry no meaning at the end
+// of a title — left either by a duplicate removed from after them ("... For
+// Companies" -> "... For") or by a source query that simply ended that way.
+function trimDanglingWords(text) {
+  const words = String(text).split(/\s+/).filter(Boolean);
+  while (words.length) {
+    const bare = words[words.length - 1].toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!bare || TITLE_MINOR_WORDS.has(bare) || STOPWORDS.has(bare)) { words.pop(); continue; }
+    break;
+  }
+  return words.join(' ').trim();
+}
+
+// Prepositions and conjunctions that can never legitimately OPEN a title.
+// Deliberately excludes articles — "The Complete Guide to X" is a fine title,
+// so "the"/"a"/"an" are left alone.
+const NON_LEADING_WORDS = new Set('and or but nor for of to in into on at by from with as per via vs'.split(' '));
+
+// Trims both ends: a removed wrapper word can leave a dangling preposition at
+// the front ("in Custom Web Development") as easily as at the back.
+function trimTitleEdges(text) {
+  const words = trimDanglingWords(text).split(/\s+/).filter(Boolean);
+  while (words.length) {
+    const bare = words[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!bare || NON_LEADING_WORDS.has(bare)) { words.shift(); continue; }
+    break;
+  }
+  return words.join(' ').trim();
 }
 
 // Path 1 — brand history: this brand's own top-clicking crawled pages,
@@ -301,7 +395,7 @@ function dropRepeatedWords(title) {
 // for the new keyword using that specific page's own title pattern.
 function titleFromBrandHistory(cluster, brand, crawlPages) {
   const clicksByUrl = new Map(analytics.topPages(brand.id, 9999, 500).map((r) => [r.entity, r]));
-  if (!clicksByUrl.size) return null;
+  if (!clicksByUrl.size) return [];
   const clusterTokens = clusterTokenSet(cluster);
   const candidates = crawlPages
     .filter((p) => p.kind === 'content' && p.title && p.url !== cluster.existingPage && clicksByUrl.has(p.url))
@@ -313,23 +407,36 @@ function titleFromBrandHistory(cluster, brand, crawlPages) {
     })
     .filter((c) => c.overlap > 0)
     .sort((a, b) => (b.overlap - a.overlap) || (b.clicks - a.clicks));
+  // Returns EVERY usable rewrite in preference order, not just the first.
+  // Returning the first meant one unusable-but-valid candidate (the blog index,
+  // whose title "Blog" rewrites into an 86-character keyword dump) was emitted
+  // with a length warning while shorter candidates went unexamined.
+  const rewrites = [];
   for (const c of candidates) {
     const oldKeyword = c.page.primary_keyword || c.page.title;
     const rewritten = rewriteTitleForKeyword(c.page.title, oldKeyword, titleCase(cluster.primaryKeyword), brand && brand.name);
     if (rewritten) {
-      return { title: rewritten, basedOn: c.page.url, sourceTitle: c.page.title, method: 'brand-history' };
+      rewrites.push({ title: rewritten, basedOn: c.page.url, sourceTitle: c.page.title, method: 'brand-history' });
+      if (rewrites.length >= 5) break;
     }
   }
-  return null;
+  return rewrites;
+}
+
+// The brand's GSC query history, fetched once per brief. The title path and
+// the headings path each used to issue the same 1,000-row query independently.
+function brandQueries(brand, cached) {
+  if (cached) return cached;
+  return analytics.topQueries(brand.id, 9999, 1000);
 }
 
 // Path 2 — query derivation: the highest-impression real GSC query string
 // that belongs to this cluster (shares a distinctive token with the primary
 // or supporting keywords), cleaned up and capitalised but not reworded —
 // it's literally what real searchers typed.
-function titleFromTopQuery(cluster, brand) {
-  const queries = analytics.topQueries(brand.id, 9999, 1000);
-  if (!queries.length) return null;
+function titleFromTopQuery(cluster, brand, cachedQueries) {
+  const queries = brandQueries(brand, cachedQueries);
+  if (!queries.length) return [];
   const clusterTokens = clusterTokenSet(cluster);
   const scored = queries
     .map((q) => {
@@ -345,16 +452,40 @@ function titleFromTopQuery(cluster, brand) {
     })
     .filter((s) => s.overlap > 0 && s.onTopic)
     .sort((a, b) => (b.overlap - a.overlap) || (b.q.impressions - a.q.impressions));
-  if (!scored.length) return null;
-  const best = scored[0].q;
-  return { title: titleCase(best.entity), basedOn: best.entity, method: 'query' };
+  if (!scored.length) return [];
+
+  // Every on-topic query, cleaned, in preference order — the caller picks the
+  // first that fits. Returning only scored[0] is how a 71-character query
+  // became the recommended title on the live brand: the brief then warned about
+  // the very title it had just chosen, while shorter, equally on-topic
+  // candidates sat further down this same list.
+  return scored
+    .slice(0, 10)
+    .map((s) => ({
+      title: dropRepeatedWords(titleCase(cleanQueryText(s.q.entity))),
+      basedOn: s.q.entity,
+      method: 'query',
+    }))
+    .filter((c) => c.title)
+    // Flagged when cleanup changed the wording, so the brief can show the
+    // verbatim query beside the title instead of implying they are identical.
+    .map((c) => ({ ...c, cleaned: c.title.toLowerCase() !== String(c.basedOn).trim().toLowerCase() }));
 }
 
-function recommendedTitle(cluster, brand, crawlPages) {
-  const fromHistory = titleFromBrandHistory(cluster, brand, crawlPages || []);
-  const chosen = fromHistory
-    || titleFromTopQuery(cluster, brand)
-    || { title: templatedTitle(cluster, brand), method: 'template' };
+function recommendedTitle(cluster, brand, crawlPages, cachedQueries) {
+  // Candidates in priority order: this brand's own proven title patterns, then
+  // real searcher phrasing, then the vertical template. The first one that FITS
+  // wins. Previously each path returned a single candidate and the first
+  // non-null won outright, so an over-long title from a high-priority path was
+  // emitted with a warning attached while shorter candidates — including the
+  // always-short template — were never considered. A 60-character limit the
+  // generator knows about is a limit it should meet, not report on.
+  const candidates = [
+    ...titleFromBrandHistory(cluster, brand, crawlPages || []),
+    ...titleFromTopQuery(cluster, brand, cachedQueries),
+    { title: templatedTitle(cluster, brand), method: 'template' },
+  ].filter((c) => c && c.title);
+  const chosen = candidates.find((c) => c.title.length <= TITLE_MAX_CHARS) || candidates[0];
   return { ...chosen, check: lengthCheck(chosen.title, 0, TITLE_MAX_CHARS, 'title') };
 }
 
@@ -397,9 +528,13 @@ const HEADING_INTRO_TEMPLATES = {
 const WH_STARTERS = new Set(['what', 'why', 'how', 'when', 'where', 'which', 'who', 'is', 'are', 'can', 'does', 'do', 'should']);
 
 function headingFromQuery(query) {
-  const words = String(query).trim().split(/\s+/);
+  const words = cleanQueryText(query).split(/\s+/).filter(Boolean);
   if (!words.length) return null;
-  const clean = titleCase(query.replace(/[?]+$/, ''));
+  // Cleaned the same way a query-derived title is: real GSC queries include
+  // stray quotes, truncated fragments and doubled-up phrases, and those read as
+  // badly in an H2 as they do in a title tag.
+  const clean = dropRepeatedWords(titleCase(cleanQueryText(query).replace(/[?]+$/, '')));
+  if (!clean) return null;
   if (WH_STARTERS.has(words[0].toLowerCase())) return `${clean}?`;
   // A noun-phrase query reads perfectly well as a heading on its own. The old
   // "About: " prefix was a hedge against forcing it into a fake question, but
@@ -411,8 +546,8 @@ function headingFromQuery(query) {
 // impression GSC queries (excluding ones that are just the primary keyword
 // itself), turned into headings. Falls back to null (caller uses the
 // template) when the brand has no matching query history at all.
-function headingsFromQueries(cluster, brand) {
-  const queries = analytics.topQueries(brand.id, 9999, 1000);
+function headingsFromQueries(cluster, brand, cachedQueries) {
+  const queries = brandQueries(brand, cachedQueries);
   if (!queries.length) return null;
   const clusterTokens = clusterTokenSet(cluster);
   const primaryTokens = new Set(distinctiveTokens(cluster.primaryKeyword));
@@ -497,9 +632,15 @@ function isSameSection(aTokens, bTokens) {
   return (matched / large.length) >= SAME_SECTION_THRESHOLD;
 }
 
-function dedupeHeadings(headings) {
+// `seedTokens` pre-loads the deduper with token sets that must not be repeated
+// but are not themselves headings — in practice the recommended title. The
+// title and the intro headings are both derived from the same ranked query
+// list, so they collided constantly: the live brand's brief opened with the H2
+// "Web Design and Development Company in USA" directly beneath the identical
+// title tag. An H2 that restates the title is a wasted section.
+function dedupeHeadings(headings, seedTokens = []) {
   const accepted = [];
-  const acceptedTokens = [];
+  const acceptedTokens = [...seedTokens];
   const seenExact = new Set();
   headings.forEach((h) => {
     if (!h) return;
@@ -528,28 +669,40 @@ function bodyHeadings(cluster) {
   const subs = Array.isArray(cluster.subClusters) ? cluster.subClusters : null;
   if (subs && subs.length >= 2) {
     return {
-      headings: subs.map((s) => titleCase(s.label)),
+      headings: subs.map((s) => dropRepeatedWords(titleCase(s.label))).filter(Boolean),
       method: 'sub-topic',
     };
   }
-  return {
-    headings: cluster.supportingKeywords.slice(0, 6).map((k) => titleCase(k)),
-    method: 'supporting-keyword',
-  };
+  // Fallback: the cluster's own supporting keywords, cleaned the same way the
+  // title is, and with any keyword that merely restates the primary one
+  // dropped — a section heading that says the same thing as the page's title
+  // is not a section, and it used to consume up to six of the nine slots.
+  const primaryTokens = new Set(distinctiveTokens(cluster.primaryKeyword).map((t) => clustering.stem(t, 'en')));
+  const headings = cluster.supportingKeywords
+    .map((k) => dropRepeatedWords(titleCase(k)))
+    .filter(Boolean)
+    .filter((h) => {
+      const tokens = headingTokens(h);
+      return tokens.length > 0 && !tokens.every((t) => primaryTokens.has(t));
+    })
+    .slice(0, 6);
+  return { headings, method: 'supporting-keyword' };
 }
 
-function suggestedHeadings(cluster, brand) {
+function suggestedHeadings(cluster, brand, cachedQueries, recommendedTitleText) {
   const intent = normaliseIntent(cluster.intent);
-  const fromQueries = headingsFromQueries(cluster, brand);
+  const fromQueries = headingsFromQueries(cluster, brand, cachedQueries);
   const intro = fromQueries || templatedIntroHeadings(cluster, brand);
   const introMethod = fromQueries ? 'query' : 'template';
   const body = bodyHeadings(cluster);
 
+  // Seeded with the title so no heading merely restates it.
+  const titleTokens = recommendedTitleText ? headingTokens(recommendedTitleText) : [];
   const headings = dedupeHeadings([
     ...intro,
     ...body.headings,
     intent === 'informational' ? 'Frequently Asked Questions' : 'Get Started',
-  ]);
+  ], titleTokens.length ? [titleTokens] : []);
 
   return {
     headings,
@@ -636,9 +789,32 @@ const META_TEMPLATES = {
   transactional: (kw, brandName) => `Compare options and pricing for ${kw}. See what's included, how quickly you can start, and what it costs${brandName ? ` with ${brandName}` : ''}.`,
   commercial: (kw, brandName) => `Looking for ${kw}? See what to look for, how the options compare, and how${brandName ? ` ${brandName}` : ' we'} can help you choose.`,
   local: (kw) => `Need ${kw}? See service areas, what's covered and how to get started — with local support and a direct line to the team.`,
-  informational: (kw) => `A practical guide to ${kw}: what it means, how it works, and what to do next. Clear answers, no jargon.`,
-  navigational: (kw) => `${kw} — find what you need and get in touch.`,
+  // Extended past the 110-character floor: the shorter original wording put any
+  // keyword under ~12 characters below the minimum, so the generator warned
+  // about its own output for every short keyword.
+  informational: (kw) => `A practical guide to ${kw}: what it means, how it works, and what to do next — clear answers, no jargon, and the steps worth taking first.`,
+  // Was `"${kw} — find what you need and get in touch."`, which is structurally
+  // under the 110-character floor for any short keyword — so the generator
+  // reliably warned about a description it had just written itself.
+  navigational: (kw, brandName) => `${kw} — everything in one place${brandName ? ` from ${brandName}` : ''}: the key pages, contact details and next steps, so you can find what you need and get in touch quickly.`,
 };
+
+// Trims an over-long description at a sentence or word boundary. The generator
+// used to length-check its own output, warn, and then emit it anyway — leaving
+// the SEO team to hand-trim something the tool could have trimmed itself.
+function trimToLength(text, max) {
+  const s = String(text || '').trim();
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max);
+  const sentenceEnd = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('? '), cut.lastIndexOf('! '));
+  // Only cut at a sentence boundary if doing so keeps most of the text.
+  if (sentenceEnd >= max * 0.6) return cut.slice(0, sentenceEnd + 1).trim();
+  const lastSpace = cut.lastIndexOf(' ');
+  const body = (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).replace(/[,;:\s—–-]+$/, '');
+  // Already ends a sentence — an ellipsis on top of a full stop just looks
+  // like a mistake.
+  return /[.!?]$/.test(body) ? body : `${body}…`;
+}
 
 function recommendedMeta(cluster, brand, cta) {
   const kw = String(cluster.primaryKeyword || '').trim();
@@ -649,6 +825,8 @@ function recommendedMeta(cluster, brand, cta) {
   if (cta && cta.text && (text.length + cta.text.length + 1) <= META_MAX_CHARS) {
     text = `${text} ${cta.text}.`.replace(/\.\.$/, '.');
   }
+  // A long primary keyword can push even a fitted template past the limit.
+  text = trimToLength(text, META_MAX_CHARS);
   return { text, method: 'template', check: lengthCheck(text, META_MIN_CHARS, META_MAX_CHARS, 'meta description') };
 }
 
@@ -695,11 +873,17 @@ function build(brand, cluster) {
     ? (csvStore.readTable(latestLinking.out_dir, 'recommendations', { perPage: 5000 }) || { rows: [] }).rows
     : [];
 
+  // Fetched once and shared by the title and headings paths, which each used
+  // to issue this same 1,000-row query independently.
+  const queryHistory = analytics.topQueries(brand.id, 9999, 1000);
+
   const services = relevantServices(cluster, brand);
   const cta = recommendedCta(cluster, brand);
-  const title = recommendedTitle(cluster, brand, crawlPages);
-  const headings = suggestedHeadings(cluster, brand);
+  const title = recommendedTitle(cluster, brand, crawlPages, queryHistory);
+  const headings = suggestedHeadings(cluster, brand, queryHistory, title.title);
   const meta = recommendedMeta(cluster, brand, cta);
+  const words = wordCountRange(crawlPages);
+  const links = internalLinkSuggestions(cluster, crawlPages, recommendationRows);
 
   // Intent gating.
   //
@@ -734,9 +918,22 @@ function build(brand, cluster) {
   }
   if (!services.configured) {
     warnings.push({ field: 'relevantServices', severity: 'low', message: 'No services are configured for this brand, so none could be matched. Add them in brand settings.' });
+  } else if (!services.matched.length) {
+    // Configured but nothing matched is a different finding from not configured
+    // at all, and it used to render as a silently empty section.
+    warnings.push({ field: 'relevantServices', severity: 'low', message: 'None of this brand\'s configured services share a topic with this keyword. Either this page sells something not yet on the service list, or the cluster is off-portfolio — worth checking before commissioning it.' });
   }
   if (!cta.configured) {
     warnings.push({ field: 'callToAction', severity: 'low', message: 'No CTA rules are configured for this brand, so a generic one is shown. Add them in brand settings.' });
+  }
+  // Both of these fields silently rendered as empty while fieldSources still
+  // claimed they were 'data' — the reader had no way to tell "measured zero"
+  // from "could not be measured".
+  if (!words) {
+    warnings.push({ field: 'wordCountRange', severity: 'low', message: 'No word-count range could be measured: this brand has fewer than three crawled content pages. Run the internal-linking crawl to establish a baseline.' });
+  }
+  if (!links.links.length) {
+    warnings.push({ field: 'internalLinks', severity: 'medium', message: 'No internal link sources could be identified — no crawled page shares a topic with this cluster. A new page with no inbound internal links will struggle to be discovered or to rank; identify link sources manually before publishing.' });
   }
 
   return {
@@ -744,7 +941,7 @@ function build(brand, cluster) {
     // before a field existed renders as undefined in a view that expects it —
     // which is the state the live brand's stored briefs are in. Stamping the
     // version lets a reader (and the view) tell an old shape from a new one.
-    schemaVersion: 2,
+    schemaVersion: SCHEMA_VERSION,
     generatedAt: new Date().toISOString(),
     brand: { id: brand.id, name: brand.name, site_url: brand.site_url },
     cluster: {
@@ -768,7 +965,14 @@ function build(brand, cluster) {
     recommendedTitleCheck: title.check,
     recommendedTitleBasis: title.method === 'template'
       ? { method: 'template' }
-      : { method: title.method, basedOn: title.basedOn, sourceTitle: title.sourceTitle || null },
+      : {
+        method: title.method,
+        basedOn: title.basedOn,
+        sourceTitle: title.sourceTitle || null,
+        // True when cleanup changed the wording, so the UI can show the
+        // verbatim query rather than implying the title IS the query.
+        cleaned: Boolean(title.cleaned),
+      },
     recommendedMetaDescription: meta.text,
     recommendedMetaDescriptionCheck: meta.check,
     suggestedHeadings: headings.headings,
@@ -783,8 +987,8 @@ function build(brand, cluster) {
     isHubTopic: Boolean(cluster.isHub),
     warnings,
     supportingKeywords: cluster.supportingKeywords,
-    wordCountRange: wordCountRange(crawlPages),
-    internalLinks: internalLinkSuggestions(cluster, crawlPages, recommendationRows),
+    wordCountRange: words,
+    internalLinks: links,
     relevantServices: services,
     callToAction: cta,
     // Explicitly unavailable rather than guessed — see file header.
@@ -803,8 +1007,11 @@ function build(brand, cluster) {
       recommendedMetaDescription: 'template',
       suggestedHeadings: headings.method === 'template' ? 'template' : 'data',
       supportingKeywords: 'data',
-      wordCountRange: 'data',
-      internalLinks: 'data',
+      // 'data' only when there is actually a measurement behind the field.
+      // Both of these previously claimed 'data' while holding null / an empty
+      // list, which is the one thing this block exists to prevent.
+      wordCountRange: words ? 'data' : 'unavailable',
+      internalLinks: links.links.length ? 'data' : 'unavailable',
       relevantServices: services.configured ? 'data' : 'unavailable',
       callToAction: cta.configured ? 'data' : 'template',
       questionsToAnswer: 'unavailable',
@@ -848,4 +1055,7 @@ function list(userId, brandId) {
     WHERE b.user_id=? ${where} ORDER BY b.id DESC LIMIT 200`).all(...args);
 }
 
-module.exports = { build, generate, get, list, findCluster, wordCountRange, recommendedTitle, suggestedHeadings, templatedTitle };
+module.exports = {
+  build, generate, get, list, findCluster, wordCountRange,
+  recommendedTitle, suggestedHeadings, templatedTitle, SCHEMA_VERSION,
+};

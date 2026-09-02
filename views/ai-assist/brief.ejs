@@ -7,7 +7,7 @@
 <%- include('../partials/topbar') %>
 
     <div class="toolbar">
-      <a class="btn ghost sm" href="/ai-lab">&larr; AI Lab</a>
+      <a class="btn ghost sm" href="/ai-assist">&larr; AI Assist</a>
       <div class="spacer"></div>
       <a class="btn secondary sm" href="/keywords/<%= realBriefLinkRunId %>" target="_blank" rel="noopener">View real clustering run &rarr;</a>
     </div>
@@ -15,7 +15,7 @@
     <div class="card">
       <div class="card-head">
         <div>
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700">AI Content Brief (Beta)</div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700">AI Content Brief</div>
           <h2 style="margin-top:4px"><%= resolved.cluster.primaryKeyword %></h2>
         </div>
         <span class="sub"><%= brand.name %></span>
@@ -46,7 +46,7 @@
       <div class="card-head">
         <h3>AI-generated creative fields</h3>
         <% if (!row) { %>
-        <form method="POST" action="/ai-lab/<%= brand.id %>/brief/<%= clusterKey %>/generate">
+        <form method="POST" action="/ai-assist/<%= brand.id %>/brief/<%= clusterKey %>/generate">
           <button class="btn sm" type="submit">Generate with AI</button>
         </form>
         <% } %>
@@ -72,7 +72,7 @@
             </ul>
           </div>
           <p class="hint">Generated <%= fmtDateTime(row.created_at) %> · <%= fmtInt(row.prompt_tokens) %> prompt / <%= fmtInt(row.completion_tokens) %> completion tokens · $<%= Number(row.cost_usd).toFixed(4) %></p>
-          <form method="POST" action="/ai-lab/<%= brand.id %>/brief/<%= clusterKey %>/generate" style="margin-top:6px">
+          <form method="POST" action="/ai-assist/<%= brand.id %>/brief/<%= clusterKey %>/generate" style="margin-top:6px">
             <input type="hidden" name="force" value="1">
             <button class="btn secondary sm" type="submit">Regenerate (forces a new, billed call)</button>
           </form>

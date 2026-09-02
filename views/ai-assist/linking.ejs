@@ -7,7 +7,7 @@
 <%- include('../partials/topbar') %>
 
     <div class="toolbar">
-      <a class="btn ghost sm" href="/ai-lab">&larr; AI Lab</a>
+      <a class="btn ghost sm" href="/ai-assist">&larr; AI Assist</a>
       <% if (run) { %>
       <div class="spacer"></div>
       <a class="btn secondary sm" href="/linking/<%= run.id %>" target="_blank" rel="noopener">View real linking run &rarr;</a>
@@ -16,9 +16,9 @@
 
     <div class="card">
       <div class="card-head">
-        <h3>AI Linking Rationale (Beta) — <%= brand.name %></h3>
+        <h3>AI Linking Rationale — <%= brand.name %></h3>
         <% if (run && recs.length) { %>
-        <form method="POST" action="/ai-lab/<%= brand.id %>/linking/generate">
+        <form method="POST" action="/ai-assist/<%= brand.id %>/linking/generate">
           <button class="btn sm" type="submit"><%= row ? 'Regenerate (new billed call)' : 'Generate with AI' %></button>
           <% if (row) { %><input type="hidden" name="force" value="1"><% } %>
         </form>

@@ -98,10 +98,24 @@ class WasmStatement {
       const a = args[0];
       if (a === undefined) return undefined;
       if (Array.isArray(a)) return a;
-      if (a !== null && typeof a === 'object' && !(a instanceof Uint8Array)) return a;
+      if (a !== null && typeof a === 'object' && !(a instanceof Uint8Array)) return WasmStatement._namedParams(a);
       return [a];
     }
     return Array.from(args);
+  }
+
+  // better-sqlite3 binds a named object against `@foo`/`:foo`/`$foo` in the
+  // SQL using the bare key ("foo"); node-sqlite3-wasm calls
+  // sqlite3_bind_parameter_index with the key as-is, which requires the
+  // sigil to be part of the key itself ("@foo"), or it throws "Unknown
+  // binding parameter". Every named param in this codebase is written as
+  // `@name`, so add that sigil here rather than at each call site.
+  static _namedParams(obj) {
+    const out = {};
+    for (const k of Object.keys(obj)) {
+      out[/^[@:$]/.test(k) ? k : `@${k}`] = obj[k];
+    }
+    return out;
   }
 
   get(...args) {
@@ -150,6 +164,83 @@ function narrowRow(row) {
 // A live writer's lock is never old enough to be touched.
 const LOCK_STALE_MS = Number(process.env.SQLITE_LOCK_STALE_MS || 60000);
 
+// How often a live process re-stamps a lock it is holding. Must stay well
+// inside LOCK_STALE_MS or a healthy process's lock will still age out.
+const LOCK_HEARTBEAT_MS = Number(process.env.SQLITE_LOCK_HEARTBEAT_MS || 10000);
+
+// --- ownership, and why the age check alone is not enough -----------------
+//
+// The engine's lock is a directory:
+//
+//   function _nodejsLock(fi, level) {
+//     if (!_isLocked(fi)) {
+//       try { fs.mkdirSync(`${_path(fi)}.lock`) }
+//       catch (err) { return err.code == "EEXIST" ? SQLITE_BUSY : SQLITE_IOERR_LOCK }
+//
+// mkdirSync is atomic, so as a mutex this is sound. But note what it does NOT
+// do: it records nothing about who holds the lock, it ignores SQLite's lock
+// LEVEL entirely (readers take the same exclusive lock as writers), and the
+// directory's mtime is stamped once at creation and never refreshed while the
+// lock is held.
+//
+// That last point breaks the age heuristic below. A lock legitimately held by a
+// live process looks arbitrarily old, so clearing on age alone DELETES A LIVE
+// PROCESS'S LOCK — after which two processes write the same file with no mutex
+// between them. That is not a theoretical risk: it corrupted this database,
+// destroying the content_briefs B-tree root page while every other table
+// survived.
+//
+// So each process records its own ownership here, and a lock is cleared only
+// when no other LIVE process has the database open.
+function ownersDir(dbPath) { return `${dbPath}.owners`; }
+
+function pidAlive(pid) {
+  if (!pid) return false;
+  if (pid === process.pid) return true;
+  try { process.kill(pid, 0); return true; } catch (err) { return err.code === 'EPERM'; }
+}
+
+// PIDs other than ours that still exist. Dead entries are pruned as we go, so
+// a crashed process cannot block recovery forever.
+function liveForeignOwners(dbPath) {
+  const dir = ownersDir(dbPath);
+  let entries;
+  try { entries = fsMod.readdirSync(dir); } catch { return []; }
+  const live = [];
+  entries.forEach((name) => {
+    const pid = Number(name);
+    if (!pid || pid === process.pid) return;
+    if (pidAlive(pid)) { live.push(pid); return; }
+    try { fsMod.rmSync(`${dir}/${name}`, { force: true }); } catch { /* best effort */ }
+  });
+  return live;
+}
+
+// Records this process as having the database open, and reports any other live
+// process that already did. Cleaned up on exit so the record does not outlive
+// the process by more than a crash.
+function claimOwnership(dbPath) {
+  const dir = ownersDir(dbPath);
+  const foreign = liveForeignOwners(dbPath);
+  const mine = `${dir}/${process.pid}`;
+  try {
+    fsMod.mkdirSync(dir, { recursive: true });
+    fsMod.writeFileSync(mine, new Date().toISOString());
+    const release = () => { try { fsMod.rmSync(mine, { force: true }); } catch { /* exiting */ } };
+    process.once('exit', release);
+    process.once('SIGINT', () => { release(); process.exit(130); });
+    process.once('SIGTERM', () => { release(); process.exit(143); });
+  } catch { /* an unwritable data dir is reported elsewhere */ }
+  return foreign;
+}
+
+// Whether ownership records can be trusted for this database. When the owners
+// directory is readable, "no live owner" is a fact; when it is missing or
+// unreadable we know nothing and must fall back to the age heuristic.
+function ownershipIsReadable(dbPath) {
+  try { fsMod.readdirSync(ownersDir(dbPath)); return true; } catch { return false; }
+}
+
 function clearStaleLock(dbPath) {
   const lockDir = `${dbPath}.lock`;
   let st;
@@ -159,6 +250,37 @@ function clearStaleLock(dbPath) {
     return false;               // no lock present — the normal case
   }
   if (!st.isDirectory()) return false;
+  // Ownership beats age. A live owner's lock is never stale no matter how old
+  // the directory looks, because its mtime is never refreshed.
+  const live = liveForeignOwners(dbPath);
+  if (live.length) {
+    console.warn(
+      `[db] another live process (pid ${live.join(', ')}) has this database open; leaving its lock alone. `
+      + 'This engine has no cross-process write safety, so concurrent writes can corrupt the file — '
+      + 'run one writer at a time.'
+    );
+    return false;
+  }
+  // The age check is only a FALLBACK for when there is no ownership record to
+  // consult. If the owners directory is readable and lists no live process,
+  // the lock is definitively abandoned however young it looks — without this,
+  // a crash left the app unable to start for LOCK_STALE_MS, which is exactly
+  // the "database is locked" loop the recovery above exists to prevent.
+  if (ownershipIsReadable(dbPath)) {
+    try {
+      fsMod.rmSync(lockDir, { recursive: true, force: true });
+      console.warn(
+        '[db] removed an abandoned lock directory: no live process owns this '
+        + 'database. This is expected after the app was stopped abruptly; the '
+        + 'database itself is intact.'
+      );
+      return true;
+    } catch (err) {
+      console.error(`[db] could not remove abandoned lock ${lockDir}: ${err.message}`);
+      return false;
+    }
+  }
+
   const age = Date.now() - st.mtimeMs;
   if (age < LOCK_STALE_MS) return false;   // someone may genuinely be writing
   try {
@@ -182,11 +304,50 @@ class SqliteDatabase {
     this.engineName = engine.name;
     this.isWasm = engine.name === 'node-sqlite3-wasm';
     // Only the WebAssembly engine uses the lock-directory scheme.
-    if (this.isWasm) clearStaleLock(file);
+    if (this.isWasm) {
+      // Claim first, so clearStaleLock can see who else is here, and so a
+      // second process is told plainly that it is about to share a file this
+      // engine cannot safely share.
+      const foreign = claimOwnership(file);
+      if (foreign.length) {
+        console.warn(
+          `[db] WARNING: pid ${foreign.join(', ')} already has ${file} open, and the WebAssembly `
+          + 'engine provides no cross-process write safety. Concurrent writes CAN CORRUPT this '
+          + 'database. Stop the other process (or set DB_DRIVER/install better-sqlite3) before writing.'
+        );
+      }
+      clearStaleLock(file);
+      this._startLockHeartbeat(file);
+    }
     this._db = new engine.Database(file, this.isWasm ? {} : options.nativeOptions || {});
     this._file = file;
     this._cache = new Map();
     this._txDepth = 0;
+  }
+
+  // Keeps the engine's lock directory as young as it actually is.
+  //
+  // clearStaleLock decides staleness from the lock's mtime, and that heuristic
+  // is correct in spirit — a lock nobody is refreshing belongs to a process
+  // that is gone. The problem is that the engine stamps the mtime once at
+  // mkdir and never touches it again, so a lock held by a perfectly healthy
+  // process ages into looking abandoned, and another process then deletes it
+  // and writes concurrently. Refreshing it here makes "old lock" mean what
+  // clearStaleLock already assumes it means, without depending on any PID
+  // bookkeeping surviving.
+  //
+  // utimesSync throws when no lock is currently held (the common case between
+  // writes); that is not an error, so it is swallowed.
+  _startLockHeartbeat(file) {
+    const lockDir = `${file}.lock`;
+    this._heartbeat = setInterval(() => {
+      try {
+        const now = new Date();
+        fsMod.utimesSync(lockDir, now, now);
+      } catch { /* no lock held at this instant */ }
+    }, LOCK_HEARTBEAT_MS);
+    // Never keep the process alive just to tick.
+    if (typeof this._heartbeat.unref === 'function') this._heartbeat.unref();
   }
 
   prepare(sql) {
@@ -349,5 +510,6 @@ function configureJournal(db) {
 
 module.exports = {
   SqliteDatabase, configureJournal, configureBusyTimeout, clearStaleLock,
-  BUSY_TIMEOUT_MS, LOCK_STALE_MS,
+  claimOwnership, liveForeignOwners, pidAlive,
+  BUSY_TIMEOUT_MS, LOCK_STALE_MS, LOCK_HEARTBEAT_MS,
 };

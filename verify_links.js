@@ -132,8 +132,7 @@ const MOUNTS = [
   ['/team', './src/routes/team'],
   ['/onboarding', './src/routes/onboarding'],
   ['/workflow', './src/routes/workflow'],
-  ['/ai-lab', './src/routes/aiLab'],
-  ['/ai-suggestions', './src/routes/aiSuggestions'],
+  ['/ai-assist', './src/routes/aiAssist'],
 ];
 MOUNTS.forEach(([mount, mod]) => {
   try { app.use(mount, passThrough, require(mod)); } catch (err) {
@@ -165,7 +164,7 @@ function seedPages() {
     '/connect', '/audit', '/pagespeed', '/linking', '/keywords', '/keywords/briefs',
     '/alerts', '/alerts/history', '/tasks', '/tasks?view=table',
     `/tasks/opportunities/${b}`, '/reports', '/settings', '/workflow',
-    '/ai-lab', '/ai-suggestions',
+    '/ai-assist',
   ];
   [
     ['linking_runs', '/linking/'], ['keyword_runs', '/keywords/'],

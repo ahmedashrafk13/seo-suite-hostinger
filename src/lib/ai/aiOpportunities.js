@@ -1,5 +1,5 @@
-// AI Opportunity Recommendations — the AI Lab counterpart to
-// lib/opportunities.js. Reads the real, already-computed findings via
+// AI Opportunity Recommendations — AI Assist's rewrite of
+// lib/opportunities.js's findings. Reads the real, already-computed findings via
 // opportunities.analyse() (read-only), then makes ONE batched AI call
 // covering every finding for the brand, asking for a punchier, more specific
 // recommendation string per finding. The underlying numbers are identical

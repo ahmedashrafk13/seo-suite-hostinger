@@ -134,8 +134,7 @@ const MOUNTS = [
   ['/team', './src/routes/team'],
   ['/onboarding', './src/routes/onboarding'],
   ['/workflow', './src/routes/workflow'],
-  ['/ai-lab', './src/routes/aiLab'],
-  ['/ai-suggestions', './src/routes/aiSuggestions'],
+  ['/ai-assist', './src/routes/aiAssist'],
 ];
 MOUNTS.forEach(([mount, mod]) => {
   try { app.use(mount, passThrough, require(mod)); } catch (err) {
@@ -184,7 +183,7 @@ function discoverTargets() {
     '/connect', '/audit', '/pagespeed', '/linking', '/keywords', '/alerts',
     '/alerts/history', '/tasks', '/tasks?status=backlog', '/tasks?severity=high',
     `/tasks/opportunities/${b}`, '/reports', '/settings', '/workflow',
-    '/team', '/ai-lab', `/ai-lab/${b}/compare`, `/ai-lab/${b}/compare.csv`,
+    '/team', '/ai-assist',
   ];
   if (linkingRun) t.push(`/linking/${linkingRun}`);
   if (keywordRun) t.push(`/keywords/${keywordRun}`);

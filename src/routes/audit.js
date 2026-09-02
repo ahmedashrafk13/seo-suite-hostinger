@@ -217,13 +217,15 @@ router.get('/:id/csv', async (req, res) => {
   const rows = [];
   report.failing.forEach((f) => {
     if (!f.items.length) {
-      rows.push({ severity: f.severity, issue_type: f.issue, affected_url: '', detail: f.summary, recommended_action: f.action, affected_count: f.failed });
+      rows.push({ severity: f.severity, issue_type: f.issue, affected_url: '', detail: f.summary, found_on: '', recommended_action: f.action, affected_count: f.failed });
       return;
     }
     f.items.forEach((item) => {
       rows.push({
         severity: f.severity, issue_type: f.issue, affected_url: item.url || '',
-        detail: item.note || f.summary, recommended_action: f.action, affected_count: f.failed,
+        detail: item.note || f.summary,
+        found_on: item.sources && item.sources.length ? item.sources.join('; ') : '',
+        recommended_action: f.action, affected_count: f.failed,
       });
     });
   });
@@ -236,6 +238,7 @@ router.get('/:id/csv', async (req, res) => {
         { header: 'Issue Type', key: 'issue_type', width: 30 },
         { header: 'Affected URL', key: 'affected_url', width: 50 },
         { header: 'Detail', key: 'detail', width: 50 },
+        { header: 'Found On / Duplicate Pages', key: 'found_on', width: 60 },
         { header: 'Recommended Action', key: 'recommended_action', width: 50 },
         { header: 'Affected Count', key: 'affected_count', width: 14 },
       ],

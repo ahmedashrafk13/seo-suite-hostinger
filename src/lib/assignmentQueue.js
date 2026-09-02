@@ -52,7 +52,7 @@ function dueRecipients({ force = false } = {}) {
 function queuedFor(email) {
   return db.prepare(`SELECT n.id, n.task_id, n.note, n.person_id, n.sent_by,
       t.title, t.severity, t.source, t.detail, t.due_date, t.effort, t.affected_url,
-      t.requires_approval, t.brand_id,
+      t.requires_approval, t.brand_id, t.evidence_json,
       b.name brand_name, p.name person_name,
       u.name assigner_name, u.email assigner_email
     FROM task_notifications n
@@ -62,6 +62,43 @@ function queuedFor(email) {
     LEFT JOIN users u ON u.id = n.sent_by
     WHERE n.email = ? AND n.status='queued'
     ORDER BY n.id`).all(email);
+}
+
+// Pulls the recommended action and per-URL detail out of a task's evidence so
+// the assignment email carries the same substance as the task page — not
+// just a title and a due date. Handles every evidence shape the task
+// generators produce: audit findings (items + action), broken/orphan links
+// (items), link recommendations (recommendations), and cannibalisation pairs.
+function evidenceExtras(evidenceJson) {
+  if (!evidenceJson) return { action: null, items: [], itemsTotal: 0 };
+  let ev;
+  try { ev = JSON.parse(evidenceJson); } catch { return { action: null, items: [], itemsTotal: 0 }; }
+
+  const items = (ev.items || []).slice(0, 10).map((i) => (typeof i === 'string' ? { url: i, note: null } : i));
+  const itemsTotal = ev.affectedCount ?? ev.failed ?? (ev.items || []).length;
+
+  if (!items.length && Array.isArray(ev.recommendations)) {
+    return {
+      action: ev.action || null,
+      items: ev.recommendations.slice(0, 10).map((r) => ({
+        url: r.source_url || null,
+        note: `→ ${r.target_url || ''} — anchor "${r.anchor_text || ''}"${r.reason ? ` (${r.reason})` : ''}`,
+      })),
+      itemsTotal: ev.recommendations.length,
+    };
+  }
+  if (!items.length && Array.isArray(ev.cannibalization)) {
+    return {
+      action: ev.action || null,
+      items: ev.cannibalization.slice(0, 10).map((c) => ({
+        url: c.page_a || null,
+        note: `vs ${c.page_b || ''} — keyword "${c.shared_keyword || ''}"${c.recommendation ? `: ${c.recommendation}` : ''}`,
+      })),
+      itemsTotal: ev.cannibalization.length,
+    };
+  }
+
+  return { action: ev.action || null, items, itemsTotal };
 }
 
 function markSent(ids, result) {
@@ -95,19 +132,25 @@ async function flushRecipient(email) {
     personName: live[0].person_name || null,
     assignedBy: assigners.join(', ') || null,
     baseUrl: baseUrl(),
-    tasks: live.map((r) => ({
-      id: r.task_id,
-      title: r.title,
-      severity: r.severity,
-      source: r.source,
-      detail: r.detail,
-      dueDate: r.due_date,
-      effort: r.effort,
-      affectedUrl: r.affected_url,
-      requiresApproval: r.requires_approval,
-      brandName: r.brand_name,
-      note: r.note,
-    })),
+    tasks: live.map((r) => {
+      const extras = evidenceExtras(r.evidence_json);
+      return {
+        id: r.task_id,
+        title: r.title,
+        severity: r.severity,
+        source: r.source,
+        detail: r.detail,
+        dueDate: r.due_date,
+        effort: r.effort,
+        affectedUrl: r.affected_url,
+        requiresApproval: r.requires_approval,
+        brandName: r.brand_name,
+        note: r.note,
+        action: extras.action,
+        items: extras.items,
+        itemsTotal: extras.itemsTotal,
+      };
+    }),
   });
 
   markSent(live.map((r) => r.id), result);

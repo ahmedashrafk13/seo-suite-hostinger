@@ -9,6 +9,7 @@ const express = require('express');
 const db = require('../db');
 const psi = require('../lib/psi');
 const google = require('../lib/google');
+const tasksLib = require('../lib/tasks');
 
 const router = express.Router();
 
@@ -147,6 +148,17 @@ router.post('/run', async (req, res, next) => {
             fieldOf('LARGEST_CONTENTFUL_PAINT_MS') ? 'crux-field' : 'lighthouse-lab');
       } catch (e) {
         console.error('[pagespeed] snapshot write failed:', e.message);
+      }
+
+      // Every PageSpeed run turns its own failing categories into tasks
+      // automatically, the same way a technical audit or a linking crawl
+      // does — no "create tasks" button to click.
+      try {
+        const savedRow = db.prepare('SELECT * FROM psi_reports WHERE id=?').get(info.lastInsertRowid);
+        const brand = db.prepare('SELECT * FROM brands WHERE id=? AND user_id=?').get(brandId, userId);
+        if (brand) tasksLib.fromPsiReport(savedRow, report, brand);
+      } catch (e) {
+        console.error('[pagespeed] task creation failed:', e.message);
       }
     }
 

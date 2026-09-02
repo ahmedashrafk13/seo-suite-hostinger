@@ -1,0 +1,38 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+
+# Local state. The container gets its own volume at /data; shipping a local
+# database into the image would overwrite nothing (the volume wins) but would
+# leak real client data into an image layer.
+data
+reports
+tmp
+backups
+*.db
+*.db-journal
+*.db-wal
+
+# Secrets never belong in an image layer. They are set with `fly secrets set`.
+.env
+.env.*
+
+# Windows helpers and stray zero-byte files from the local checkout.
+#
+# These patterns match ROOT-LEVEL entries only — a .dockerignore pattern without
+# a slash is matched against the whole relative path, so `node` excludes ./node
+# and leaves tools/node alone. That matters: tools/node holds the JavaScript
+# crawler ports the audit and internal-linking features spawn, and an image
+# without them fails at run time, not at build time.
+cloudflared.exe
+/node
+/npm
+/cd
+seo-automation-suite@1.0.0
+
+# Docs and one-off verification scripts are not needed at runtime.
+*.md
+verify_*.js
+make_*.js
+csv_exports

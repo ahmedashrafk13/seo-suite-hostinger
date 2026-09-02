@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%- include('_partials/runhead') %>
+
+<% const r = run.result; %>
+<% if (run.status === 'completed' && r && r.empty) { %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body"><%= r.reason %></div>
+  </div>
+<% } else if (run.status === 'completed' && r) { %>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Profiles found</div>
+      <div class="value"><%= r.counts.present %></div>
+      <div class="meta">of <%= r.counts.checked %> platforms checked</div>
+    </div>
+    <div class="stat">
+      <div class="label">Missing</div>
+      <div class="value"><%= r.counts.missing + r.counts.likelyMissing %></div>
+      <div class="meta"><%= r.counts.missing %> confirmed absent · <%= r.counts.likelyMissing %> no indexed profile found</div>
+    </div>
+    <div class="stat">
+      <div class="label">Could not be checked</div>
+      <div class="value"><%= r.counts.unknown %></div>
+      <div class="meta">reported as unknown, never as a gap</div>
+    </div>
+    <div class="stat">
+      <div class="label">Vertical</div>
+      <div class="value" style="font-size:20px"><%= r.vertical %></div>
+      <div class="meta">decides which platforms are relevant</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0"><strong>Method.</strong> <%= r.method %></p>
+      <% if (r.scoreMeaning) { %><p class="hint mt-0"><strong>The score above:</strong> <%= r.scoreMeaning %></p><% } %>
+    </div>
+  </div>
+
+  <%- include('_partials/findings') %>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Platform by platform</h3>
+      <span class="muted" style="font-size:12px">Ordered as checked; the gap list below is ordered by consequence</span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr>
+          <th>Platform</th><th>Verdict</th><th>Weight</th><th>Profile</th><th>Evidence</th>
+        </tr></thead>
+        <tbody>
+        <% r.rows.forEach(function (row) { %>
+          <tr>
+            <td>
+              <strong><%= row.label %></strong>
+              <% if (row.universal) { %> <span class="badge neutral">all verticals</span><% } %>
+              <div class="muted mono-sm"><%= row.domain %></div>
+            </td>
+            <td>
+              <% if (row.verdict === 'present') { %><span class="badge good">present</span>
+              <% } else if (row.verdict === 'missing') { %><span class="badge critical">absent</span>
+              <% } else if (row.verdict === 'likely-missing') { %><span class="badge medium">none found</span>
+              <% } else { %><span class="badge neutral">unknown</span><% } %>
+            </td>
+            <td><%= row.weight %></td>
+            <td class="mono-sm">
+              <% if (row.profileUrl) { %>
+                <a href="<%= row.profileUrl %>" target="_blank" rel="noopener"><%= shortUrl(row.profileUrl, 48) %></a>
+              <% } else { %>—<% } %>
+            </td>
+            <td class="muted" style="font-size:11.5px">
+              <% row.evidence.forEach(function (e) { %><div><%= e %></div><% }) %>
+            </td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint">
+        <strong>"None found" is not the same as "absent".</strong> A confirmed absence comes from a 404 at the
+        platform's own conventional profile URL. "None found" means a site-restricted search returned nothing,
+        which is evidence of absence rather than proof — the profile may exist and be unindexed. Both are worth
+        acting on; only the first is certain.
+      </p>
+    </div>
+  </div>
+
+  <% if (r.gaps.length) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>Gaps, in the order worth closing</h3>
+      <span class="muted" style="font-size:12px">Weight reflects how much a missing profile actually costs, not how well-known the platform is</span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Platform</th><th>Weight</th><th>Status</th><th>Why this one matters</th></tr></thead>
+        <tbody>
+        <% r.gaps.forEach(function (g) { %>
+          <tr>
+            <td><strong><%= g.label %></strong><div class="muted mono-sm"><%= g.domain %></div></td>
+            <td>
+              <%= g.weight %>
+              <span class="meter <%= g.weight >= 8 ? 'bad' : (g.weight >= 6 ? 'warn' : '') %>"><span style="width:<%= g.weight * 10 %>%"></span></span>
+            </td>
+            <td>
+              <% if (g.verdict === 'missing') { %><span class="badge critical">confirmed absent</span>
+              <% } else { %><span class="badge medium">no indexed profile</span><% } %>
+            </td>
+            <td style="font-size:12px"><%= g.why %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint">
+        <strong>Claiming is the easy half.</strong> Every platform here allows a business to claim its own profile
+        for free. The work is what comes after: a claimed profile sitting at zero reviews is weaker than no
+        profile, because it reads as a business nobody has bothered to review. Plan how genuine reviews will be
+        requested before claiming.
+      </p>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (r.unknown.length) { %>
+  <div class="card">
+    <div class="card-head"><h3>Not checkable in this run (<%= r.unknown.length %>)</h3></div>
+    <div class="card-body">
+      <ul class="tight">
+        <% r.unknown.forEach(function (u) { %>
+          <li><strong><%= u.label %></strong> — <span class="muted"><%= u.evidence.join('; ') %></span></li>
+        <% }) %>
+      </ul>
+      <p class="hint">
+        These are excluded from the score on both sides of the ratio — a platform that blocked the request must
+        not count against the brand and must not count for it either. The block is usually rate limiting rather
+        than a permanent refusal, so re-running later normally resolves them.
+      </p>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/provenance', { prov: r.provenance }) %>
+<% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%- include('_partials/runhead') %>
+
+<% const r = run.result; %>
+<% if (run.status === 'completed' && r && r.empty) { %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body"><%= r.reason %></div>
+  </div>
+<% } else if (run.status === 'completed' && r) { %>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Keyword universe</div>
+      <div class="value"><%= fmtInt(r.counts.total) %></div>
+      <div class="meta"><%= fmtInt(r.counts.measured) %> measured · <%= fmtInt(r.counts.suggested) %> suggested only</div>
+    </div>
+    <div class="stat">
+      <div class="label">Striking distance</div>
+      <div class="value"><%= fmtInt(r.counts.striking) %></div>
+      <div class="meta">positions 4-20 with real impressions</div>
+    </div>
+    <div class="stat">
+      <div class="label">Topic clusters</div>
+      <div class="value"><%= r.clusters.length %></div>
+      <div class="meta"><%= r.clusters.filter(function(c){ return c.evidence !== 'suggested'; }).length %> backed by measured demand</div>
+    </div>
+    <div class="stat">
+      <div class="label">With a measured volume</div>
+      <div class="value"><%= fmtInt(r.counts.withVolume || 0) %></div>
+      <div class="meta">
+        <% if (r.counts.withVolume) { %>from a keyword-volume source<% } else { %>no volume source configured — see the basis below<% } %>
+      </div>
+    </div>
+    <div class="stat">
+      <div class="label">With a difficulty</div>
+      <div class="value"><%= fmtInt(r.counts.withDifficulty || 0) %></div>
+      <div class="meta">
+        <%= fmtInt(r.counts.withProxyDifficulty || 0) %> from a SERP proxy<% if ((r.counts.withDifficulty||0) - (r.counts.withProxyDifficulty||0) > 0) { %>, <%= fmtInt((r.counts.withDifficulty||0) - (r.counts.withProxyDifficulty||0)) %> measured<% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Country</div>
+      <div class="value" style="font-size:18px"><%= r.market ? r.market.name : 'not set' %></div>
+      <div class="meta">volume, difficulty and autocomplete are all for this market</div>
+    </div>
+    <div class="stat">
+      <div class="label">Branded terms excluded from ranking</div>
+      <div class="value"><%= fmtInt(r.counts.branded) %></div>
+      <div class="meta">already captured, so pushed down the list</div>
+    </div>
+    <div class="stat">
+      <div class="label">From related searches</div>
+      <div class="value"><%= fmtInt(r.counts.fromRelatedSearches || 0) %></div>
+      <div class="meta">alternative phrasings autocomplete does not give</div>
+    </div>
+    <div class="stat">
+      <div class="label">From the alphabet sweep</div>
+      <div class="value"><%= fmtInt(r.counts.fromAlphabetSweep || 0) %></div>
+      <div class="meta">long-tail completions no modifier list anticipates</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Seeds:</strong> <%= r.seeds.join(', ') %>
+        <% if (r.seedOrigin) { %><span class="muted"> — taken from <%= r.seedOrigin %></span><% } %>
+      </p>
+      <% if (r.metrics) { %>
+        <p class="hint"><strong>Where the numbers came from.</strong> <%= r.metrics.volumeBasisNote %></p>
+        <% if (r.metrics.difficultyCoverage) { %>
+          <p class="hint">
+            <strong>Difficulty coverage:
+            <%= r.metrics.difficultyCoverage.scored %> of <%= r.metrics.difficultyCoverage.total %> keywords
+            (<%= r.metrics.difficultyCoverage.pct %>%).</strong>
+            <%= r.metrics.difficultyBasisNote %>
+            <% if (r.metrics.difficultyQueued) { %>
+              <%= r.metrics.difficultyQueued %> keyword<%= r.metrics.difficultyQueued === 1 ? ' was' : 's were' %>
+              handed to the background scorer, which runs hourly and works through the queue at the pace the
+              search endpoints allow. Nothing is guessed in the meantime — an unscored keyword shows a dash
+              until it has a real number, and re-opening this report after the next pass will show more of them
+              filled in.
+            <% } %>
+            <% if (r.metrics.hydratedFromCache) { %>
+              <br><span class="muted">
+                <%= r.metrics.hydratedFromCache %> of these were scored by the background job after this run
+                finished and are shown here from the cache — the stored run itself is unchanged.
+              </span>
+            <% } %>
+          </p>
+        <% } %>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th style="width:22%">Source tried</th><th>Outcome</th></tr></thead>
+          <tbody>
+          <% r.metrics.attempted.forEach(function (a) { %>
+            <tr>
+              <td class="mono-sm"><%= a.rung %></td>
+              <td class="muted" style="font-size:12px"><%= a.outcome %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+        <% if (r.metrics.errors && r.metrics.errors.length) { %>
+          <p class="hint mt-0"><strong>Errors:</strong> <%= r.metrics.errors.join(' · ') %></p>
+        <% } %>
+        <p class="hint mt-0">
+          Sources are tried in order of trustworthiness and the first one to answer wins for that value. A row
+          can carry a measured volume, a proxy difficulty and a Trends interest from three different sources at
+          once — so each value keeps its own provenance rather than the row keeping one.
+        </p>
+      <% } %>
+      <% if (r.related && !r.related.ok && r.related.errors && r.related.errors.length) { %>
+        <p class="hint mt-0"><strong>Related searches returned nothing:</strong> <%= r.related.errors.join('; ') %></p>
+      <% } %>
+    </div>
+  </div>
+
+  <%- include('_partials/findings') %>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Topic clusters</h3>
+      <span class="muted" style="font-size:12px">Ordered by the demand evidence that exists, not by a guessed volume</span>
+    </div>
+    <div class="card-body">
+      <% if (!r.clusters.length) { %>
+        <div class="empty-state">No cluster had more than one keyword — the universe is too small or too varied to group.</div>
+      <% } else { %>
+        <div class="table-wrap"><table class="data">
+          <thead><tr>
+            <th>Cluster</th><th>Intent</th><th>Keywords</th><th>Evidence</th>
+            <th>Impressions</th><th>Volume</th><th>Avg difficulty</th><th>Priority</th><th>Suggested page type</th>
+          </tr></thead>
+          <tbody>
+          <% r.clusters.slice(0, 40).forEach(function (c) { %>
+            <tr>
+              <td>
+                <strong><%= c.primaryKeyword %></strong>
+                <% if (c.isHub) { %> <span class="badge accent">hub</span><% } %>
+                <% if (c.needsReview) { %> <span class="badge medium">loose — review</span><% } %>
+                <div class="muted" style="font-size:12px"><%= (c.supportingKeywords || []).slice(0, 6).join(', ') %></div>
+              </td>
+              <td><%= c.intent %> <span class="muted" style="font-size:11px">(<%= c.intentConfidence %>)</span></td>
+              <td><%= c.keywordCount %></td>
+              <td>
+                <% if (c.evidence === 'measured') { %><span class="badge good">measured</span>
+                <% } else if (c.evidence === 'mixed') { %><span class="badge accent"><%= c.measuredShare %>% measured</span>
+                <% } else { %><span class="badge neutral">suggested only</span><% } %>
+              </td>
+              <td><%= c.impressions ? fmtInt(c.impressions) : '—' %></td>
+              <td>
+                <% if (c.volume != null) { %>
+                  <%= fmtInt(c.volume) %>
+                  <div class="basis measured"><%= c.volumeMembers %> of <%= c.keywordCount %> members</div>
+                <% } else { %>—<% } %>
+              </td>
+              <td>
+                <% if (c.avgDifficulty != null) { %>
+                  <%= c.avgDifficulty %>
+                  <div class="basis <%= c.difficultyBasis === 'serp-proxy' ? 'proxy' : 'measured' %>">
+                    <%= c.difficultyBasis === 'serp-proxy' ? 'proxy' : c.difficultyBasis %>,
+                    <%= c.difficultyMembers %> of <%= c.keywordCount %> members
+                  </div>
+                <% } else { %>
+                  <span class="muted">—</span>
+                  <div class="basis muted">not scored yet</div>
+                <% } %>
+              </td>
+              <td><%= c.priority %></td>
+              <td class="muted" style="font-size:12px"><%= c.suggestedPageType %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+        <p class="hint">
+          <strong>Evidence, not volume.</strong> "Measured" means Search Console recorded impressions for every
+          keyword in the cluster on this site. "Suggested only" means Google offers the phrasing to people typing
+          but this site has never been shown for it — a hypothesis worth checking against a live SERP, not a
+          number to plan against.
+        </p>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (r.prompts) { %>
+  <div class="card">
+    <div class="card-head"><h3>AI-assistant prompts</h3></div>
+    <div class="card-body">
+      <%- include('_partials/aiblock', { ai: r.prompts }) %>
+      <% if (r.prompts.ok && r.prompts.data && r.prompts.data.clusters) { %>
+        <% r.prompts.data.clusters.forEach(function (c) { %>
+          <div class="disclosure">
+            <h4 style="margin:14px 0 4px"><%= c.job %>
+              <% if (c.intent) { %><span class="badge neutral"><%= c.intent %></span><% } %>
+            </h4>
+            <% if (c.contentAngle) { %><p class="muted mt-0"><%= c.contentAngle %></p><% } %>
+            <div class="table-wrap"><table class="data">
+              <thead><tr><th>Prompt someone would type</th><th>Stage</th><th>Engines</th><th>What a page needs to be cited</th></tr></thead>
+              <tbody>
+              <% (c.prompts || []).forEach(function (p) { %>
+                <tr>
+                  <td><%= p.prompt %></td>
+                  <td><span class="badge neutral"><%= p.stage || '—' %></span></td>
+                  <td class="muted" style="font-size:12px"><%= (p.engines || []).join(', ') %></td>
+                  <td class="muted" style="font-size:12px"><%= p.citationOpportunity || '—' %></td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table></div>
+          </div>
+        <% }) %>
+        <% if (r.prompts.data.gaps && r.prompts.data.gaps.length) { %>
+          <p class="hint"><strong>Gaps the model flagged:</strong> <%= r.prompts.data.gaps.join('; ') %></p>
+        <% } %>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Keyword universe</h3>
+      <span class="muted" style="font-size:12px">Top <%= Math.min(200, r.keywords.length) %> by priority</span>
+    </div>
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Reading the columns.</strong>
+        <em>Volume</em> is a measured monthly search count, and the source is printed under every value — where
+        it is blank, no volume source is configured and nothing has been guessed in its place.
+        <em>Interest</em> is Google Trends relative interest for <%= r.market ? r.market.name : 'the selected market' %>,
+        scored 0-100 against the other keywords in this run; it is the shape of demand, not a count, and it
+        cannot be converted into one.
+        <em>Difficulty</em> marked "SERP proxy" is computed here from a keyless sample of a non-Google result
+        page — hover the component line for the formula. It is a real competition signal and it is not Ahrefs KD.
+        An em dash always means unknown; it never means zero.
+      </p>
+      <div class="table-wrap scroll-y" style="max-height:640px">
+        <table class="data">
+          <thead><tr>
+            <th>Keyword</th><th>Evidence</th>
+            <th>Volume<div class="basis">monthly, measured</div></th>
+            <th>Interest<div class="basis">Trends 0-100</div></th>
+            <th>Difficulty</th>
+            <th>Impressions</th><th>Clicks</th>
+            <th>Position</th><th>Autocomplete</th><th>Priority</th><th>Why</th>
+          </tr></thead>
+          <tbody>
+          <% r.keywords.slice(0, 200).forEach(function (k) { %>
+            <tr>
+              <td>
+                <%= k.keyword %>
+                <% if (k.branded) { %> <span class="badge neutral">branded</span><% } %>
+              </td>
+              <td>
+                <% if (k.demandEvidence === 'measured+suggested') { %><span class="badge good">measured + suggested</span>
+                <% } else if (k.demandEvidence === 'measured') { %><span class="badge good">measured</span>
+                <% } else { %><span class="badge neutral">suggested</span><% } %>
+              </td>
+              <td>
+                <% if (k.volume != null) { %>
+                  <strong><%= fmtInt(k.volume) %></strong>
+                  <div class="basis measured"><%= k.volumeBasis %></div>
+                  <% if (k.cpc != null) { %><div class="basis">CPC <%= k.cpc %></div><% } %>
+                <% } else { %><span class="cell-none">—</span><% } %>
+              </td>
+              <td>
+                <% if (k.relativeInterest != null) { %>
+                  <%= k.relativeInterest %>
+                  <span class="meter"><span style="width:<%= Math.min(100, k.relativeInterest) %>%"></span></span>
+                  <% if (k.interestTrend != null) { %>
+                    <div class="basis"><%= k.interestTrend >= 0 ? '+' : '' %><%= k.interestTrend %>% trend</div>
+                  <% } %>
+                <% } else { %><span class="cell-none">—</span><% } %>
+              </td>
+              <td>
+                <% if (k.difficulty != null) { %>
+                  <strong><%= k.difficulty %></strong>
+                  <span class="meter <%= k.difficulty <= 35 ? 'good' : (k.difficulty <= 60 ? 'warn' : 'bad') %>"><span style="width:<%= k.difficulty %>%"></span></span>
+                  <div class="basis <%= k.difficultyBasis === 'serp-proxy' ? 'proxy' : 'measured' %>">
+                    <%= k.difficultyBasis === 'serp-proxy' ? 'SERP proxy' : k.difficultyBasis %>
+                  </div>
+                  <% if (k.difficultyDetail && k.difficultyDetail.components) { %>
+                    <div class="basis" title="<%= k.difficultyDetail.formula %>">
+                      auth <%= k.difficultyDetail.components.authorityShare %>% ·
+                      title <%= k.difficultyDetail.components.titleMatchShare %>% ·
+                      ugc <%= k.difficultyDetail.components.ugcShare %>%
+                    </div>
+                  <% } %>
+                <% } else if (k.difficultyUnavailable) { %>
+                  <span class="cell-none">—</span>
+                  <div class="basis" title="<%= k.difficultyUnavailable %>">not sampled</div>
+                <% } else { %><span class="cell-none">—</span><% } %>
+              </td>
+              <td><%= k.impressions == null ? '—' : fmtInt(k.impressions) %></td>
+              <td><%= k.clicks == null ? '—' : fmtInt(k.clicks) %></td>
+              <td><%= fmtPos(k.position) %></td>
+              <td><%= k.suggestRank || '—' %></td>
+              <td><%= k.score %></td>
+              <td class="muted" style="font-size:11px"><%= (k.reasons || []).join('; ') %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <%- include('_partials/provenance', { prov: r.provenance }) %>
+<% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

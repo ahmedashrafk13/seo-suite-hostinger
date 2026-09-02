@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%- include('_partials/runhead') %>
+
+<% const r = run.result; %>
+<% if (run.status === 'completed' && r && r.empty) { %>
+  <div class="notice error">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body"><%= r.reason %></div>
+  </div>
+<% } else if (run.status === 'completed' && r) { %>
+
+  <%
+  const statusBadgeFor = (s) => ({ pass: 'good', warn: 'medium', fail: 'critical' }[s] || 'neutral');
+  const statusLabel = (s) => ({ pass: 'pass', warn: 'needs attention', fail: 'fail' }[s] || s);
+  %>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Checklist</div>
+      <div class="value"><%= r.counts.pass %>/<%= r.counts.items %></div>
+      <div class="meta"><%= r.counts.fail %> failing · <%= r.counts.warn %> needing attention</div>
+    </div>
+    <div class="stat">
+      <div class="label">Pages examined</div>
+      <div class="value"><%= fmtInt(r.scope.usable) %></div>
+      <div class="meta">of <%= fmtInt(r.scope.crawled) %> fetched · <%= fmtInt(r.scope.sitemapUrls) %> in the sitemap</div>
+    </div>
+    <div class="stat">
+      <div class="label">AI retrieval fetchers blocked</div>
+      <div class="value"><%= r.retrievalBlocked.length %></div>
+      <div class="meta">of <%= r.agents.filter(function(a){ return a.purpose === 'retrieval'; }).length %> tested</div>
+    </div>
+    <div class="stat">
+      <div class="label">Crawl coverage</div>
+      <div class="value"><%= r.scope.complete ? 'complete' : 'capped' %></div>
+      <div class="meta"><%= r.scope.complete ? 'the crawl exhausted the site' : 'stopped at ' + r.scope.maxPages + ' pages' %></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0"><strong>Scope.</strong> <%= r.scope.basis %></p>
+    </div>
+  </div>
+
+  <%- include('_partials/findings') %>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>The checklist</h3>
+      <span class="muted" style="font-size:12px">Ordered by what blocks what, not by severity</span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th style="width:26%">Item</th><th style="width:10%">Verdict</th><th style="width:6%">Weight</th><th>What was found</th></tr></thead>
+        <tbody>
+        <% r.checklist.forEach(function (c) { %>
+          <tr>
+            <td><strong><%= c.item %></strong></td>
+            <td><span class="badge <%= statusBadgeFor(c.status) %>"><%= statusLabel(c.status) %></span></td>
+            <td class="muted"><%= c.weight %></td>
+            <td><%= c.summary %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint">
+        Score = the weighted share of items passing, with a warn counting half. The weights are deliberate:
+        robots.txt, important-pages-200 and content-in-HTML carry the most because a failure there means an AI
+        fetcher gets nothing at all, and structured data carries the least because a page with imperfect markup
+        is still readable.
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Per AI agent</h3>
+      <span class="muted" style="font-size:12px">robots.txt <em>and</em> the live wire response — the second is what catches an edge rule</span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Agent</th><th>Purpose</th><th>robots.txt</th><th>Live probe</th><th>Verdict</th><th>Why</th></tr></thead>
+        <tbody>
+        <% r.agents.forEach(function (a) { %>
+          <tr>
+            <td><strong><%= a.label %></strong><div class="muted" style="font-size:11px"><%= a.token %></div></td>
+            <td>
+              <% if (a.purpose === 'retrieval') { %><span class="badge accent">retrieval</span>
+              <% } else { %><span class="badge neutral">training</span><% } %>
+            </td>
+            <td><%= a.allowed ? 'allowed' : 'blocked' %><% if (a.rule) { %><div class="muted" style="font-size:11px"><%= a.rule %></div><% } %></td>
+            <td class="muted" style="font-size:12px">
+              <% if (a.probe) { %>
+                HTTP <%= a.probe.status == null ? '—' : a.probe.status %><% if (a.probe.challenge) { %> · <%= a.probe.challenge %><% } %>
+              <% } else { %>not probed<% } %>
+            </td>
+            <td>
+              <% if (a.verdict === 'reachable') { %><span class="badge good">reachable</span>
+              <% } else if (a.verdict === 'blocked') { %><span class="badge critical">blocked</span>
+              <% } else if (a.verdict === 'degraded') { %><span class="badge medium">degraded</span>
+              <% } else { %><span class="badge neutral"><%= a.verdict %></span><% } %>
+            </td>
+            <td class="muted" style="font-size:12px"><%= a.reason %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint">
+        <strong>Retrieval and training are not the same decision.</strong> A retrieval fetcher requests a page at
+        the moment someone asks a question, in order to cite it — blocking one means this site cannot appear in
+        that assistant's answers. A training crawler collects text for model training, and blocking it costs
+        nothing in visibility. A tool that reports "8 AI bots blocked" without that split tells a publisher who
+        deliberately blocked training crawlers that they have a problem, and tells a site whose WAF is silently
+        403ing PerplexityBot that they are fine.
+      </p>
+    </div>
+  </div>
+
+  <% r.checklist.forEach(function (c) { %>
+    <% if (c.status === 'pass') return; %>
+    <div class="card">
+      <div class="card-head">
+        <h3><%= c.item %></h3>
+        <span class="badge <%= statusBadgeFor(c.status) %>"><%= statusLabel(c.status) %></span>
+      </div>
+      <div class="card-body">
+        <p class="mt-0"><%= c.summary %></p>
+
+        <% if (c.key === 'sitemap_coverage' && c.detail.missingFromSitemap && c.detail.missingFromSitemap.length) { %>
+          <h4>Indexable pages missing from the sitemap (<%= c.detail.missingFromSitemap.length %>)</h4>
+          <ul class="tight">
+            <% c.detail.missingFromSitemap.slice(0, 40).forEach(function (u) { %><li class="mono-sm"><%= u %></li><% }) %>
+          </ul>
+          <% if (c.detail.inSitemapNotCrawled.length) { %>
+            <h4>Sitemap URLs the crawl did not reach (<%= c.detail.inSitemapNotCrawled.length %>)</h4>
+            <p class="hint mt-0"><%= c.detail.caveat %></p>
+            <ul class="tight">
+              <% c.detail.inSitemapNotCrawled.slice(0, 25).forEach(function (u) { %><li class="mono-sm"><%= u %></li><% }) %>
+            </ul>
+          <% } %>
+        <% } %>
+
+        <% if (c.key === 'important_200' && c.detail.failures && c.detail.failures.length) { %>
+          <p class="hint mt-0"><strong>"Important" here means:</strong> <%= c.detail.definition %></p>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>URL</th><th>Status</th><th>Why it was checked</th></tr></thead>
+            <tbody>
+            <% c.detail.failures.forEach(function (f) { %>
+              <tr><td class="mono-sm"><%= f.url %></td><td><span class="badge critical"><%= f.status || f.error %></span></td><td class="muted"><%= f.why.join('; ') %></td></tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+
+        <% if (c.key === 'no_accidental_noindex' && c.detail.noindexed && c.detail.noindexed.length) { %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>URL</th><th>Directive</th><th>In the sitemap?</th></tr></thead>
+            <tbody>
+            <% c.detail.noindexed.slice(0, 40).forEach(function (n) { %>
+              <tr>
+                <td class="mono-sm"><%= n.url %></td>
+                <td class="muted" style="font-size:12px"><%= n.robotsMeta || n.xRobots || '—' %></td>
+                <td>
+                  <% if (n.inSitemap) { %><span class="badge critical">yes — contradiction</span>
+                  <% } else { %><span class="badge neutral">no — reads as deliberate</span><% } %>
+                </td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+
+        <% if (c.key === 'canonical_correct') { %>
+          <% if (c.detail.offSite.length || c.detail.toBroken.length) { %>
+            <h4>Canonicals pointing somewhere they should not</h4>
+            <div class="table-wrap"><table class="data">
+              <thead><tr><th>Page</th><th>Canonical target</th><th>Problem</th></tr></thead>
+              <tbody>
+              <% c.detail.offSite.forEach(function (x) { %>
+                <tr><td class="mono-sm"><%= x.url %></td><td class="mono-sm"><%= x.resolved %></td><td><span class="badge critical">different host</span></td></tr>
+              <% }) %>
+              <% c.detail.toBroken.forEach(function (x) { %>
+                <tr><td class="mono-sm"><%= x.url %></td><td class="mono-sm"><%= x.resolved %></td><td><span class="badge critical">target returned HTTP <%= x.targetStatus %></span></td></tr>
+              <% }) %>
+              </tbody>
+            </table></div>
+          <% } %>
+          <% if (c.detail.collapsed.length) { %>
+            <h4>Several distinct pages collapsing onto one canonical</h4>
+            <% c.detail.collapsed.forEach(function (g) { %>
+              <p class="mt-0"><strong class="mono-sm"><%= g.canonical %></strong> <span class="muted">← <%= g.count %> pages</span></p>
+              <ul class="tight">
+                <% g.urls.forEach(function (u) { %><li class="mono-sm"><%= u %></li><% }) %>
+              </ul>
+            <% }) %>
+          <% } %>
+          <% if (c.detail.missing.length) { %>
+            <h4>Pages with no canonical (<%= c.detail.missing.length %>)</h4>
+            <ul class="tight">
+              <% c.detail.missing.slice(0, 25).forEach(function (u) { %><li class="mono-sm"><%= u %></li><% }) %>
+            </ul>
+          <% } %>
+        <% } %>
+
+        <% if (c.key === 'content_in_html') { %>
+          <% if (c.detail.clientRendered.length) { %>
+            <h4>Pages whose content arrives by JavaScript</h4>
+            <div class="table-wrap"><table class="data">
+              <thead><tr><th>URL</th><th>Words served in HTML</th><th>Scripts</th><th>SPA markers</th></tr></thead>
+              <tbody>
+              <% c.detail.clientRendered.forEach(function (x) { %>
+                <tr><td class="mono-sm"><%= x.url %></td><td><span class="badge critical"><%= x.servedWords %></span></td><td class="muted"><%= x.scriptCount %></td><td><%= x.spaMarker ? 'yes' : 'no' %></td></tr>
+              <% }) %>
+              </tbody>
+            </table></div>
+          <% } %>
+          <% if (c.detail.thin.length) { %>
+            <h4>Thin pages (under 120 words of content, no SPA markers)</h4>
+            <ul class="tight">
+              <% c.detail.thin.slice(0, 25).forEach(function (x) { %><li class="mono-sm"><%= x.url %> <span class="muted">— <%= x.contentWords %> words</span></li><% }) %>
+            </ul>
+          <% } %>
+        <% } %>
+
+        <% if (c.key === 'standard_internal_links') { %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Page</th><th>Real anchors</th><th>Not crawlable</th><th>Real share</th><th>Examples</th></tr></thead>
+            <tbody>
+            <% (c.detail.worst.length ? c.detail.worst : c.detail.rows.slice(0, 20)).forEach(function (x) { %>
+              <tr>
+                <td class="mono-sm"><%= x.url %></td>
+                <td><%= x.realAnchors %></td>
+                <td><%= x.fakeTotal %></td>
+                <td><%= x.realShare == null ? '—' : x.realShare + '%' %></td>
+                <td class="muted" style="font-size:11px">
+                  <%= (x.examples || []).slice(0, 3).map(function (e) { return e.kind + (e.text ? ' ("' + e.text + '")' : ''); }).join('; ') %>
+                </td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+
+        <% if (c.key === 'schema_matches_visible') { %>
+          <p class="hint mt-0"><%= c.detail.sampleBasis %></p>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Page</th><th>Page type</th><th>Declared</th><th>Blocks</th><th>Problems</th></tr></thead>
+            <tbody>
+            <% c.detail.rows.forEach(function (x) { %>
+              <tr>
+                <td class="mono-sm"><%= x.url %></td>
+                <td><%= x.pageTypeLabel %><% if (!x.pageTypeConfident) { %> <span class="badge medium">low confidence</span><% } %></td>
+                <td class="muted" style="font-size:12px"><%= (x.declaredTypes || []).join(', ') || '—' %></td>
+                <td><%= x.blocks %></td>
+                <td>
+                  <% if (x.ok) { %><span class="badge good">clean</span><% } %>
+                  <% (x.parseErrors || []).forEach(function (pe) { %><div><span class="badge critical">does not parse</span> <span class="muted" style="font-size:11px"><%= pe.error %></span></div><% }) %>
+                  <% (x.typeMismatches || []).forEach(function (m) { %><div><span class="badge critical">wrong type: <%= m.declared %></span></div><% }) %>
+                  <% (x.faqMismatches || []).forEach(function (m) { %><div><span class="badge critical">FAQ answer not visible</span> <span class="muted" style="font-size:11px"><%= m.question %></span></div><% }) %>
+                  <% (x.mismatches || []).forEach(function (m) { %><div><span class="badge medium"><%= m.property %> not on page</span> <span class="muted" style="font-size:11px">"<%= m.markupValue %>"</span></div><% }) %>
+                </td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+      </div>
+    </div>
+  <% }) %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>llms.txt:</strong> <%= r.llmsTxt.present ? 'present' : 'absent' %>.
+        <%= r.llmsTxt.note %>
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/provenance', { prov: r.provenance }) %>
+<% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

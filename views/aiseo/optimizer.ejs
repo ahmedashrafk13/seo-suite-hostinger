@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Scores a live URL or a pasted draft</strong> on semantic coverage against the pages it competes
+        with, readability, entity density, target-term placement, and citability — whether an AI answer engine
+        can lift a passage and attribute it. Every one of those is computed locally and returns the same number
+        twice; the AI model is used only to turn the measured gaps into edits a writer can paste.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <div class="card">
+    <div class="card-head"><h3>Score a page</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/ai-seo/optimizer/run">
+        <% if (brand) { %><input type="hidden" name="brand_id" value="<%= brand.id %>"><% } %>
+        <div class="field">
+          <label for="url">Page URL</label>
+          <input type="url" id="url" name="url" placeholder="https://example.com/certification/aml">
+        </div>
+        <div class="field">
+          <label for="keyword">Target term <span class="muted">(required — the score is relative to it)</span></label>
+          <input type="text" id="keyword" name="keyword" placeholder="aml certification">
+        </div>
+        <div class="field">
+          <label for="draft">Or paste a draft <span class="muted">(HTML or plain text — scored exactly as given, so plain text scores low on structure, correctly)</span></label>
+          <textarea id="draft" name="draft" rows="6" placeholder="<h1>…</h1><p>…</p>"></textarea>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="field">
+          <label for="competitor_urls">Comparison pages <span class="muted">(one URL per line — the most accurate option, because you know who you compete with)</span></label>
+          <textarea id="competitor_urls" name="competitor_urls" rows="4" placeholder="https://competitor-one.com/their-page&#10;https://competitor-two.com/their-page"></textarea>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="auto_competitors" checked>
+            Otherwise find the best-matching page on each configured competitor domain
+            <span class="muted">(by reading their sitemaps and scoring URLs against the target term)</span>
+          </label>
+        </div>
+        <% if (brand) { %>
+          <p class="hint mt-0">
+            <% if (competitors && competitors.length) { %>
+              Configured competitors for <%= brand.name %>: <%= competitors.map(function(c){ return c.domain; }).join(', ') %>.
+            <% } else { %>
+              No competitors configured for <%= brand.name %>, so automatic discovery has nothing to search.
+              <a href="/ai-seo/competitors?brand=<%= brand.id %>">Add some</a>, or paste URLs above.
+            <% } %>
+          </p>
+        <% } %>
+        <p class="hint mt-0">
+          There is no SERP API credential in this deployment, so "the current top 10" cannot be fetched, and
+          scraping Google's results page would degrade silently to comparing against nothing. The comparison
+          set is therefore always named on the result page, and the score states which pages produced it.
+        </p>
+
+        <div class="section-divider"></div>
+
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="want_ai" <%= aiAvailable ? 'checked' : 'disabled' %>>
+            Ask the model for in-line edits based on the measured gaps
+            <% if (!aiAvailable) { %><span class="muted">— needs an Azure OpenAI credential</span><% } %>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check"><input type="checkbox" name="force" value="1"> Regenerate rather than reusing the cached edit suggestions</label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite ? '' : 'disabled' %>>Score it</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

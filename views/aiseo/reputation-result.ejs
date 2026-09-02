@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%- include('_partials/runhead') %>
+
+<% const r = run.result; %>
+<% if (run.status === 'completed' && r && r.empty) { %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body"><%= r.reason %></div>
+  </div>
+<% } else if (run.status === 'completed' && r) { %>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Mentions counted</div>
+      <div class="value"><%= fmtInt(r.mix.total) %></div>
+      <div class="meta">
+        <%= r.newThisScan %> new in this scan · <%= r.scanned %> screened, <%= r.rejected %> did not name the brand
+        <% if (r.mix.unclear) { %><br><%= r.mix.unclear %> named it but are about something else — excluded below<% } %>
+      </div>
+    </div>
+    <div class="stat">
+      <div class="label">Net sentiment</div>
+      <div class="value"><%= r.netSentiment == null ? '—' : r.netSentiment %></div>
+      <div class="meta"><%= r.mix.positive %> positive · <%= r.mix.negative %> negative · <%= r.mix.neutral %> neutral</div>
+    </div>
+    <div class="stat">
+      <div class="label">Damaging claims</div>
+      <div class="value"><%= r.mix.risky %></div>
+      <div class="meta"><%= r.mix.unreviewed %> not yet reviewed</div>
+    </div>
+    <div class="stat">
+      <div class="label">Watch terms</div>
+      <div class="value sm"><%= r.terms.join(', ') %></div>
+    </div>
+  </div>
+
+  <%- include('_partials/findings') %>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Is it the right company?</h3>
+      <span class="muted" style="font-size:12px">
+        <%= r.confidence.usable ? r.confidence.termCount + ' topic terms from ' + r.confidence.context : 'no topic context available' %>
+      </span>
+    </div>
+    <div class="card-body">
+      <p class="hint mt-0">
+        A brand name is rarely unique. Searching "Wix" returns the website builder <em>and</em> WIX Filters, the
+        car-parts manufacturer — a real result from a real scan. Word-boundary matching cannot separate them,
+        because the word really is there; only the topic can. Each mention is therefore scored for whether it
+        also discusses something this brand actually does.
+      </p>
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Confidence</th><th>Mentions</th><th>What it means</th><th>Counted in the totals?</th></tr></thead>
+        <tbody>
+        <%
+        const MEANING = {
+          certain: 'Names the brand\'s own domain — nothing else does that.',
+          likely: 'Also discusses something the brand does.',
+          unassessable: 'No topic context exists for this brand yet, so this could not be judged.',
+          unclear: 'The name appears, but nothing in the text relates to what this brand does.',
+        };
+        %>
+        <% r.mix.byConfidence.forEach(function (b) { %>
+          <tr>
+            <td>
+              <span class="badge <%= b.level === 'certain' ? 'good' : (b.level === 'likely' ? 'accent' : (b.level === 'unclear' ? 'medium' : 'neutral')) %>">
+                <%= b.level %>
+              </span>
+            </td>
+            <td><%= fmtInt(b.count) %></td>
+            <td class="muted"><%= MEANING[b.level] %></td>
+            <td><%= b.level === 'unclear' ? 'no — stored and listed below' : 'yes' %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <% if (!r.confidence.usable) { %>
+        <p class="hint" style="margin-bottom:0">
+          <strong>Confidence could not be assessed.</strong> Topic context is derived from the brand's own
+          non-branded Search Console queries, and there is not enough history yet. Nothing has been excluded on
+          the strength of a signal that does not exist — every mention is counted, and a name shared with
+          another company would inflate these numbers until the history arrives.
+        </p>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (r.unclearMentions && r.unclearMentions.length) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>Named the brand, but about something else</h3>
+      <span class="badge medium">excluded from the totals</span>
+    </div>
+    <div class="card-body">
+      <p class="hint mt-0">
+        Listed rather than discarded: the judgement is a heuristic, so a wrongly-excluded mention must still be
+        visible. If these <em>are</em> about the brand, the topic context is too narrow — if they are not, add a
+        more specific watch term so the search stops returning them.
+      </p>
+      <div class="table-wrap scroll-y" style="max-height:360px">
+        <table class="data">
+          <thead><tr><th>Source</th><th>Mention</th><th>Why it was excluded</th></tr></thead>
+          <tbody>
+          <% r.unclearMentions.forEach(function (m) { %>
+            <tr>
+              <td class="muted"><%= m.source %></td>
+              <td class="truncate" style="max-width:420px"><a href="<%= m.url %>" target="_blank" rel="noopener"><%= m.title || m.url %></a></td>
+              <td class="muted" style="font-size:11px"><%= m.confidence_why || '—' %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="card">
+    <div class="card-head"><h3>Per-source result</h3></div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Source</th><th>Stored for this brand</th><th>Returned in this scan</th><th>Per-term status</th></tr></thead>
+        <tbody>
+        <% r.bySource.forEach(function (s) { %>
+          <tr>
+            <td>
+              <strong><%= s.label %></strong>
+              <% if (s.tiers && Object.keys(s.tiers).length) { %>
+                <div class="muted" style="font-size:11px">
+                  answered by:
+                  <% Object.keys(s.tiers).forEach(function (t) { %><span class="badge neutral"><%= t %> (<%= s.tiers[t] %>)</span><% }) %>
+                </div>
+              <% } %>
+            </td>
+            <td><%= s.stored %></td>
+            <td><%= s.thisScan %></td>
+            <td>
+              <% s.status.forEach(function (x) { %>
+                <span class="badge <%= x.ok ? (x.items ? 'good' : 'neutral') : 'critical' %>" title="<%= x.error || '' %>">
+                  <%= x.term %><% if (x.tier) { %> <span style="opacity:.7">[<%= x.tier %>]</span><% } %>:
+                  <%= x.ok ? x.items + ' items' : 'failed' %>
+                </span>
+              <% }) %>
+            </td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint" style="margin-bottom:0">
+        Per-source failures are reported rather than swallowed, because a silently failing source looks exactly
+        like a quiet one. A single failure is usually rate limiting and clears on its own; a source that fails
+        on every scan should be treated as absent coverage, not as a clean result.
+      </p>
+    </div>
+  </div>
+
+  <% if (r.reddit) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>How Reddit was reached</h3>
+      <span class="muted" style="font-size:12px">
+        <%= r.reddit.authenticated ? 'authenticated API' : 'no credential — scraped' %>
+      </span>
+    </div>
+    <div class="card-body">
+      <p class="hint mt-0">
+        Reddit is the source an assistant leans on hardest for "is this brand any good", and the most
+        defended. Four endpoints are tried in order and the one that answered is recorded, because it changes
+        what the data contains: the RSS feed carries the post body but no score, while the authenticated API
+        carries scores and comment counts. Comparing engagement between two scans that used different
+        endpoints would be comparing different things.
+      </p>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="label">Requests made</div>
+          <div class="value"><%= r.reddit.requests %></div>
+          <% if (r.reddit.retries) { %><div class="meta"><%= r.reddit.retries %> recovered by retry after a cooldown</div><% } %>
+        </div>
+        <div class="stat">
+          <div class="label">Rate limits hit</div>
+          <div class="value"><%= r.reddit.totalBlocks %></div>
+          <div class="meta"><%= r.reddit.hardBlocked ? 'gave up and kept what it had' : 'backed off and continued' %></div>
+        </div>
+        <div class="stat">
+          <div class="label">Searches abandoned</div>
+          <div class="value"><%= r.reddit.abandoned %></div>
+          <div class="meta">after the block threshold</div>
+        </div>
+        <div class="stat">
+          <div class="label">Subreddits searched</div>
+          <div class="value"><%= (r.watchSubreddits || []).length %></div>
+          <div class="meta"><%= (r.watchSubreddits || []).length ? r.watchSubreddits.map(function (x) { return 'r/' + x; }).join(', ') : 'sitewide only' %></div>
+        </div>
+      </div>
+      <% if (r.reddit.closedEndpoints && r.reddit.closedEndpoints.length) { %>
+        <p class="hint" style="margin-bottom:0">
+          <strong>Endpoints closed to us during this scan:</strong>
+          <%= r.reddit.closedEndpoints.join(', ') %>.
+          Each answered HTTP 403 once and was then skipped for the rest of the run — retrying a
+          permanently-closed endpoint per search term would spend the request budget on a guaranteed failure
+          and push the endpoints that DO work into the rate limit.
+        </p>
+      <% } %>
+      <% if (!r.reddit.authenticated) { %>
+        <p class="hint" style="margin-bottom:0">
+          Running without a Reddit credential. That works — the RSS tier answers — but it is rate-limited and
+          carries no post scores or comment bodies. A free "script" app at
+          <code>reddit.com/prefs/apps</code> (<code>REDDIT_CLIENT_ID</code> / <code>REDDIT_CLIENT_SECRET</code>)
+          removes the rate limiting and adds both.
+        </p>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (r.triage) { %>
+  <div class="card">
+    <div class="card-head"><h3>Triage of the damaging claims</h3></div>
+    <div class="card-body">
+      <%- include('_partials/aiblock', { ai: r.triage }) %>
+      <% if (r.triage.ok && r.triage.data && r.triage.data.triaged) { %>
+        <% r.triage.data.triaged.forEach(function (t) { %>
+          <div class="alert-item">
+            <div class="alert-head">
+              <span class="dot-sev <%= t.severity || 'medium' %>"></span>
+              <strong><a href="<%= t.url %>" target="_blank" rel="noopener"><%= shortUrl(t.url, 80) %></a></strong>
+              <span class="badge neutral"><%= t.claimType %></span>
+              <% if (!t.aboutThisBrand) { %><span class="badge medium">may not be about this brand</span><% } %>
+              <span class="badge <%= t.recommendedResponse === 'ignore' || t.recommendedResponse === 'monitor' ? 'neutral' : 'high' %>"><%= t.recommendedResponse %></span>
+            </div>
+            <div class="alert-body">
+              <p class="mt-0"><strong>Verifiable:</strong> <%= t.verifiable ? 'yes' : 'no' %>
+                <% if (t.whatWouldSettleIt) { %> — <%= t.whatWouldSettleIt %><% } %>
+              </p>
+              <% if (t.draftResponse) { %>
+                <p class="mt-0"><strong>Draft response:</strong></p>
+                <p class="pre" style="font-size:12px;white-space:pre-wrap"><%= t.draftResponse %></p>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+        <p class="hint" style="margin-bottom:0">
+          The model is not asked whether a claim is true — it cannot know. It is asked what KIND of statement it
+          is, and what would establish it. Read every draft response before it goes anywhere near a public thread.
+        </p>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="card">
+    <div class="card-head"><h3>Mentions</h3></div>
+    <div class="card-body">
+      <% if (!r.mentions.length) { %>
+        <div class="empty-state">Nothing stored yet.</div>
+      <% } else { %>
+        <div class="table-wrap scroll-y" style="max-height:600px">
+          <table class="data">
+            <thead><tr><th>Source</th><th>Mention</th><th>Confidence</th><th>Sentiment</th><th>Risk</th><th>Engagement</th><th>Published</th></tr></thead>
+            <tbody>
+            <% r.mentions.forEach(function (m) { %>
+              <tr>
+                <td class="muted"><%= m.source %></td>
+                <td style="max-width:520px">
+                  <a href="<%= m.url %>" target="_blank" rel="noopener"><%= m.title || m.url %></a>
+                  <% if (m.snippet) { %><div class="muted" style="font-size:11px"><%= m.snippet.slice(0, 220) %></div><% } %>
+                </td>
+                <td>
+                  <span class="badge <%= m.confidence === 'certain' ? 'good' : (m.confidence === 'likely' ? 'accent' : (m.confidence === 'unclear' ? 'medium' : 'neutral')) %>"
+                        title="<%= m.confidence_why || '' %>"><%= m.confidence || 'unassessed' %></span>
+                </td>
+                <td><span class="badge <%= m.sentiment === 'negative' ? 'critical' : (m.sentiment === 'positive' ? 'good' : 'neutral') %>"><%= m.sentiment %></span></td>
+                <td><% if (m.risk) { %><span class="badge critical"><%= m.risk %></span><% } else { %>—<% } %></td>
+                <td><%= m.engagement || '—' %></td>
+                <td class="muted"><%= fmtDate(m.published_at || m.first_seen_at) %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Sources deliberately not monitored</h3></div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Source</th><th>Why not</th></tr></thead>
+        <tbody>
+        <% r.notMonitored.forEach(function (n) { %>
+          <tr><td><strong><%= n.label %></strong></td><td class="muted"><%= n.why %></td></tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <%- include('_partials/provenance', { prov: r.provenance }) %>
+<% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

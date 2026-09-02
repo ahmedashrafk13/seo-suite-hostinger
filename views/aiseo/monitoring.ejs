@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Every tracking element on one board</strong> — crawlability and indexation, Core Web Vitals,
+        speed and TTFB, SSL and security headers, redirect chains, canonicals, structured data, JavaScript
+        rendering, server-side crawl signals, mobile usability, titles and meta descriptions, heading structure,
+        content quality and cannibalisation, internal linking, image optimisation, URL structure, and AI
+        crawler access. Each check stores its value <em>and</em> its verdict, so the board answers "did something
+        break" rather than only "what is it now".
+      </p>
+      <p class="hint" style="margin-bottom:0">
+        A check that cannot measure returns <strong>unknown</strong>, never <strong>good</strong>. Collapsing
+        those two is how a monitoring system reports green through an outage, so they are coloured differently
+        and unknown metrics are excluded from the board score on both sides of the ratio.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <% if (brand) { %>
+  <div class="card">
+    <div class="card-head"><h3>Run a sweep</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/ai-seo/monitoring/run">
+        <input type="hidden" name="brand_id" value="<%= brand.id %>">
+        <div class="field-row">
+          <label class="field">
+            <span>Scope</span>
+            <select name="scope">
+              <option value="sample" selected>Sampled — a deliberate 12-URL cross-section</option>
+              <option value="sitewide">Sitewide — every URL in the sitemap and every page with traffic</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Sample size for page-scoped checks</span>
+            <select name="sample_size">
+              <option value="6">6 — fast</option>
+              <option value="12" selected>12 — default</option>
+              <option value="20">20</option>
+              <option value="30">30 — slow</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Sitewide cap</span>
+            <select name="sitewide_cap">
+              <option value="500">500 URLs</option>
+              <option value="1500">1,500 URLs</option>
+              <option value="3000" selected>3,000 URLs</option>
+              <option value="10000">10,000 URLs — slow</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint mt-0">
+          <strong>A sample answers "is there a problem"; it cannot answer "which pages".</strong>
+          Sampled scope runs every check against the same deliberate 12-URL cross-section — the homepage, the
+          highest-impression pages, and one page per sitemap section — which is enough to detect a templating
+          fault and cheap enough to run nightly.
+          Sitewide scope additionally hands the FULL URL set to the checks that can absorb it: broken pages,
+          canonical health and title/meta duplication. The rest keep the sample, because running PageSpeed
+          against three thousand URLs would exhaust the daily quota on the first brand. Each check on the result
+          page says which set it actually used, so a count is never read against the wrong denominator.
+        </p>
+
+        <p class="hint mt-0">
+          <strong>How the sample is chosen, and why it matters.</strong> The homepage always, then the
+          highest-impression pages from Search Console, then one page per distinct sitemap section. That last
+          part is what makes it <em>representative</em> rather than merely important: a templating fault usually
+          affects one section, and a sample drawn only from top pages would miss a broken section entirely
+          because it has no traffic yet. The composition is recorded on every run, so "3 pages have no H1" is
+          never mistaken for "3 pages on the whole site".
+        </p>
+
+        <div class="field">
+          <label>Restrict to specific checks <span class="muted">(leave all unticked for a full sweep)</span></label>
+          <% grouped.forEach(function (g) { %>
+            <div style="margin-bottom:8px">
+              <div class="nav-section" style="padding-left:0"><%= g.group %></div>
+              <div class="checkbox-row" style="flex-wrap:wrap;gap:10px">
+                <% g.items.forEach(function (c) {
+                     const av = availability.find(function (a) { return a.key === c.key; }); %>
+                  <label class="check" style="min-width:260px" title="<%= c.whatItTracks %>">
+                    <input type="checkbox" name="checks" value="<%= c.key %>" <%= av && av.available ? '' : 'disabled' %>>
+                    <%= c.element %>
+                    <% if (av && !av.available) { %>
+                      <span class="muted">— needs <%= av.missing.map(function (m) { return m.label; }).join(', ') %></span>
+                    <% } %>
+                  </label>
+                <% }) %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite ? '' : 'disabled' %>>Run sweep</button>
+        </div>
+        <p class="hint">
+          Checks run one after another, not in parallel: they hit the same origin, the same PageSpeed quota and
+          the same small memory allowance on this host, and fourteen at once is how a sweep gets rate-limited
+          into reporting "unknown" for half the board. A full sweep at the default sample size takes a few minutes.
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <% if (board && board.latest && board.latest.result && board.latest.result.byGroup) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>Latest sweep</h3>
+      <span class="muted" style="font-size:12px"><%= fmtDateTime(board.latest.finished_at) %></span>
+    </div>
+    <div class="card-body">
+      <div class="grid cols-4">
+        <% board.latest.result.byGroup.forEach(function (g) { %>
+          <div class="setup-row">
+            <span class="setup-mark">
+              <% if (g.status === 'good') { %>&#10003;
+              <% } else if (g.status === 'fail') { %>&#10007;
+              <% } else if (g.status === 'warn') { %>!
+              <% } else { %>?<% } %>
+            </span>
+            <div class="setup-body">
+              <strong><%= g.group %></strong>
+              <div class="muted" style="font-size:11px">
+                <%= g.checks %> check<%= g.checks === 1 ? '' : 's' %><%= g.failing ? ' · ' + g.failing + ' failing' : '' %>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+      <div class="btn-row" style="margin-top:14px">
+        <a class="btn secondary sm" href="/ai-seo/monitoring/<%= board.latest.id %>">Open the full board &rarr;</a>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (board && board.metrics && board.metrics.length) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>Current metric values</h3>
+      <span class="muted" style="font-size:12px">Newest capture per metric</span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap scroll-y" style="max-height:560px">
+        <table class="data">
+          <thead><tr><th>Metric</th><th>URL</th><th>Value</th><th>Verdict</th><th>Captured</th><th>Detail</th></tr></thead>
+          <tbody>
+          <% board.metrics.forEach(function (m) { %>
+            <tr>
+              <td><code><%= m.metric_key %></code></td>
+              <td class="truncate muted" style="max-width:220px"><%= m.url ? shortUrl(m.url, 44) : 'site-wide' %></td>
+              <td><%= m.value == null ? '—' : m.value %></td>
+              <td>
+                <span class="badge <%= m.status === 'good' ? 'good' : (m.status === 'warn' ? 'medium' : (m.status === 'fail' ? 'critical' : 'neutral')) %>">
+                  <%= m.status || 'unknown' %>
+                </span>
+              </td>
+              <td class="muted"><%= fmtDateTime(m.captured_at) %></td>
+              <td class="muted" style="font-size:11px"><%= m.detail || '—' %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint" style="margin-bottom:0">
+        Each row's history is available as JSON at
+        <code>/ai-seo/monitoring/series/&lt;metric&gt;?brand=<%= brand.id %></code> — which is also what the
+        alert engine reads when it decides a metric has regressed.
+      </p>
+    </div>
+  </div>
+  <% } %>
+  <% } %>
+
+  <div class="card">
+    <div class="card-head"><h3>What each element tracks, and why</h3></div>
+    <div class="card-body">
+      <% grouped.forEach(function (g) { %>
+        <h4><%= g.group %></h4>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th style="width:22%">Element</th><th style="width:30%">What it tracks</th><th style="width:34%">Why it matters</th><th>Scope</th></tr></thead>
+          <tbody>
+          <% g.items.forEach(function (c) { const av = availability.find(function (a) { return a.key === c.key; }); %>
+            <tr>
+              <td>
+                <strong><%= c.element %></strong>
+                <% if (av && !av.available) { %>
+                  <div><span class="badge neutral">needs <%= av.missing.map(function (m) { return m.label; }).join(', ') %></span></div>
+                <% } %>
+              </td>
+              <td class="muted"><%= c.whatItTracks %></td>
+              <td class="muted"><%= c.whyItMatters %></td>
+              <td><span class="badge neutral"><%= c.scope === 'page' ? 'sampled pages' : 'site-wide' %></span></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+      <% }) %>
+    </div>
+  </div>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

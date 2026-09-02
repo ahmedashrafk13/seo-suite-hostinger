@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Every other AI SEO report here measures whether a page <em>could</em> be cited. This one measures
+        what that produced.</strong> When someone reads an answer in ChatGPT or Perplexity and clicks the link
+        to this site, GA4 records the assistant as the session source. That is a measurement of a real person
+        arriving, not an estimate of a model's behaviour — and it needs no paid citation-tracking credential.
+      </p>
+      <p class="hint" style="margin-bottom:0">
+        <strong>Read the number as a floor, not a total.</strong> An assistant that named the brand in an answer
+        nobody clicked leaves no trace in analytics, and Google AI Overviews are reported by GA4 as
+        <code>google / organic</code> — indistinguishable from an ordinary blue-link click. Nothing here
+        estimates either. What is counted was measured; what cannot be measured is named on the result page
+        rather than quietly filled in.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <div class="card">
+    <div class="card-head"><h3>Measure AI referral traffic</h3></div>
+    <div class="card-body">
+      <% if (brand && !ga4Linked) { %>
+        <p class="hint" style="color:var(--critical,#b91c1c)">
+          <strong>No GA4 property is paired with this brand.</strong> This report reads GA4 session sources, so
+          it has nothing to read until a property is linked on the brand.
+        </p>
+      <% } %>
+      <form method="POST" action="/ai-seo/ai-referrals/run">
+        <% if (brand) { %><input type="hidden" name="brand_id" value="<%= brand.id %>"><% } %>
+        <div class="field">
+          <label for="days">Window</label>
+          <select id="days" name="days">
+            <option value="28">Last 28 days</option>
+            <option value="90" selected>Last 90 days</option>
+            <option value="180">Last 180 days</option>
+            <option value="365">Last 365 days</option>
+          </select>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="include_landing_pages" checked>
+            Also break down which pages the assistants send people to
+            <span class="muted">(one extra GA4 report)</span>
+          </label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite ? '' : 'disabled' %>>Measure AI referrals</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Assistants counted</h3></div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Assistant</th><th>Counted as AI referral</th><th>GA4 session sources matched</th></tr></thead>
+        <tbody>
+        <% aiSources.forEach(function (s) { %>
+          <tr>
+            <td><%= s.label %></td>
+            <td><span class="badge good">yes</span></td>
+            <td class="muted" style="font-size:12px"><code><%= s.match.join(', ') %></code></td>
+          </tr>
+        <% }) %>
+        <% ambiguousSources.forEach(function (s) { %>
+          <tr>
+            <td><%= s.label %></td>
+            <td><span class="badge medium">reported separately</span></td>
+            <td class="muted" style="font-size:12px"><code><%= s.match.join(', ') %></code></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint" style="margin-bottom:0">
+        Hostnames are matched as substrings rather than exact strings on purpose. Assistants rename themselves —
+        <code>chat.openai.com</code> became <code>chatgpt.com</code>, <code>bard.google.com</code> became
+        <code>gemini.google.com</code> — and GA4 keeps whatever the referrer said at the time. An exact-match
+        list would silently drop the history. Bing is kept out of the headline number because it carries Copilot
+        answer clicks and ordinary Bing searches under one name, with no way to split them.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

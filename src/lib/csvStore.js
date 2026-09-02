@@ -362,8 +362,13 @@ function normaliseAuditFindings(jsonResult) {
   const findings = parsed.findings.map((f) => {
     const severity = TIER_TO_SEVERITY[f.display] || 'medium';
     const items = (f.items || []).map((i) => {
-      if (typeof i === 'string') return { url: i, note: null };
-      return { url: i.url || i.page || i.link || null, note: i.note || i.detail || i.status || i.title || null, raw: i };
+      if (typeof i === 'string') return { url: i, note: null, sources: null };
+      return {
+        url: i.url || i.page || i.link || null,
+        note: i.note || i.detail || i.status || i.title || null,
+        sources: Array.isArray(i.sources) ? i.sources : null,
+        raw: i,
+      };
     });
     return {
       id: f.id,

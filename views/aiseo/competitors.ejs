@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>What this report measures, and what it samples.</strong>
+        Everything about a competitor's content — their inventory, their topics, their entities, their anchor
+        text, their schema, their publishing rate, their AI-retrieval posture — is measured from a live fetch of
+        their site. Referring domains are a <em>verified sample</em>: candidate pages are found by a keyless web
+        search, then each one is fetched and its outbound links read, so every domain counted carries a real link
+        — but the candidate list is capped, so the counts are floors rather than totals. Keyword positions are
+        read from a keyless result page unless a rank-tracker credential is configured, and are labelled
+        accordingly. Organic traffic estimates and actual AI citation share are not available at all and are not
+        shown.
+      </p>
+      <p class="hint">
+        <strong>The gap lists are filtered.</strong> A competitor's own brand name is structurally the entity
+        most certain to appear on their pages and not on this one, so before filtering it topped every list and
+        the report was advising the client to write about their rivals. Competitor brand names, generic button
+        and section labels ("Learn More", "Why Choose Us", "Office Headquarters") and each site's own template
+        text are now suppressed — and what was suppressed is listed on the result page, because a filter nobody
+        can inspect is a filter nobody can trust.
+      </p>
+
+      <p class="hint" style="margin-bottom:0">
+        <strong>What is still not available at all:</strong>
+        <% if (notMeasured && notMeasured.length) { %>
+          organic traffic estimates, and which pages AI assistants actually cite. Nothing is shown for either —
+          a fabricated traffic figure is indistinguishable on screen from a real one. Referring domains and
+          keyword positions <em>are</em> now produced, as the verified sample and the labelled non-Google
+          comparison described above; configuring
+          <%= notMeasured.map(function (p) { return p.label; }).join(', ') %>
+          replaces the samples with complete counts and the sampled positions with live Google SERPs. The
+          adapters exist — set the environment variables and they activate.
+        <% } else { %>
+          nothing — every configured provider is available, so every table on the result page uses measured data
+          rather than a sample.
+        <% } %>
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <% if (brand) { %>
+  <div class="card">
+    <div class="card-head"><h3>Competitors for <%= brand.name %></h3></div>
+    <div class="card-body">
+      <% if (!competitors.length) { %>
+        <div class="empty-state">
+          None yet. Name two to four domains you genuinely compete with — a list guessed from SERP overlap on a
+          small keyword set is wrong often enough to waste the crawl it costs.
+        </div>
+      <% } else { %>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Domain</th><th>Label</th><th>Active</th><th>Added</th><th></th></tr></thead>
+          <tbody>
+          <% competitors.forEach(function (c) { %>
+            <tr>
+              <td><a href="https://<%= c.domain %>" target="_blank" rel="noopener"><%= c.domain %></a></td>
+              <td class="muted"><%= c.label || '—' %></td>
+              <td><%= c.active ? 'yes' : 'no' %></td>
+              <td class="muted"><%= fmtDate(c.created_at) %></td>
+              <td>
+                <% if (perms.canWrite) { %>
+                  <form method="POST" action="/ai-seo/competitors/<%= c.id %>/remove" class="inline-form">
+                    <input type="hidden" name="brand_id" value="<%= brand.id %>">
+                    <button type="submit" class="btn danger-ghost xs">Remove</button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+      <% } %>
+
+      <form method="POST" action="/ai-seo/competitors/add" style="margin-top:14px">
+        <input type="hidden" name="brand_id" value="<%= brand.id %>">
+        <div class="field">
+          <label for="domains">Add competitors <span class="muted">(one per line — optionally <code>domain.com | Their label</code>)</span></label>
+          <textarea id="domains" name="domains" rows="3" placeholder="competitor-one.com | The incumbent&#10;competitor-two.com"></textarea>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn secondary" <%= perms.canWrite ? '' : 'disabled' %>>Save competitors</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Run the comparison</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/ai-seo/competitors/run">
+        <input type="hidden" name="brand_id" value="<%= brand.id %>">
+        <div class="field-row">
+          <label class="field">
+            <span>Pages to crawl per site</span>
+            <select name="max_pages">
+              <option value="15">15 — quick</option>
+              <option value="30" selected>30 — default</option>
+              <option value="60">60</option>
+              <option value="120">120 — slow, and it crawls every site</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Country <span class="muted">(for the keyword gap)</span></span>
+            <select name="country">
+              <% marketList.forEach(function (mk) { %>
+                <option value="<%= mk.code %>" <%= mk.code === selectedMarket ? 'selected' : '' %>><%= mk.name %></option>
+              <% }) %>
+            </select>
+          </label>
+          <label class="field">
+            <span>Keywords in the gap table</span>
+            <select name="keyword_gap_limit">
+              <option value="10">10 — fastest</option>
+              <option value="25" selected>25</option>
+              <option value="40">40</option>
+              <option value="60">60 — slow</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Backlink sample per site</span>
+            <select name="backlink_sample_limit">
+              <option value="10">10 candidates</option>
+              <option value="20" selected>20 candidates</option>
+              <option value="35">35 candidates</option>
+              <option value="50">50 candidates — slow</option>
+            </select>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="include_matrix" checked>
+            Build the topic coverage matrix
+            <span class="muted">— one row per topic, one column per site, one score computed identically for everybody. Replaces the two flat gap lists, which said what was missing but not how far behind.</span>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="include_keyword_gap" checked>
+            Build the keyword gap table
+            <span class="muted">— where each site appears for each candidate keyword. Measured against Google where a rank-tracker credential exists; otherwise read from a keyless result sample and labelled as not-Google on every row.</span>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="include_backlink_gap" checked>
+            Build the backlink gap table
+            <span class="muted">— referring domains per site, and the domains linking to a competitor and not to this brand. Every candidate page is fetched and its outbound links read, so a domain only counts where a real link exists.</span>
+          </label>
+        </div>
+
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="want_ai" <%= aiAvailable ? 'checked' : 'disabled' %>>
+            Ask the model to prioritise the gaps and say which ones not to chase
+            <% if (!aiAvailable) { %><span class="muted">— needs an Azure OpenAI credential</span><% } %>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check"><input type="checkbox" name="force" value="1"> Regenerate rather than reusing the cached prioritisation</label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite && competitors.filter(function(c){ return c.active; }).length ? '' : 'disabled' %>>
+            Run comparison
+          </button>
+        </div>
+        <p class="hint">
+          This crawls this site plus up to five competitor sites, so with a 30-page budget it makes roughly
+          180 requests and takes a few minutes. It runs in the background — the result page refreshes itself.
+        </p>
+      </form>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

@@ -12,6 +12,7 @@
 // someone on the SEO team has explicitly approved it. The list is defined
 // once, here, and matched against every task as it is created.
 const db = require('../db');
+const csvStore = require('./csvStore');
 
 // The restricted actions, straight from the operating rule.
 const APPROVAL_RULES = [
@@ -43,6 +44,14 @@ const SOURCES = {
   audit: 'Technical audit',
   linking: 'Internal linking',
   opportunity: 'Content opportunity',
+  // The AI SEO suite: research, on-page scoring, schema, AI-crawler readiness,
+  // architecture, competitive intelligence, reputation, freshness and the
+  // tracking board all file work under one source. They share a source rather
+  // than getting nine of their own because a task's source answers "where do I
+  // go to see the evidence", and for all nine that answer is the run page
+  // recorded in source_ref.
+  aiseo: 'AI SEO suite',
+  pagespeed: 'PageSpeed',
   manual: 'Added by hand',
 };
 
@@ -85,16 +94,18 @@ function upsertTask({
       // pages" — and the title is the part anyone actually reads in a list.
       //
       // Human edits win: `update()` logs an `edited` event, so a task whose
-      // title someone has deliberately rewritten keeps that wording and only
-      // its detail and evidence are refreshed.
+      // title or detail someone has deliberately rewritten keeps that wording
+      // — only severity/priority/evidence/affected_url are refreshed. Only
+      // guarding the title (and still overwriting a hand-edited detail) would
+      // contradict the same "human edits win" claim it makes.
       const manuallyEdited = db.prepare(
         "SELECT COUNT(*) c FROM task_events WHERE task_id=? AND kind='edited'",
       ).get(existing.id).c > 0;
 
       if (manuallyEdited) {
-        db.prepare(`UPDATE tasks SET detail=?, severity=?, priority=?, evidence_json=?,
+        db.prepare(`UPDATE tasks SET severity=?, priority=?, evidence_json=?,
           affected_url=COALESCE(?, affected_url), updated_at=datetime('now') WHERE id=?`)
-          .run(detail, severity, priority, evidenceJson, affectedUrl, existing.id);
+          .run(severity, priority, evidenceJson, affectedUrl, existing.id);
       } else {
         db.prepare(`UPDATE tasks SET title=?, detail=?, severity=?, priority=?, evidence_json=?,
           affected_url=COALESCE(?, affected_url), updated_at=datetime('now') WHERE id=?`)
@@ -405,42 +416,47 @@ function fromAlertEvent(event, brand) {
 }
 
 // Turns failing technical-audit findings into tasks, one per failing check.
+//
+// Item extraction goes through csvStore.normaliseAuditFindings — the SAME
+// function the audit-result page uses to render its "Failing checks" table —
+// instead of re-deriving items here with a narrower field list. The raw
+// finding items don't always use the key names `url`/`note`; normalise
+// handles the `page`/`link`/`detail`/`status`/`title` fallbacks too, and this
+// keeps both places reading the identical url/note pair rather than drifting.
 function fromAuditRun(run, brand, { minTier = 'warning', maxTasks = 40 } = {}) {
-  let parsed;
-  try { parsed = JSON.parse(run.json_result); } catch { return { created: 0, skipped: 'unparseable audit result' }; }
-  const findings = parsed.findings || [];
+  const report = csvStore.normaliseAuditFindings(run.json_result);
+  if (!report) return { created: 0, skipped: 'unparseable audit result' };
 
-  const tierRank = { error: 1, warning: 2, notice: 3, info: 4, passed: 9 };
-  const cutoff = tierRank[minTier] || 2;
-  const severityFor = { error: 'critical', warning: 'high', notice: 'medium', info: 'low' };
+  const minRank = { error: 1, warning: 2, notice: 3, info: 4 }[minTier] || 2;
+  // report.failing severities are already 'critical'/'high'/'medium'/'low',
+  // mapped from the audit's own error/warning/notice/info tiers.
+  const severityRank = { critical: 1, high: 2, medium: 3, low: 4 };
 
-  const failing = findings
-    .filter((f) => (f.failed || 0) > 0 && (tierRank[f.display] || 9) <= cutoff)
-    .sort((a, b) => (tierRank[a.display] || 9) - (tierRank[b.display] || 9) || (b.failed || 0) - (a.failed || 0))
+  const failing = report.failing
+    .filter((f) => (severityRank[f.severity] || 9) <= minRank)
     .slice(0, maxTasks);
 
   let created = 0;
   failing.forEach((f) => {
-    const items = (f.items || []).map((i) => (typeof i === 'string' ? i : (i.url || i.page || JSON.stringify(i))));
-    // A clean one-line summary — no embedded bullet list. The example URLs
-    // live in evidence.items so the export step can put them in their own
-    // column / "Examples" sheet instead of a newline-joined blob.
+    const items = f.items.slice(0, 50);
     const detail = `${f.summary || ''} (${f.failed} of ${f.total || '?'} ${f.unit || 'pages'} affected.) `
       + `Source: technical audit run #${run.id} on ${String(run.created_at).slice(0, 16)} (${run.domain}).`;
 
     const r = upsertTask({
       userId: brand ? brand.user_id : run.user_id,
       brandId: brand ? brand.id : run.brand_id,
-      title: `Fix: ${f.name} (${f.failed} ${f.unit || 'pages'})`,
+      title: `Fix: ${f.issue} (${f.failed} ${f.unit || 'pages'})`,
       detail,
       source: 'audit',
       sourceRef: `audit:${run.id}:${f.id}`,
       category: 'Technical',
-      severity: severityFor[f.display] || 'medium',
-      affectedUrl: items.length === 1 ? items[0] : null,
+      severity: f.severity,
+      affectedUrl: items.length === 1 ? items[0].url : null,
       evidence: {
         findingId: f.id, failed: f.failed, total: f.total, runId: run.id,
-        summary: f.summary || '', items: items.slice(0, 50), exampleUrls: items.slice(0, 50),
+        summary: f.summary || '', action: f.action || null,
+        items,
+        exampleUrls: items.map((i) => i.url).filter(Boolean),
       },
       // Keyed on the check rather than the run, so a recurring issue keeps one
       // task across crawls instead of creating a fresh one every week.
@@ -451,6 +467,76 @@ function fromAuditRun(run, brand, { minTier = 'warning', maxTasks = 40 } = {}) {
 
   db.prepare('UPDATE audit_runs SET tasks_created=? WHERE id=?').run(created, run.id);
   return { created, considered: failing.length };
+}
+
+// Turns a PageSpeed Insights report into tasks: one per category
+// (performance/accessibility/best-practices/seo) that scored below "good",
+// listing its top failing checks. One task per category rather than one per
+// Lighthouse audit — a "poor" performance score often fails a dozen
+// individual audits, and a task per audit would flood the board.
+function fromPsiReport(row, report, brand) {
+  const userId = brand ? brand.user_id : row.user_id;
+  const brandId = brand ? brand.id : row.brand_id;
+  if (!brandId) return { created: 0, skipped: 'no brand on this report' };
+
+  const scope = brandId;
+  const url = row.url;
+  const strategy = row.strategy;
+  const keyPrefix = `task:pagespeed:${scope}:${url}:${strategy}:`;
+
+  const failingByCategory = (id) => {
+    if (id === 'performance') return [...(report.insights || []), ...(report.diagnostics || [])];
+    const cat = (report.otherCategories || []).find((c) => c.id === id);
+    return cat ? cat.failing : [];
+  };
+
+  let created = 0;
+  const currentKeys = [];
+
+  (report.categories || []).forEach((cat) => {
+    if (cat.band === 'good' || cat.band === 'none') return;
+    const failing = failingByCategory(cat.id);
+    if (!failing.length) return;
+
+    const top = failing.slice(0, 10);
+    const dedupeKey = `${keyPrefix}${cat.id}`;
+    currentKeys.push(dedupeKey);
+
+    const detail = [
+      `${cat.title} scored ${cat.score}/100 (${cat.band}) on ${strategy}.`,
+      '',
+      ...top.map((a) => `  • ${a.title}${a.displayValue ? ` — ${a.displayValue}` : ''}`),
+      ...(failing.length > top.length ? [`  … and ${failing.length - top.length} more.`] : []),
+      '',
+      `Source: PageSpeed Insights report #${row.id} on ${String(row.created_at || '').slice(0, 16)} for ${url}.`,
+    ].join('\n');
+
+    const r = upsertTask({
+      userId,
+      brandId,
+      title: `Fix ${failing.length} ${cat.title.toLowerCase()} issue${failing.length === 1 ? '' : 's'} (${strategy}) — ${url.replace(/^https?:\/\/[^/]+/, '') || '/'}`,
+      detail,
+      source: 'pagespeed',
+      sourceRef: `pagespeed:${row.id}:${cat.id}`,
+      category: cat.title,
+      severity: cat.band === 'poor' ? 'high' : 'medium',
+      affectedUrl: url,
+      evidence: {
+        reportId: row.id, url, strategy, categoryId: cat.id, score: cat.score,
+        failingCount: failing.length,
+        items: top.map((a) => ({ url, note: `${a.title}${a.displayValue ? ` — ${a.displayValue}` : ''}` })),
+      },
+      dedupeKey,
+    });
+    if (r.created) created += 1;
+  });
+
+  reconcile(userId, brandId, 'pagespeed', currentKeys, {
+    sourceRef: `pagespeed:${row.id}`,
+    keyPrefix,
+  });
+
+  return { created, considered: (report.categories || []).length };
 }
 
 // Turns internal-linking output into tasks: orphan pages, cannibalisation, and
@@ -522,7 +608,16 @@ function fromLinkingRun(run, brand, { maxTasks = 30 } = {}) {
       sourceRef: `linking:${run.id}`,
       category: 'Internal linking',
       severity: 'medium',
-      evidence: { orphans: orphans.slice(0, 50), runId: run.id },
+      evidence: {
+        orphans: orphans.slice(0, 50),
+        runId: run.id,
+        items: orphans.slice(0, 50).map((o) => ({
+          url: o.url,
+          note: [o.title, o.gsc_impressions ? `${o.gsc_impressions} impressions (GSC)` : null]
+            .filter(Boolean).join(' — '),
+        })),
+        exampleUrls: orphans.slice(0, 50).map((o) => o.url),
+      },
       dedupeKey: `task:linking:${scope}:orphans`,
     });
     if (r.created) created += 1;
@@ -567,6 +662,14 @@ function fromLinkingRun(run, brand, { maxTasks = 30 } = {}) {
       evidence: {
         broken: broken.slice(0, 50),
         runId: run.id,
+        // `items` mirrors the audit engine's shape (url + note) so the task
+        // page and export can render both sources the same way — the note
+        // here is the HTTP status/classification plus which page(s) link to it.
+        items: broken.slice(0, 50).map((b) => ({
+          url: b.url,
+          note: [b.status, b.classification, b.linked_from ? `linked from: ${b.linked_from}` : null]
+            .filter(Boolean).join(' — '),
+        })),
         exampleUrls: broken.slice(0, 50).map((b) => b.url),
       },
       dedupeKey: `task:linking:${scope}:broken`,
@@ -583,6 +686,6 @@ module.exports = {
   classifyApproval, upsertTask, setStatus, approve, revokeApproval,
   update, remove, get, list, counts, assignees, logEvent,
   assignTask, recordNotification, notificationsFor,
-  fromAlertEvent, fromAuditRun, fromLinkingRun,
+  fromAlertEvent, fromAuditRun, fromLinkingRun, fromPsiReport,
   reconcile, RECONCILABLE_STATUSES, ANNOTATE_ONLY_STATUSES,
 };

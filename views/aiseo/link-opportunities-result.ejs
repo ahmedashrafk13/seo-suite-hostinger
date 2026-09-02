@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%- include('_partials/runhead') %>
+
+<% const r = run.result; %>
+<% if (run.status === 'completed' && r && r.empty) { %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body"><%= r.reason %></div>
+  </div>
+<% } else if (run.status === 'completed' && r) { %>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Link opportunities</div>
+      <div class="value"><%= fmtInt(r.counts.opportunities) %></div>
+      <div class="meta">each with an anchor already in the source page's copy</div>
+    </div>
+    <div class="stat">
+      <div class="label">Already linking here</div>
+      <div class="value"><%= fmtInt(r.counts.alreadyLinking) %></div>
+      <div class="meta"><%= r.counts.alreadyLinking ? 'existing internal links to this URL' : 'nothing links to this page' %></div>
+    </div>
+    <div class="stat">
+      <div class="label">Relevant, no usable anchor</div>
+      <div class="value"><%= fmtInt(r.counts.relevantWithoutAnchor) %></div>
+      <div class="meta">would need a sentence written — listed separately</div>
+    </div>
+    <div class="stat">
+      <div class="label">Pages crawled</div>
+      <div class="value"><%= fmtInt(r.crawl.usable) %></div>
+      <div class="meta"><%= r.crawl.complete ? 'crawl completed' : 'capped at ' + r.crawl.maxPages %></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0"><strong>Basis.</strong> <%= r.basis %></p>
+      <% if (r.scoreMeaning) { %>
+        <p class="hint mt-0"><strong>The score above:</strong> <%= r.scoreMeaning %></p>
+      <% } %>
+    </div>
+  </div>
+
+  <%- include('_partials/findings') %>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Anchor phrases read from the target page</h3>
+      <span class="muted" style="font-size:12px">Only these are offered as anchors, and only where they appear verbatim in a source page</span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Phrase</th><th>Weight</th><th>Where it came from</th></tr></thead>
+        <tbody>
+        <% r.phrases.forEach(function (p) { %>
+          <tr>
+            <td class="mono-sm"><%= p.phrase %></td>
+            <td><%= p.weight %></td>
+            <td class="muted" style="font-size:12px"><%= p.origins.join(', ') %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint">
+        Ordered by how strongly each identifies the page: the H1 and title first, then the URL slug, then its own
+        H2s, then the phrases the page repeats. A phrase of only stopwords, one shorter than 8 characters, or one
+        that is a generic UI label is excluded — none of those identify anything.
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Link opportunities</h3>
+      <div class="btn-row">
+        <a class="btn secondary sm" href="/ai-seo/link-opportunities/<%= run.id %>/csv">Download CSV</a>
+      </div>
+    </div>
+    <div class="card-body">
+      <% if (!r.rows.length) { %>
+        <div class="empty-state">
+          No page carried a verbatim anchor phrase for this target. The pages that were topically relevant but
+          had no usable phrase are listed below — those need a sentence writing, which is a content task rather
+          than a linking one.
+        </div>
+      <% } else { %>
+        <div class="table-wrap"><table class="data">
+          <thead><tr>
+            <th style="width:18%">URL</th>
+            <th style="width:20%">Source URL</th>
+            <th style="width:14%">Anchor text</th>
+            <th>Sentence the anchor is already in</th>
+            <th style="width:8%">Relevance</th>
+          </tr></thead>
+          <tbody>
+          <% r.rows.forEach(function (row) { %>
+            <tr>
+              <td class="mono-sm"><%= row.url %></td>
+              <td class="mono-sm">
+                <a href="<%= row.sourceUrl %>" target="_blank" rel="noopener"><%= row.sourceUrl %></a>
+                <% if (row.sourceTitle) { %><div class="muted" style="font-size:11px"><%= row.sourceTitle %></div><% } %>
+              </td>
+              <td><strong class="mono-sm"><%= row.anchorText %></strong>
+                <div class="basis">from the target's <%= row.anchorFrom %></div>
+              </td>
+              <td style="font-size:12px">
+                <%= row.sentence %>
+                <div class="muted" style="font-size:11px;margin-top:3px">
+                  shares: <%= (row.sharedEntities || []).slice(0, 5).join(', ') || 'vocabulary only' %>
+                </div>
+              </td>
+              <td>
+                <%= row.relevance %>
+                <span class="meter <%= row.relevance >= 0.25 ? 'good' : (row.relevance >= 0.12 ? 'warn' : '') %>">
+                  <span style="width:<%= Math.min(100, Math.round(row.relevance * 300)) %>%"></span>
+                </span>
+                <div class="muted" style="font-size:10.5px">e <%= row.entityOverlap %> · v <%= row.cosine %></div>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+        <% if (r.truncated) { %>
+          <p class="hint"><strong>Truncated.</strong> More qualifying pages exist than the row limit set for this run. Raise the limit and re-run to see the rest — nothing has been silently dropped from the counts above.</p>
+        <% } %>
+        <p class="hint">
+          <strong>How to implement a row:</strong> open the Source URL, find the sentence shown, wrap the anchor
+          phrase in a link to the target. No new copy is required for any row in this table — that is what the
+          anchor rule buys.
+        </p>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (r.alreadyLinking.length) { %>
+  <div class="card">
+    <div class="card-head"><h3>Pages that already link here (<%= r.alreadyLinking.length %>)</h3></div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Source URL</th><th>Anchor used</th><th>In main content?</th><th>rel</th></tr></thead>
+        <tbody>
+        <% r.alreadyLinking.forEach(function (a) { %>
+          <tr>
+            <td class="mono-sm"><%= a.sourceUrl %></td>
+            <td class="mono-sm"><%= a.anchor %></td>
+            <td><% if (a.inMain) { %><span class="badge good">yes</span><% } else { %><span class="badge neutral">nav / footer</span><% } %></td>
+            <td class="muted"><%= a.nofollow ? 'nofollow' : '—' %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint">
+        A link from a nav or footer is sitewide and carries little topical signal — it tells a search engine the
+        page exists, not what it is about. Editorial links from the main content are what the table above
+        proposes.
+      </p>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (r.relevantWithoutAnchor.length) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>Relevant pages with no usable anchor (<%= r.relevantWithoutAnchor.length %>)</h3>
+      <span class="muted" style="font-size:12px">Listed separately because linking from these means writing, not wrapping</span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Source URL</th><th>Relevance</th><th>Shared entities</th><th>Why it is not in the table above</th></tr></thead>
+        <tbody>
+        <% r.relevantWithoutAnchor.forEach(function (x) { %>
+          <tr>
+            <td class="mono-sm"><%= x.sourceUrl %><% if (x.sourceTitle) { %><div class="muted" style="font-size:11px"><%= x.sourceTitle %></div><% } %></td>
+            <td><%= x.relevance %></td>
+            <td class="muted" style="font-size:12px"><%= (x.sharedEntities || []).slice(0, 6).join(', ') || '—' %></td>
+            <td class="muted" style="font-size:12px"><%= x.reason %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint">
+        Treat each as a small content edit: add one sentence that genuinely belongs on the page, then link from
+        it. Do not bolt on a sentence purely to carry a link — a paragraph that exists only to hold an anchor
+        reads as one to a reader and to a ranking system.
+      </p>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/provenance', { prov: r.provenance }) %>
+<% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

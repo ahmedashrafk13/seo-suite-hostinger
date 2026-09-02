@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%- include('_partials/runhead') %>
+
+<% const r = run.result; %>
+<% if (run.status === 'completed' && r && r.empty) { %>
+  <div class="notice error">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body"><%= r.reason %></div>
+  </div>
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>What was measured, and over what.</strong>
+        The page serves <%= fmtInt(r.page.wordCount) %> words in its main region; content metrics below were
+        computed over <%= fmtInt(r.page.contentWordCount) %> words after the navigation, header, footer, social
+        links, cookie banner, form controls and repeated pricing labels were excluded.
+        <% if (r.page.boilerplateExcluded && r.page.boilerplateExcluded.fellBack) { %>
+          <br><span class="badge medium">boilerplate could not be separated</span>
+          <%= r.page.boilerplateExcluded.reason %>
+        <% } else if (r.page.boilerplateExcluded) { %>
+          That is <%= r.page.boilerplateExcluded.retainedShare %>% of the text retained;
+          <%= fmtInt(r.page.boilerplateExcluded.removedChars) %> characters were removed from
+          <%= (r.page.boilerplateExcluded.selectorsMatched || []).length %> template region(s).
+        <% } %>
+      </p>
+      <p class="hint mt-0">
+        This matters more than it sounds. Readability, entity density, keyword density and semantic coverage are
+        all ratios, and computing them over a page's chrome moves every one of them — on a short page the
+        navigation and footer are most of the words.
+      </p>
+      <% if (r.page.boilerplateExcluded && (r.page.boilerplateExcluded.samples || []).length) { %>
+        <details class="disclosure">
+          <summary>What was excluded (<%= (r.page.boilerplateExcluded.samples || []).length %> samples)</summary>
+          <ul class="tight">
+            <% r.page.boilerplateExcluded.samples.forEach(function (x) { %>
+              <li><span class="mono-sm"><%= x.selector %></span> — <span class="muted"><%= x.preview %></span></li>
+            <% }) %>
+          </ul>
+        </details>
+      <% } %>
+      <% if (r.pageTypeVerdict) { %>
+        <p class="hint mt-0">
+          <strong>This page reads as a <%= r.pageTypeVerdict.label.toLowerCase() %></strong>
+          <% if (!r.pageTypeVerdict.confident) { %>
+            <span class="badge medium">low confidence</span>
+            — it scored <%= r.pageTypeVerdict.score %><% if (r.pageTypeVerdict.runnerUp) { %> against <%= r.pageTypeVerdict.runnerUp.label %> at <%= r.pageTypeVerdict.runnerUp.score %><% } %>.
+          <% } %>
+          <span class="muted">
+            Based on: <%= (r.pageTypeVerdict.evidence || []).slice(0, 3).map(function (e) { return e.why; }).join('; ') %>.
+          </span>
+          <% if ((r.pageTypeVerdict.mismatches || []).length) { %>
+            <br><span class="badge critical">schema type mismatch</span>
+            This page declares <%= r.pageTypeVerdict.mismatches.map(function (m) { return m.declared; }).join(', ') %>,
+            which its own content contradicts.
+            <a href="/ai-seo/schema?url=<%= encodeURIComponent(r.url) %>">Run the schema audit</a> to get the
+            correct block, ready to paste.
+          <% } %>
+        </p>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (r.headingStructure) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>Heading hierarchy</h3>
+      <span class="badge <%= r.headingStructure.score >= 90 ? 'good' : (r.headingStructure.score >= 70 ? 'medium' : 'critical') %>">
+        <%= r.headingStructure.score %>/100
+      </span>
+    </div>
+    <div class="card-body">
+      <% if (r.headingStructure.valid) { %>
+        <div class="empty-state">The outline is clean: one H1, no skipped levels, no duplicated or empty headings.</div>
+      <% } else { %>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th style="width:16%">Issue</th><th style="width:10%">Severity</th><th>What was found</th></tr></thead>
+          <tbody>
+          <% r.headingStructure.issues.forEach(function (i) { %>
+            <tr>
+              <td class="mono-sm"><%= i.key %></td>
+              <td><span class="badge <%= i.severity === 'high' ? 'critical' : (i.severity === 'medium' ? 'medium' : 'neutral') %>"><%= i.severity %></span></td>
+              <td>
+                <%= i.message %>
+                <% if (i.wcag) { %><div class="muted" style="font-size:11px">Also WCAG <%= i.wcag %>.</div><% } %>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+      <% } %>
+
+      <p class="hint">
+        <strong>Why the order is not a style preference.</strong> A retrieval system chunks a page by its heading
+        tree: an H3 is understood as belonging to the H2 above it, and the H2 to the H1. A page that goes
+        H1 → H4 → H2 has no tree, so the chunker either flattens it — losing which passage answers which
+        question — or nests wrongly and attributes a passage to the wrong subject. Screen readers have the same
+        problem for the same reason.
+      </p>
+
+      <details class="disclosure">
+        <summary>The outline as parsed (<%= r.headingStructure.counts.total %> headings<% if (r.headingStructure.counts.empty) { %>, <%= r.headingStructure.counts.empty %> empty<% } %>)</summary>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th style="width:8%">Level</th><th>Text</th></tr></thead>
+          <tbody>
+          <% r.headingStructure.outline.forEach(function (h) { %>
+            <tr>
+              <td><span class="badge <%= h.level === 1 ? 'accent' : 'neutral' %>">H<%= h.level %></span></td>
+              <td style="padding-left:<%= (h.level - 1) * 16 %>px"><%= h.text %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+      </details>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (r.overOptimisation) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>Keyword repetition and stuffing</h3>
+      <% if (!r.overOptimisation.measurable) { %>
+        <span class="badge neutral">not measurable</span>
+      <% } else if (r.overOptimisation.clean) { %>
+        <span class="badge good">clean</span>
+      <% } else { %>
+        <span class="badge <%= r.overOptimisation.worstSeverity === 'high' ? 'critical' : (r.overOptimisation.worstSeverity === 'medium' ? 'medium' : 'neutral') %>">
+          <%= r.overOptimisation.issues.length %> issue<%= r.overOptimisation.issues.length === 1 ? '' : 's' %>
+        </span>
+      <% } %>
+    </div>
+    <div class="card-body">
+      <% if (!r.overOptimisation.measurable) { %>
+        <div class="empty-state"><%= r.overOptimisation.reason %></div>
+      <% } else { %>
+        <% if (r.overOptimisation.target) { %>
+          <%
+          const t = r.overOptimisation.target;
+          const maxBucket = Math.max.apply(null, t.distribution.concat([1]));
+          %>
+          <div class="stat-row">
+            <div class="stat">
+              <div class="label">"<%= t.keyword %>" density</div>
+              <div class="value"><%= t.densityPct %>%</div>
+              <div class="meta">ceiling <%= t.ceiling %>% · <%= t.exactMatches %> exact matches in <%= fmtInt(r.overOptimisation.words) %> words</div>
+            </div>
+            <div class="stat">
+              <div class="label">Spread across the page</div>
+              <div class="value"><%= t.tenthsCovered %>/10</div>
+              <div class="meta"><%= t.clustered ? 'clustered — over half the occurrences in one tenth' : 'evenly distributed' %></div>
+            </div>
+            <div class="stat">
+              <div class="label">In subheadings</div>
+              <div class="value"><%= t.inHeadings %>/<%= t.headingsTotal %></div>
+              <div class="meta">one or two is right; most of them is not</div>
+            </div>
+          </div>
+          <p class="hint mt-0"><strong>Where the term falls across the page</strong> (each bar is one tenth of the content, left to right):</p>
+          <div style="display:flex;gap:3px;align-items:flex-end;height:46px;margin:6px 0 14px">
+            <% t.distribution.forEach(function (n, i) { %>
+              <div title="tenth <%= i + 1 %>: <%= n %> occurrence<%= n === 1 ? '' : 's' %>"
+                   style="flex:1;background:<%= n && n / Math.max(1, t.exactMatches) >= 0.5 ? '#d6543d' : 'var(--accent, #3884ff)' %>;opacity:<%= n ? 1 : 0.15 %>;height:<%= Math.max(6, Math.round((n / maxBucket) * 46)) %>px;border-radius:2px"></div>
+            <% }) %>
+          </div>
+        <% } %>
+
+        <% if (r.overOptimisation.issues.length) { %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th style="width:16%">Issue</th><th style="width:10%">Severity</th><th>What was found</th><th style="width:26%">What to do</th></tr></thead>
+            <tbody>
+            <% r.overOptimisation.issues.forEach(function (i) { %>
+              <tr>
+                <td class="mono-sm"><%= i.key %></td>
+                <td><span class="badge <%= i.severity === 'high' ? 'critical' : (i.severity === 'medium' ? 'medium' : 'neutral') %>"><%= i.severity %></span></td>
+                <td style="font-size:12.5px"><%= i.message %></td>
+                <td class="muted" style="font-size:12px"><%= i.action || '' %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } else { %>
+          <div class="empty-state">No term or phrase is over-used, and no sentence is duplicated.</div>
+        <% } %>
+
+        <% if ((r.overOptimisation.overUsedPhrases || []).length) { %>
+          <details class="disclosure">
+            <summary>Over-used phrases (<%= r.overOptimisation.overUsedPhrases.length %>)</summary>
+            <div class="table-wrap"><table class="data">
+              <thead><tr><th>Phrase</th><th>Count</th><th>Share of content</th></tr></thead>
+              <tbody>
+              <% r.overOptimisation.overUsedPhrases.forEach(function (ph) { %>
+                <tr><td class="mono-sm"><%= ph.phrase %></td><td><%= ph.count %></td><td><%= ph.densityPct %>%</td></tr>
+              <% }) %>
+              </tbody>
+            </table></div>
+          </details>
+        <% } %>
+
+        <p class="hint">
+          <strong>Density alone is a bad test, so both are measured.</strong> A 300-word page mentioning its term
+          six times and a 3,000-word page mentioning it sixty times are both at 2% — but if fifty of those sixty
+          sit in one section, the second reads like spam and the first does not. That is why the distribution is
+          charted next to the percentage, and why a clustered term is flagged even when the overall density is
+          natural. All of it is measured after the template was excluded, so a brand name repeated in a footer
+          never counts as stuffing.
+        </p>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/findings') %>
+<% } else if (run.status === 'completed' && r) { %>
+
+  <div class="card">
+    <div class="card-head"><h3>How the score is made up</h3></div>
+    <div class="card-body">
+      <p class="hint mt-0"><%= r.composite.basis %></p>
+      <% r.composite.parts.forEach(function (p) { %>
+        <div class="pfm-bar">
+          <div class="pfm-head">
+            <span class="pfm-name"><%= p.label %></span>
+            <span class="pfm-value <%= p.pct >= 75 ? 'good' : (p.pct >= 50 ? 'average' : 'poor') %>">
+              <%= p.pct %>% <span class="muted">(<%= p.earned %> of <%= p.weight %> points)</span>
+            </span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill <%= p.pct >= 75 ? 'good' : (p.pct >= 50 ? 'medium' : 'critical') %>" style="width:<%= p.pct %>%"></div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Semantic coverage</div>
+      <div class="value"><%= r.coverage.pct == null ? '—' : r.coverage.pct + '%' %></div>
+      <div class="meta"><%= r.coverage.basis %></div>
+    </div>
+    <div class="stat">
+      <div class="label">Citability</div>
+      <div class="value"><%= r.citability.score %></div>
+      <div class="meta"><%= r.citability.signals.quotablePassages %> of <%= r.citability.signals.passagesTotal %> passages quotable as-is</div>
+    </div>
+    <div class="stat">
+      <div class="label">Entity density</div>
+      <div class="value"><%= r.entity.density %></div>
+      <div class="meta"><%= r.entity.distinct %> distinct per <%= fmtInt(r.entity.words) %> words · target 1.5-6</div>
+    </div>
+    <div class="stat">
+      <div class="label">Reading ease</div>
+      <div class="value"><%= r.readability.fleschReadingEase == null ? '—' : r.readability.fleschReadingEase %></div>
+      <div class="meta">grade <%= r.readability.fleschKincaidGrade %> · avg sentence <%= r.readability.avgSentenceWords %> words</div>
+    </div>
+  </div>
+
+  <%- include('_partials/findings') %>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <div class="card-head"><h3>The page as served</h3></div>
+      <div class="card-body">
+        <ul class="kv">
+          <li><span>Title</span><span><%= r.page.title || '(none)' %> <span class="muted">(<%= r.page.titleLength %> chars)</span></span></li>
+          <li><span>Meta description</span><span><%= r.page.metaDesc ? r.page.metaDesc.slice(0, 120) : '(none)' %> <span class="muted">(<%= r.page.metaDescLength %>)</span></span></li>
+          <li><span>H1</span><span><%= r.page.h1s.length ? r.page.h1s.join(' | ') : '(none)' %></span></li>
+          <li><span>Main content words</span><span><%= fmtInt(r.page.wordCount) %> <span class="muted">(read from <code><%= r.page.mainSelector %></code>)</span></span></li>
+          <li><span>Headings</span><span><%= r.page.headings.length %></span></li>
+          <li><span>Internal / external links</span><span><%= r.page.internalLinks %> / <%= r.page.externalLinks %></span></li>
+          <li><span>Images missing alt</span><span><%= r.page.images.missingAlt %> of <%= r.page.images.total %></span></li>
+          <li><span>Schema types</span><span><%= r.page.schemaTypes.length ? [...new Set(r.page.schemaTypes)].join(', ') : '(none)' %></span></li>
+          <li><span>Canonical</span><span class="truncate"><%= r.page.canonical || '(none)' %></span></li>
+          <li><span>Robots meta</span><span><%= r.page.robotsMeta || '(none)' %></span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Target-term placement</h3></div>
+      <div class="card-body">
+        <% if (!r.keyword) { %>
+          <div class="empty-state">No target term was given.</div>
+        <% } else { %>
+          <p class="mt-0">Checking for <strong>"<%= r.keyword %>"</strong>:</p>
+          <ul class="kv">
+            <li><span>Title tag</span><span><%= r.placement.inTitle ? '&#10003; present' : '&#10007; absent' %></span></li>
+            <li><span>H1</span><span><%= r.placement.inH1 ? '&#10003; present' : '&#10007; absent' %></span></li>
+            <li><span>First 100 words</span><span><%= r.placement.inFirstHundredWords ? '&#10003; present' : '&#10007; absent' %></span></li>
+            <li><span>A subheading</span><span><%= r.placement.inSubheading ? '&#10003; present' : '&#10007; absent' %></span></li>
+            <li><span>URL</span><span><%= r.placement.inUrl ? '&#10003; present' : '&#10007; absent' %></span></li>
+            <li><span>Exact-match occurrences</span><span><%= r.placement.exactMatchCount %></span></li>
+          </ul>
+          <p class="hint" style="margin-bottom:0">
+            Placement counts for 10 of the 100 points, deliberately: it is the cheapest thing on this page to fix
+            and therefore the least informative about whether the page is any good.
+          </p>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Comparison set</h3>
+      <span class="muted" style="font-size:12px">Method: <%= r.comparison.method %></span>
+    </div>
+    <div class="card-body">
+      <% if (!r.comparison.pages.length) { %>
+        <div class="empty-state">
+          No comparison pages were used, so semantic coverage could not be measured and its weight was
+          redistributed across the other components.
+        </div>
+      <% } else { %>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>URL</th><th>Found via</th><th>Status</th><th>Title</th><th>Words</th><th>Headings</th></tr></thead>
+          <tbody>
+          <% r.comparison.pages.forEach(function (p) { %>
+            <tr>
+              <td class="truncate" style="max-width:320px"><a href="<%= p.url %>" target="_blank" rel="noopener"><%= p.url %></a></td>
+              <td class="muted"><%= p.via %></td>
+              <td>
+                <% if (p.ok) { %><span class="badge good">read</span>
+                <% } else { %><span class="badge critical"><%= p.error || ('HTTP ' + p.status) %></span><% } %>
+              </td>
+              <td class="truncate" style="max-width:220px"><%= p.title || '—' %></td>
+              <td><%= p.words == null ? '—' : fmtInt(p.words) %></td>
+              <td><%= p.headings == null ? '—' : p.headings %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (r.coverage.pct != null) { %>
+  <div class="grid cols-2">
+    <div class="card">
+      <div class="card-head"><h3>Consensus terms this page is missing</h3></div>
+      <div class="card-body">
+        <% if (!r.coverage.missing.length) { %>
+          <div class="empty-state">Nothing missing — the page covers every term the comparison set agrees on.</div>
+        <% } else { %>
+          <p class="hint mt-0"><%= r.coverage.basis %>.</p>
+          <p class="pre term"><%= r.coverage.missing.join('  ·  ') %></p>
+          <% if (r.coverage.suppressedCount) { %>
+            <p class="hint mt-0">
+              <%= r.coverage.suppressedCount %> further consensus term<%= r.coverage.suppressedCount === 1 ? ' was' : 's were' %>
+              excluded as noise (<%= (r.coverage.suppressedSummary || []).join(', ') %>). The coverage percentage
+              is computed on the filtered list, so the page is not marked down for lacking a competitor's brand
+              name or the words on their buttons.
+            </p>
+          <% } %>
+          <p class="hint" style="margin-bottom:0">
+            Add the subjects, not the words. A term inserted without the explanation behind it raises this
+            number and changes nothing a reader or a retrieval system can use.
+          </p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Entities the comparison pages name and this one does not</h3></div>
+      <div class="card-body">
+        <% if (!r.entityGap.missing.length) { %>
+          <div class="empty-state">
+            None — every entity they name appears here too<% if (r.entityGap.suppressedCount) { %>, once the
+            <%= r.entityGap.suppressedCount %> noise candidate<%= r.entityGap.suppressedCount === 1 ? '' : 's' %>
+            below <%= r.entityGap.suppressedCount === 1 ? 'is' : 'are' %> set aside<% } %>.
+          </div>
+        <% } else { %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Entity</th><th>Type</th><th>On how many comparison pages</th></tr></thead>
+            <tbody>
+            <% r.entityGap.missing.slice(0, 30).forEach(function (e) { %>
+              <tr><td><%= e.surface %></td><td class="muted"><%= e.type %></td><td><%= e.documents %></td></tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+          <p class="hint" style="margin-bottom:0">
+            Each of these is a factual question, not a keyword: is this standard, body, product or figure
+            genuinely relevant here? Add the ones that are, with a source. Ignore the rest.
+          </p>
+        <% } %>
+
+        <% if (r.entityGap.suppressedCount) { %>
+          <p class="hint">
+            <strong><%= r.entityGap.suppressedCount %> candidate<%= r.entityGap.suppressedCount === 1 ? '' : 's' %>
+            suppressed as noise</strong> (<%= (r.entityGap.suppressedSummary || []).join(', ') %>),
+            from <%= r.entityGap.candidatesBeforeFilter %> before filtering.
+            A competitor's own brand name is structurally the entity most certain to be on their pages and not on
+            this one, so without the filter it topped every list — and the report was advising the client to write
+            about their rivals. Generic button and section labels came next for the same reason.
+          </p>
+          <details class="disclosure">
+            <summary>What was suppressed, and why</summary>
+            <div class="table-wrap"><table class="data">
+              <thead><tr><th>Candidate</th><th>Reason it was not reported</th></tr></thead>
+              <tbody>
+              <% r.entityGap.suppressed.forEach(function (x) { %>
+                <tr><td class="mono-sm"><%= x.surface %></td><td class="muted" style="font-size:12px"><%= x.reason %></td></tr>
+              <% }) %>
+              </tbody>
+            </table></div>
+            <p class="hint mt-0">
+              Shown because a filter nobody can inspect is a filter nobody can trust. If something here is a real
+              gap, it will be a competitor brand term the domain-name heuristic caught by mistake — the surface
+              and the reason together are enough to tell.
+            </p>
+          </details>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (r.headingGap && r.headingGap.length) { %>
+  <div class="card">
+    <div class="card-head"><h3>Sections the comparison pages have and this one does not</h3></div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Their heading</th><th>On how many pages</th></tr></thead>
+        <tbody>
+        <% r.headingGap.forEach(function (h) { %>
+          <tr><td><%= h.examples.join(' / ') %></td><td><%= h.documents %></td></tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="card">
+    <div class="card-head"><h3>Citability detail</h3></div>
+    <div class="card-body">
+      <div class="grid cols-2">
+        <div>
+          <ul class="kv">
+            <li><span>Paragraphs that can stand alone</span><span><%= r.citability.signals.selfContainedShare %>%</span></li>
+            <li><span>Passages quotable as-is</span><span><%= r.citability.signals.quotablePassages %> of <%= r.citability.signals.passagesTotal %></span></li>
+            <li><span>Headings phrased as a question</span><span><%= r.citability.signals.questionHeadings %></span></li>
+            <li><span>Lists / tables present</span><span><%= r.citability.signals.hasStructuredBlocks ? 'yes' : 'no' %> <span class="muted">(<%= r.citability.signals.listCount %> lists)</span></span></li>
+            <li><span>Semantic main/article element</span><span><%= r.citability.signals.hasSemanticMain ? 'yes' : 'no' %></span></li>
+            <li><span>Visible date or "last updated"</span><span><%= r.citability.signals.hasVisibleDate ? 'yes' : 'no' %></span></li>
+            <li><span>Valid structured data</span><span><%= r.citability.signals.hasSchema ? 'yes' : 'no' %></span></li>
+            <li><span>Concrete figures on the page</span><span><%= r.citability.signals.statistics %></span></li>
+          </ul>
+        </div>
+        <div>
+          <h4 style="margin-top:0">Paragraphs that cannot be quoted</h4>
+          <% if (!r.citability.weakPassages.length) { %>
+            <p class="muted">None — every paragraph reads independently of its neighbours.</p>
+          <% } else { %>
+            <p class="hint mt-0">
+              These open with a word whose referent is off-screen ("This", "It", "However"), so a retrieval
+              system that extracts one loses its meaning.
+            </p>
+            <% r.citability.weakPassages.slice(0, 6).forEach(function (p) { %>
+              <p class="pre" style="font-size:12px"><%= p.preview %>…</p>
+            <% }) %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <% if (r.performance) { %>
+  <div class="card">
+    <div class="card-head"><h3>How this page actually performs</h3></div>
+    <div class="card-body">
+      <div class="stat-row">
+        <div class="stat"><div class="label">Clicks (28 days)</div><div class="value"><%= fmtInt(r.performance.clicks) %></div></div>
+        <div class="stat"><div class="label">Impressions</div><div class="value"><%= fmtInt(r.performance.impressions) %></div></div>
+        <div class="stat"><div class="label">Average position</div><div class="value"><%= fmtPos(r.performance.position) %></div></div>
+        <div class="stat"><div class="label">Window</div><div class="value sm"><%= r.performance.window.startDate %> → <%= r.performance.window.endDate %></div></div>
+      </div>
+      <p class="hint" style="margin-bottom:0">
+        Read the score against this. A page scoring 45 that earns real clicks does not need rewriting; a page
+        scoring 85 with no impressions has a problem that is not its copy.
+      </p>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (r.aiEdits) { %>
+  <div class="card">
+    <div class="card-head"><h3>Suggested edits</h3></div>
+    <div class="card-body">
+      <%- include('_partials/aiblock', { ai: r.aiEdits }) %>
+      <% if (r.aiEdits.ok && r.aiEdits.data) { %>
+        <% const d = r.aiEdits.data; %>
+        <% if (d.edits && d.edits.length) { %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Priority</th><th>Type</th><th>Where</th><th>Why</th><th>Replacement copy</th></tr></thead>
+            <tbody>
+            <% d.edits.forEach(function (e) { %>
+              <tr>
+                <td><span class="badge <%= e.priority === 'high' ? 'high' : (e.priority === 'medium' ? 'medium' : 'low') %>"><%= e.priority || '—' %></span></td>
+                <td class="muted"><%= e.type %></td>
+                <td><%= e.where %></td>
+                <td class="muted" style="font-size:12px"><%= e.why %></td>
+                <td>
+                  <%= e.replaceWith %>
+                  <% if (e.needsFact) { %><br><span class="badge medium">needs a fact you supply</span><% } %>
+                </td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+        <% if (d.missingSections && d.missingSections.length) { %>
+          <h4>Sections to add</h4>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Heading</th><th>What it should cover</th><th>Approx words</th></tr></thead>
+            <tbody>
+            <% d.missingSections.forEach(function (s) { %>
+              <tr><td><%= s.heading %></td><td class="muted"><%= s.whatItShouldCover %></td><td><%= s.approxWords || '—' %></td></tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+        <% if (d.quotableRewrites && d.quotableRewrites.length) { %>
+          <h4>Rewrites for citability</h4>
+          <% d.quotableRewrites.forEach(function (q) { %>
+            <div class="disclosure" style="margin-bottom:12px">
+              <p class="muted mt-0" style="font-size:12px"><strong>Now:</strong> <%= q.original %></p>
+              <p class="mt-0"><strong>Rewritten:</strong> <%= q.rewritten %></p>
+              <p class="hint mt-0" style="margin-bottom:0"><%= q.whyMoreCitable %></p>
+            </div>
+          <% }) %>
+        <% } %>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/provenance', { prov: r.provenance }) %>
+<% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

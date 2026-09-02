@@ -9,10 +9,9 @@
     <div class="card">
       <div class="card-body">
         <p class="hint">
-          <strong>Beta / comparison area.</strong> This section generates an AI-powered counterpart to four
-          existing deterministic features, using a paid Azure OpenAI model, so the team can compare them
-          side by side before deciding which to ship. Nothing here runs automatically — every generation is
-          a manual button click, and every call is logged and capped.
+          AI-generated content briefs, opportunity recommendations, linking rationale, metadata rewrites and
+          task rewrites, using a paid Azure OpenAI model. Nothing here runs automatically — every generation
+          is a manual button click, and every call is logged and capped.
         </p>
       </div>
     </div>
@@ -69,20 +68,21 @@
           <div class="empty-state">Add a brand first.</div>
         <% } else { %>
           <div class="table-wrap"><table class="data">
-            <thead><tr><th>Brand</th><th>AI Content Brief</th><th>AI Opportunities</th><th>AI Linking Rationale</th><th>AI Task Recommendations</th></tr></thead>
+            <thead><tr><th>Brand</th><th>AI Content Brief</th><th>AI Opportunities</th><th>AI Linking Rationale</th><th>AI Metadata Optimization</th><th>AI Task Recommendations</th></tr></thead>
             <tbody>
             <% brands.forEach(function(b){ %>
               <tr>
                 <td><%= b.name %></td>
                 <td><a class="btn secondary sm" href="/keywords?brand=<%= b.id %>">Pick a cluster from Keyword clusters &rarr;</a></td>
-                <td><a class="btn secondary sm" href="/ai-lab/<%= b.id %>/opportunities">Open</a></td>
-                <td><a class="btn secondary sm" href="/ai-lab/<%= b.id %>/linking">Open</a></td>
-                <td><a class="btn secondary sm" href="/ai-lab/<%= b.id %>/tasks">Open</a></td>
+                <td><a class="btn secondary sm" href="/ai-assist/<%= b.id %>/opportunities">Open</a></td>
+                <td><a class="btn secondary sm" href="/ai-assist/<%= b.id %>/linking">Open</a></td>
+                <td><a class="btn secondary sm" href="/ai-assist/<%= b.id %>/metadata">Open</a></td>
+                <td><a class="btn secondary sm" href="/ai-assist/<%= b.id %>/tasks">Open</a></td>
               </tr>
             <% }) %>
             </tbody>
           </table></div>
-          <p class="hint">Content briefs are generated per keyword cluster — approve a cluster in Keyword clustering, then look for the "AI (Beta)" link on its real content brief.</p>
+          <p class="hint">Content briefs are generated per keyword cluster — approve a cluster in Keyword clustering, then look for the "AI Assist" link on its content brief.</p>
         <% } %>
       </div>
     </div>

@@ -1,0 +1,39 @@
+<%
+/* Past runs for one feature. Deliberately shows the score AND the finding
+   counts: a score alone cannot distinguish "80, nothing urgent" from
+   "80, two critical problems in a small sample". */
+%>
+<div class="card">
+  <div class="card-head"><h3>Previous runs</h3></div>
+  <div class="card-body">
+    <% if (!runs.length) { %>
+      <div class="empty-state">Nothing run yet.</div>
+    <% } else { %>
+      <div class="table-wrap"><table class="data">
+        <thead><tr>
+          <th>When</th><th>Target</th><th>Score</th><th>Findings</th><th>Status</th><th>Took</th><th></th>
+        </tr></thead>
+        <tbody>
+        <% runs.forEach(function(r){ %>
+          <tr>
+            <td><%= fmtDateTime(r.started_at) %></td>
+            <td class="truncate" title="<%= r.target || '' %>">
+              <%= r.label || shortUrl(r.target) %>
+              <% if (r.brand_name && (typeof brand === 'undefined' || !brand)) { %><span class="muted"> · <%= r.brand_name %></span><% } %>
+            </td>
+            <td><%= r.score == null ? '—' : Math.round(r.score) %></td>
+            <td>
+              <% if (!r.findings) { %>—<% } else { %>
+                <%= r.findings %><% if (r.urgent) { %> <span class="badge critical"><%= r.urgent %> urgent</span><% } %>
+              <% } %>
+            </td>
+            <td><span class="badge <%= statusBadge(r.status) %>"><%= r.status %></span></td>
+            <td class="muted"><%= r.ms ? (r.ms > 1000 ? (r.ms/1000).toFixed(1) + 's' : r.ms + 'ms') : '—' %></td>
+            <td><a class="btn secondary xs" href="/ai-seo/<%= slug %>/<%= r.id %>">Open</a></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+    <% } %>
+  </div>
+</div>

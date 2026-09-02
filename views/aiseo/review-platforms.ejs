@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Which review platforms have a profile for this brand, and which do not.</strong>
+        This is a different question from the one <a href="/ai-seo/reputation">Reputation signals</a> answers.
+        That feature monitors what is being <em>said</em>; this one establishes what <em>exists</em>. A profile
+        is a public page with a predictable shape, so its existence can be checked without reading a single
+        review — which is what makes it possible on platforms that block automated access.
+      </p>
+      <p class="hint">
+        <strong>Two methods, and a third outcome.</strong> Where a platform has a deterministic profile URL, that
+        URL is probed directly: a 200 naming the brand is proof, a 404 is proof of absence. Everywhere else a
+        keyless site-restricted search is used. A platform that rate-limits or blocks the request is recorded as
+        <strong>unknown</strong>, never as missing — calling an unknown a gap would send someone to create a
+        profile that already exists, and "unknown" has its own count on the result page for exactly that reason.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <% if (brand) { %>
+  <div class="card">
+    <div class="card-head"><h3>Check review platform coverage</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/ai-seo/review-platforms/run">
+        <input type="hidden" name="brand_id" value="<%= brand.id %>">
+        <div class="field-row">
+          <label class="field">
+            <span>Country <span class="muted">(affects the search only)</span></span>
+            <select name="country">
+              <% marketList.forEach(function (m) { %>
+                <option value="<%= m.code %>" <%= m.code === selectedMarket ? 'selected' : '' %>><%= m.name %></option>
+              <% }) %>
+            </select>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="include_probe" checked>
+            Probe conventional profile URLs directly
+            <span class="muted">— the stronger evidence where a platform has a deterministic URL shape</span>
+          </label>
+        </div>
+        <div class="checkbox-row">
+          <label class="check">
+            <input type="checkbox" name="include_search" checked>
+            Search each platform's domain for this brand
+            <span class="muted">— the only method available for platforms whose profile URLs are not derivable</span>
+          </label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite ? '' : 'disabled' %>>Check coverage</button>
+        </div>
+        <p class="hint">
+          Checks run one at a time with a pause between them. Every platform here rate-limits, and firing twenty
+          concurrent requests returns 429 for most of them — which would land in the "unknown" bucket and make
+          the whole report say nothing.
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Platforms checked for a <%= brand.vertical || 'general' %> business</h3>
+      <span class="muted" style="font-size:12px"><%= platformList.length %> of <%= allPlatforms.length %> — the rest are irrelevant to this vertical and are not reported</span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Platform</th><th>Weight</th><th>Method</th><th>Why it matters here</th></tr></thead>
+        <tbody>
+        <% platformList.forEach(function (p) { %>
+          <tr>
+            <td><strong><%= p.label %></strong><div class="muted mono-sm"><%= p.domain %></div></td>
+            <td><%= p.weight %></td>
+            <td class="muted" style="font-size:12px"><%= p.probe ? 'direct probe + search' : 'search only' %></td>
+            <td style="font-size:12px"><%= p.why %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <p class="hint">
+        The list is vertical-aware on purpose. A restaurant missing from G2 has no problem; a B2B software
+        product missing from G2 has a serious one. A flat list of twenty platforms would produce nineteen
+        irrelevant findings per brand, so each platform declares the verticals it matters for and only those
+        plus the universal ones are checked.
+        <% if (!brand.vertical || brand.vertical === 'other') { %>
+          <br><strong>This brand has no vertical set</strong>, so only the universal platforms are checked.
+          <a href="/brands/<%= brand.id %>">Set a vertical</a> to include the ones specific to the industry.
+        <% } %>
+      </p>
+    </div>
+  </div>
+  <% } %>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

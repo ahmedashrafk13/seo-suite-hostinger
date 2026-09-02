@@ -3,7 +3,7 @@ const isAjax = typeof ajax !== 'undefined' && ajax;
 // Named chart palette — single source of truth for the per-metric colors
 // used across trendchart/barchart/worldmap partials below (kept as literal
 // hex since these render as SVG fill attributes, not CSS classes).
-const chartColor = { volume: '#6b46c1', engagement: '#0d9488', rank: '#b45309' };
+const chartColor = { volume: '#6b46c1', engagement: '#0f766e', rank: '#b45309' };
 %>
 <% if (!isAjax) { %>
 <!DOCTYPE html>
@@ -22,7 +22,10 @@ function deltaHtml(recent, prior, invert) {
   const pct = prior === 0 ? null : (abs / prior) * 100;
   const good = invert ? abs < 0 : abs > 0;
   const cls = abs === 0 ? 'flat' : (good ? 'up' : 'down');
-  const arrow = abs === 0 ? '' : (abs > 0 ? '▲' : '▼');
+  // Arrow means "better/worse", not "the raw number went up/down" — for an
+  // inverted metric (Avg Position, bounce rate) a falling number is an
+  // IMPROVEMENT and must show ▲, matching report-detail.ejs's convention.
+  const arrow = abs === 0 ? '' : (good ? '▲' : '▼');
   const label = pct === null ? (abs > 0 ? 'new' : '') : `${Math.abs(pct).toFixed(1)}%`;
   return `<span class="delta ${cls}">${arrow} ${label}</span>`;
 }
@@ -97,10 +100,10 @@ function sortLink(key, label) {
         }); }
         function render(d) {
           if (!d.ok) { body.innerHTML = '<span style="color:var(--text-3)">Realtime unavailable — ' + esc(d.reason || 'no GA4 property linked') + '</span>'; return; }
-          var countryHtml = (d.byCountry || []).slice(0, 5).map(function (c) {
+          var countryHtml = (d.byCountry || []).map(function (c) {
             return '<tr><td>' + esc(c.country) + '</td><td class="num">' + c.activeUsers + '</td></tr>';
           }).join('') || '<tr><td colspan="2" style="color:var(--text-3)">No active users right now.</td></tr>';
-          var pageHtml = (d.byPage || []).slice(0, 5).map(function (p) {
+          var pageHtml = (d.byPage || []).map(function (p) {
             return '<tr><td>' + esc(p.page) + '</td><td class="num">' + p.activeUsers + '</td></tr>';
           }).join('') || '<tr><td colspan="2" style="color:var(--text-3)">No active users right now.</td></tr>';
           body.innerHTML =
@@ -172,7 +175,7 @@ function sortLink(key, label) {
           </div>
 
           <div class="grid cols-4" style="gap:16px;margin-top:16px">
-            <%- include('partials/trendchart', { label: 'Clicks', points: data.series.map(s => ({ date: fmtDate(s.date), value: s.clicks })), color: '#2563eb', fmt: 'int' }) %>
+            <%- include('partials/trendchart', { label: 'Clicks', points: data.series.map(s => ({ date: fmtDate(s.date), value: s.clicks })), color: '#1e4d6b', fmt: 'int' }) %>
             <%- include('partials/trendchart', { label: 'Impressions', points: data.series.map(s => ({ date: fmtDate(s.date), value: s.impressions })), color: chartColor.volume, fmt: 'int' }) %>
             <%- include('partials/trendchart', { label: 'CTR', points: data.series.map(s => ({ date: fmtDate(s.date), value: s.ctr })), color: chartColor.engagement, fmt: 'pct' }) %>
             <%- include('partials/trendchart', { label: 'Average position', points: data.series.map(s => ({ date: fmtDate(s.date), value: s.position })), color: chartColor.rank, fmt: 'pos', invert: true }) %>
@@ -222,7 +225,7 @@ function sortLink(key, label) {
           </div>
 
           <div class="grid cols-2" style="gap:16px;margin-top:16px">
-            <%- include('partials/trendchart', { label: 'Sessions', points: data.ga4Series.map(s => ({ date: fmtDate(s.date), value: s.sessions })), color: '#2563eb', fmt: 'int' }) %>
+            <%- include('partials/trendchart', { label: 'Sessions', points: data.ga4Series.map(s => ({ date: fmtDate(s.date), value: s.sessions })), color: '#1e4d6b', fmt: 'int' }) %>
             <%- include('partials/trendchart', { label: 'Conversions', points: data.ga4Series.map(s => ({ date: fmtDate(s.date), value: s.conversions })), color: chartColor.engagement, fmt: 'int' }) %>
           </div>
         <% } %>
@@ -241,6 +244,7 @@ function sortLink(key, label) {
           <a class="tab <%= tab === 'countries' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'countries' }) %>">Countries</a>
           <a class="tab <%= tab === 'devices' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'devices' }) %>">Devices</a>
           <a class="tab <%= tab === 'appearance' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'appearance' }) %>">Search appearance</a>
+          <a class="tab <%= tab === 'searchtype' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'searchtype' }) %>">Discover/News</a>
           <a class="tab <%= tab === 'sitemaps' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'sitemaps' }) %>">Sitemaps</a>
           <a class="tab <%= tab === 'indexing' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'indexing' }) %>">Page indexing</a>
           <a class="tab <%= tab === 'channels' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'channels' }) %>">GA4 channels</a>
@@ -249,6 +253,10 @@ function sortLink(key, label) {
           <a class="tab <%= tab === 'ga4geo' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ga4geo' }) %>">GA4 geo</a>
           <a class="tab <%= tab === 'ga4acquisition' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ga4acquisition' }) %>">GA4 acquisition</a>
           <a class="tab <%= tab === 'ga4events' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ga4events' }) %>">GA4 events</a>
+          <a class="tab <%= tab === 'retention' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'retention' }) %>">Retention</a>
+          <a class="tab <%= tab === 'monetization' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'monetization' }) %>">Monetization</a>
+          <a class="tab <%= tab === 'predictive' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'predictive' }) %>">Predictive</a>
+          <a class="tab <%= tab === 'customdimensions' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'customdimensions' }) %>">Custom Dimensions</a>
           <a class="tab <%= tab === 'ai' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ai' }) %>">AI Suggestions</a>
         </div>
         <% if (['queries','pages','querypage','countries','ga4pages','ga4geo','ga4acquisition'].includes(tab)) { %>
@@ -262,8 +270,11 @@ function sortLink(key, label) {
       </div>
 
       <% if (tab === 'queries') { %>
+        <div style="margin-bottom:10px">
+          <input type="text" id="queries-livefilter" placeholder="Search loaded queries…" style="width:260px">
+        </div>
         <div class="table-wrap">
-          <table class="data compact">
+          <table class="data compact" id="queries-table">
             <thead><tr>
               <th>Query</th>
               <th class="num"><%- sortLink('clicks', 'Clicks') %></th>
@@ -290,19 +301,38 @@ function sortLink(key, label) {
           </table>
         </div>
         <%- include('partials/pagination', { total: data.queryTotal, page, pageSize, makeHref: (n) => `/performance?${qs({ page: n })}` }) %>
+        <script>
+          (function () {
+            var input = document.getElementById('queries-livefilter');
+            var table = document.getElementById('queries-table');
+            if (!input || !table) return;
+            input.addEventListener('input', function () {
+              var needle = input.value.trim().toLowerCase();
+              var rows = table.querySelectorAll('tbody tr');
+              Array.prototype.forEach.call(rows, function (row) {
+                var text = row.textContent.toLowerCase();
+                row.style.display = (!needle || text.indexOf(needle) !== -1) ? '' : 'none';
+              });
+            });
+          })();
+        </script>
       <% } else if (tab === 'pages') { %>
+        <div style="margin-bottom:10px">
+          <input type="text" id="pages-livefilter" placeholder="Search loaded pages…" style="width:260px">
+        </div>
         <div class="table-wrap">
-          <table class="data compact">
+          <table class="data compact" id="pages-table">
             <thead><tr>
               <th>Page</th>
               <th class="num"><%- sortLink('clicks', 'Clicks') %></th>
               <th class="num"><%- sortLink('impressions', 'Impressions') %></th>
               <th class="num"><%- sortLink('ctr', 'CTR') %></th>
               <th class="num"><%- sortLink('position', 'Position') %></th>
+              <th class="num">vs prior</th>
             </tr></thead>
             <tbody>
               <% if (!data.pageRows.length) { %>
-                <tr><td colspan="5"><div class="empty-state">No pages in this window.</div></td></tr>
+                <tr><td colspan="6"><div class="empty-state">No pages in this window.</div></td></tr>
               <% } %>
               <% data.pageRows.forEach(function(r){ %>
                 <tr>
@@ -311,12 +341,28 @@ function sortLink(key, label) {
                   <td class="num"><%= fmtInt(r.impressions) %></td>
                   <td class="num"><%= fmtPct(r.ctr * 100, 2) %></td>
                   <td class="num"><%= fmtPos(r.position) %></td>
+                  <td class="num"><%- deltaHtml(r.clicks, r.priorClicks) %></td>
                 </tr>
               <% }) %>
             </tbody>
           </table>
         </div>
         <%- include('partials/pagination', { total: data.pageTotal, page, pageSize, makeHref: (n) => `/performance?${qs({ page: n })}` }) %>
+        <script>
+          (function () {
+            var input = document.getElementById('pages-livefilter');
+            var table = document.getElementById('pages-table');
+            if (!input || !table) return;
+            input.addEventListener('input', function () {
+              var needle = input.value.trim().toLowerCase();
+              var rows = table.querySelectorAll('tbody tr');
+              Array.prototype.forEach.call(rows, function (row) {
+                var text = row.textContent.toLowerCase();
+                row.style.display = (!needle || text.indexOf(needle) !== -1) ? '' : 'none';
+              });
+            });
+          })();
+        </script>
 
       <% } else if (tab === 'querypage') { %>
         <div class="notice info" style="margin:16px">
@@ -362,7 +408,7 @@ function sortLink(key, label) {
 
       <% } else if (tab === 'channels') { %>
         <div class="grid cols-2" style="gap:20px;margin-bottom:16px">
-          <%- include('partials/barchart', { label: 'Sessions by channel', rows: data.channels, nameKey: 'channel', valueKey: 'sessions', color: '#2563eb', max: 8 }) %>
+          <%- include('partials/barchart', { label: 'Sessions by channel', rows: data.channels, nameKey: 'channel', valueKey: 'sessions', color: '#1e4d6b', max: 8 }) %>
           <%- include('partials/barchart', { label: 'Conversions by channel', rows: data.channels, nameKey: 'channel', valueKey: 'conversions', color: chartColor.engagement, max: 8 }) %>
         </div>
         <div class="table-wrap">
@@ -427,13 +473,13 @@ function sortLink(key, label) {
           <div class="card">
             <div class="card-head"><h3>Clicks by country</h3></div>
             <div class="card-body">
-              <%- include('partials/worldmap', { rows: data.countriesForChart, nameKey: 'entity', valueKey: 'clicks', codeType: 'alpha3', color: '#2563eb' }) %>
+              <%- include('partials/worldmap', { rows: data.countriesForChart, nameKey: 'entity', valueKey: 'clicks', codeType: 'alpha3', color: '#1e4d6b' }) %>
             </div>
           </div>
           <div class="card">
             <div class="card-head"><h3>Top countries</h3></div>
             <div class="card-body">
-              <%- include('partials/barchart', { label: '', rows: data.countriesForChart, nameKey: 'entity', valueKey: 'clicks', color: '#2563eb', max: 8 }) %>
+              <%- include('partials/barchart', { label: '', rows: data.countriesForChart, nameKey: 'entity', valueKey: 'clicks', color: '#1e4d6b', max: 8 }) %>
             </div>
           </div>
         </div>
@@ -522,6 +568,46 @@ function sortLink(key, label) {
                   <td class="num"><%= fmtInt(a.impressions) %></td>
                   <td class="num"><%= fmtPct(a.impressions > 0 ? (a.clicks / a.impressions) * 100 : 0, 2) %></td>
                   <td class="num"><%= fmtPos(a.position) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+      <% } else if (tab === 'searchtype') { %>
+        <div class="notice info" style="margin-bottom:16px">
+          <span class="notice-icon">&#8505;</span>
+          <div class="notice-body">
+            Search Console's <code>searchType</code> dimension — Discover, Google News, Image and Video results,
+            broken out from regular web search. Most sites see mostly "web"; Discover/News rows only appear once
+            content actually surfaces there.
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-body">
+            <%- include('partials/barchart', { label: 'Clicks by search type', rows: data.searchType, nameKey: 'entity', valueKey: 'clicks', color: chartColor.rank, max: 6 }) %>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Search type</th>
+              <th class="num">Clicks</th>
+              <th class="num">Impressions</th>
+              <th class="num">CTR</th>
+              <th class="num">Position</th>
+            </tr></thead>
+            <tbody>
+              <% if (!data.searchType.length) { %>
+                <tr><td colspan="5"><div class="empty-state">No Discover/News/Image/Video data in this window.</div></td></tr>
+              <% } %>
+              <% data.searchType.forEach(function(s){ %>
+                <tr>
+                  <td style="text-transform:capitalize"><%= s.entity %></td>
+                  <td class="num"><%= fmtInt(s.clicks) %></td>
+                  <td class="num"><%= fmtInt(s.impressions) %></td>
+                  <td class="num"><%= fmtPct(s.impressions > 0 ? (s.clicks / s.impressions) * 100 : 0, 2) %></td>
+                  <td class="num"><%= fmtPos(s.position) %></td>
                 </tr>
               <% }) %>
             </tbody>
@@ -734,6 +820,12 @@ function sortLink(key, label) {
                           <%= fmtInt(data.richResults.totals.withIssues || 0) %>
                         </div>
                       </div>
+                      <div class="stat">
+                        <div class="label">Failing</div>
+                        <div class="value" style="color:<%= data.richResults.totals.failing ? 'var(--critical)' : 'var(--text)' %>">
+                          <%= fmtInt(data.richResults.totals.failing || 0) %>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -767,9 +859,13 @@ function sortLink(key, label) {
                 <th>URL</th>
                 <th>Verdict</th>
                 <th>Coverage reason</th>
+                <th>Robots.txt</th>
+                <th>Indexing</th>
+                <th>Page fetch</th>
                 <th>Crawled as</th>
                 <th>Rich results</th>
                 <th>In sitemap</th>
+                <th>Referring URLs</th>
                 <th>Last crawled</th>
               </tr></thead>
               <tbody>
@@ -778,6 +874,9 @@ function sortLink(key, label) {
                     <td class="url wrap"><%= shortUrl(r.url, 55) %></td>
                     <td><span class="badge <%= r.verdict === 'PASS' ? 'good' : (r.error ? 'neutral' : 'critical') %>"><%= r.error ? 'error' : (r.verdict || 'unknown') %></span></td>
                     <td class="wrap"><%= r.error ? r.error : (r.coverage_state || '—') %></td>
+                    <td class="narrow"><%= r.robots_txt_state || '—' %></td>
+                    <td class="narrow"><%= r.indexing_state || '—' %></td>
+                    <td class="narrow"><%= r.page_fetch_state || '—' %></td>
                     <td class="narrow" style="text-transform:capitalize"><%= r.crawled_as ? String(r.crawled_as).toLowerCase() : '—' %></td>
                     <td class="wrap">
                       <% if (r.rich_result_types) { %>
@@ -785,6 +884,11 @@ function sortLink(key, label) {
                       <% } else { %>—<% } %>
                     </td>
                     <td class="narrow"><%= r.sitemap ? 'Yes' : '—' %></td>
+                    <td class="wrap" style="max-width:220px">
+                      <% if (r.referring_urls) { %>
+                        <span title="<%= r.referring_urls %>"><%= shortUrl(r.referring_urls.split(' | ')[0], 40) %><%= r.referring_urls.includes(' | ') ? ' +more' : '' %></span>
+                      <% } else { %>—<% } %>
+                    </td>
                     <td class="narrow"><%= r.last_crawl_time ? fmtDate(r.last_crawl_time) : '—' %></td>
                   </tr>
                 <% }) %>
@@ -831,6 +935,29 @@ function sortLink(key, label) {
                     <td class="num"><%= fmtInt(b.sessions) %></td>
                     <td class="num"><%= fmtInt(b.users) %></td>
                     <td class="num"><%= fmtInt(b.conversions) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-head"><h3>New vs returning users</h3></div>
+          <div class="table-wrap">
+            <table class="data compact">
+              <thead><tr><th>Device category</th><th>New / returning</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
+              <tbody>
+                <% if (!data.ga4DeviceSegmentRows.length) { %>
+                  <tr><td colspan="5"><div class="empty-state">No new-vs-returning breakdown in this window.</div></td></tr>
+                <% } %>
+                <% data.ga4DeviceSegmentRows.forEach(function(d){ %>
+                  <tr>
+                    <td style="text-transform:capitalize"><%= d.device_category %></td>
+                    <td><%= d.new_vs_returning %></td>
+                    <td class="num"><%= fmtInt(d.sessions) %></td>
+                    <td class="num"><%= fmtInt(d.users) %></td>
+                    <td class="num"><%= fmtInt(d.conversions) %></td>
                   </tr>
                 <% }) %>
               </tbody>
@@ -899,6 +1026,29 @@ function sortLink(key, label) {
           </div>
         </div>
 
+        <div class="card" style="margin-top:16px">
+          <div class="card-head"><h3>New vs returning users by country</h3></div>
+          <div class="table-wrap">
+            <table class="data compact">
+              <thead><tr><th>Country</th><th>New / returning</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
+              <tbody>
+                <% if (!data.ga4GeoSegmentRows.length) { %>
+                  <tr><td colspan="5"><div class="empty-state">No new-vs-returning breakdown in this window.</div></td></tr>
+                <% } %>
+                <% data.ga4GeoSegmentRows.forEach(function(g){ %>
+                  <tr>
+                    <td><%= g.country %></td>
+                    <td><%= g.new_vs_returning %></td>
+                    <td class="num"><%= fmtInt(g.sessions) %></td>
+                    <td class="num"><%= fmtInt(g.users) %></td>
+                    <td class="num"><%= fmtInt(g.conversions) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       <% } else if (tab === 'ga4acquisition') { %>
         <div class="card" style="margin-bottom:16px">
           <div class="card-body">
@@ -951,13 +1101,149 @@ function sortLink(key, label) {
           </table>
         </div>
         <%- include('partials/pagination', { total: data.ga4EventTotal, page, pageSize, makeHref: (n) => `/performance?${qs({ page: n })}` }) %>
+      <% } else if (tab === 'retention') { %>
+        <div class="notice info" style="margin-bottom:16px">
+          <span class="notice-icon">&#8505;</span>
+          <div class="notice-body">
+            Weekly cohorts from GA4's cohort report: users grouped by the week of their first session, tracked for
+            three weeks after. Week 0 is the acquisition week itself (100% by definition); week 1-3 show how many of
+            that cohort came back.
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Cohort week</th>
+              <th class="num">Week 0</th>
+              <th class="num">Week 1</th>
+              <th class="num">Week 2</th>
+              <th class="num">Week 3</th>
+            </tr></thead>
+            <tbody>
+              <% if (!data.retention.length) { %>
+                <tr><td colspan="5"><div class="empty-state">No retention data yet — it lands with the next brand sync.</div></td></tr>
+              <% } %>
+              <% data.retention.forEach(function(c){ %>
+                <tr>
+                  <td><%= c.cohortWeek %></td>
+                  <td class="num"><%= c.weeks[0] != null ? fmtInt(c.weeks[0]) : '—' %></td>
+                  <td class="num"><%= c.weeks[1] != null ? fmtInt(c.weeks[1]) : '—' %></td>
+                  <td class="num"><%= c.weeks[2] != null ? fmtInt(c.weeks[2]) : '—' %></td>
+                  <td class="num"><%= c.weeks[3] != null ? fmtInt(c.weeks[3]) : '—' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+      <% } else if (tab === 'monetization') { %>
+        <div class="notice info" style="margin-bottom:16px">
+          <span class="notice-icon">&#8505;</span>
+          <div class="notice-body">
+            GA4 ecommerce metrics. These will be zero or blank for brands that have not configured ecommerce tracking
+            (purchase/item events) in GA4 — that is expected, not a sync failure.
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Date</th>
+              <th class="num">Purchase revenue</th>
+              <th class="num">Item revenue</th>
+              <th class="num">Transactions</th>
+            </tr></thead>
+            <tbody>
+              <% if (!data.monetization.length) { %>
+                <tr><td colspan="4"><div class="empty-state">No monetization data in this window (no ecommerce tracking configured, or none in this range).</div></td></tr>
+              <% } %>
+              <% data.monetization.forEach(function(m){ %>
+                <tr>
+                  <td><%= fmtDate(m.date) %></td>
+                  <td class="num"><%= fmtInt(m.purchase_revenue) %></td>
+                  <td class="num"><%= fmtInt(m.item_revenue) %></td>
+                  <td class="num"><%= fmtInt(m.transactions) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+      <% } else if (tab === 'predictive') { %>
+        <div class="notice info" style="margin-bottom:16px">
+          <span class="notice-icon">&#8505;</span>
+          <div class="notice-body">
+            GA4's predictive metrics (purchase probability, churn probability, predicted 90-day revenue). Google only
+            computes these once a property has enough purchase/conversion volume and an eligible predictive audience
+            enabled — most properties will not qualify, which is expected, not a sync failure.
+          </div>
+        </div>
+        <% if (!data.predictive.length) { %>
+          <div class="empty-state">Predictive metrics are not available for this property (insufficient purchase/conversion volume, or not yet synced).</div>
+        <% } else { %>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Date</th>
+              <th class="num">Purchase probability</th>
+              <th class="num">Churn probability</th>
+              <th class="num">Predicted revenue (90d)</th>
+            </tr></thead>
+            <tbody>
+              <% data.predictive.forEach(function(p){ %>
+                <tr>
+                  <td><%= fmtDate(p.date) %></td>
+                  <td class="num"><%= fmtPct(p.purchase_probability * 100, 2) %></td>
+                  <td class="num"><%= fmtPct(p.churn_probability * 100, 2) %></td>
+                  <td class="num"><%= fmtInt(p.predicted_revenue_90d) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
+
+      <% } else if (tab === 'customdimensions') { %>
+        <div class="notice info" style="margin-bottom:16px">
+          <span class="notice-icon">&#8505;</span>
+          <div class="notice-body">
+            Whatever custom dimensions/metrics are configured on this brand's GA4 property, discovered automatically
+            via the GA4 Metadata API — nothing here is hardcoded per brand.
+          </div>
+        </div>
+        <% if (!data.customDimensions.length) { %>
+          <div class="empty-state">No custom dimensions or metrics are configured for this property.</div>
+        <% } else { %>
+        <div class="table-wrap">
+          <table class="data compact">
+            <thead><tr>
+              <th>Date</th>
+              <th>Dimension</th>
+              <th>Value</th>
+              <th>Metric</th>
+              <th class="num">Value</th>
+            </tr></thead>
+            <tbody>
+              <% data.customDimensions.forEach(function(c){ %>
+                <tr>
+                  <td><%= fmtDate(c.date) %></td>
+                  <td><%= c.dimension_name || '—' %></td>
+                  <td><%= c.dimension_value || '—' %></td>
+                  <td><%= c.metric_name %></td>
+                  <td class="num"><%= fmtInt(c.metric_value) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
+
       <% } else if (tab === 'ai') { %>
         <div class="empty-state">
           <div class="icon">&#10024;</div>
-          <h3>AI Suggestions — coming soon</h3>
+          <h3>AI performance summary — coming soon</h3>
           <p>Requires an ongoing paid AI API connection, so it isn't switched on yet. This is where an AI-written
             summary of this brand's performance will appear, generated from the real data already on this page.</p>
-          <a class="btn secondary sm" href="/ai-suggestions">See what's planned</a>
+          <a class="btn secondary sm" href="/ai-seo">See the AI SEO suite</a>
         </div>
       <% } %>
     </div>

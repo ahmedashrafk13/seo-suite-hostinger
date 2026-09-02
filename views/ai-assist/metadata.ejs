@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+    <div class="toolbar">
+      <a class="btn ghost sm" href="/ai-assist">&larr; AI Assist</a>
+      <div class="spacer"></div>
+      <% if (run) { %>
+      <a class="btn secondary sm" href="/audit/<%= run.id %>" target="_blank" rel="noopener">View real audit run &rarr;</a>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>AI Metadata Optimization — <%= brand.name %></h3>
+        <% if (pages.length) { %>
+        <form method="POST" action="/ai-assist/<%= brand.id %>/metadata/generate">
+          <button class="btn sm" type="submit"><%= row ? 'Regenerate (new billed call)' : 'Generate with AI' %></button>
+          <% if (row) { %><input type="hidden" name="force" value="1"><% } %>
+        </form>
+        <% } %>
+      </div>
+      <div class="card-body">
+        <% if (!run) { %>
+          <div class="empty-state">No completed technical audit for this brand yet — run one from the Technical audit page first.</div>
+        <% } else if (!pages.length) { %>
+          <div class="empty-state">The latest audit found no pages with a missing or duplicated title/meta description — nothing to send to AI.</div>
+        <% } else { %>
+          <% if (row) { %>
+            <p class="hint">Generated <%= fmtDateTime(row.created_at) %> · <%= fmtInt(row.prompt_tokens) %> prompt / <%= fmtInt(row.completion_tokens) %> completion tokens · $<%= Number(row.cost_usd).toFixed(4) %></p>
+          <% } %>
+          <p class="hint">Showing up to <%= maxPages %> pages from audit run #<%= run.id %> (<%= fmtDateTime(run.created_at) %>) flagged with a missing or duplicated title/meta description.</p>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>URL</th><th>Issue(s)</th><th>Suggested title</th><th>Suggested meta description</th></tr></thead>
+            <tbody>
+            <% pages.forEach(function(p){ %>
+              <% const note = row && row.notes && row.notes[String(p.id)]; %>
+              <tr>
+                <td><a href="<%= p.url %>" target="_blank" rel="noopener"><%= p.url %></a></td>
+                <td><% p.issues.forEach(function(i){ %><span class="badge medium"><%= i %></span> <% }) %></td>
+                <td><%= note ? note.title : (row ? '—' : 'Not generated yet') %></td>
+                <td><%= note ? note.description : (row ? '—' : 'Not generated yet') %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        <% } %>
+      </div>
+    </div>
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

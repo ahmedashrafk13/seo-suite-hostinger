@@ -199,6 +199,198 @@ const JOBS = [
     },
   },
   {
+    // The tracking board, swept on a schedule.
+    //
+    // WHY ONE BRAND PER TICK
+    // A full sweep crawls a sample of pages, probes AI user agents and calls
+    // PageSpeed Insights. Doing that for every brand in one cron tick would
+    // exceed the PSI quota and, on shared hosting, the memory allowance. So
+    // each tick sweeps the brand whose last sweep is oldest, and the rotation
+    // comes out of the metric history rather than a cursor that could drift
+    // out of step with reality.
+    //
+    // The consequence is stated plainly rather than hidden: with N brands and
+    // a daily schedule, each brand is swept every N days. A brand that needs
+    // daily monitoring should be swept from its own cron line with
+    // ?job=aiseo_tracking.
+    key: 'aiseo_tracking',
+    label: 'AI SEO tracking sweep',
+    cron: () => process.env.AISEO_TRACKING_CRON || '40 4 * * *',
+    async run() {
+      const tracking = require('./aiseo/tracking');
+      const brands = tracking.brandsToSweep({ limit: 100 });
+      if (!brands.length) return 'no active brands with a site URL';
+
+      // Oldest last-sweep first. A brand never swept has no row at all, and
+      // COALESCE puts it at the front — which is what makes a new brand get
+      // its baseline on the next tick rather than after every other brand.
+      const lastSweep = new Map(db.prepare(`SELECT brand_id, MAX(finished_at) last
+        FROM aiseo_runs WHERE kind='tracking' AND status='completed' GROUP BY brand_id`)
+        .all().map((r) => [r.brand_id, r.last]));
+      brands.sort((a, b) => String(lastSweep.get(a.id) || '').localeCompare(String(lastSweep.get(b.id) || '')));
+
+      const brand = brands[0];
+      const perTick = Math.max(1, Number(process.env.AISEO_TRACKING_BRANDS_PER_TICK || 1));
+      const selected = brands.slice(0, perTick);
+      const done = [];
+      for (const b of selected) {
+        try {
+          /* eslint-disable no-await-in-loop */
+          const r = await tracking.run({
+            userId: b.user_id,
+            brand: b,
+            sampleSize: Number(process.env.AISEO_TRACKING_SAMPLE || 12),
+          });
+          /* eslint-enable no-await-in-loop */
+          done.push(`${b.name}: score ${r.score == null ? 'n/a' : Math.round(r.score)}, ${r.findings.length} finding(s)`);
+        } catch (err) {
+          // One brand failing must not abandon the others.
+          done.push(`${b.name}: FAILED ${String(err.message).slice(0, 120)}`);
+        }
+      }
+      return `${done.length} of ${brands.length} brand(s) swept (oldest first, starting with ${brand.name}) — ${done.join('; ')}`;
+    },
+  },
+  {
+    // Reputation scanning. Separate from the tracking sweep because it calls
+    // out to third-party public endpoints rather than to the brand's own site,
+    // and because it is the one job here whose findings people want to see
+    // promptly — a damaging claim is worth knowing about the same day.
+    key: 'aiseo_reputation',
+    label: 'AI SEO reputation scan',
+    cron: () => process.env.AISEO_REPUTATION_CRON || '15 5 * * *',
+    async run() {
+      const providers = require('./aiseo/providers');
+      if (!providers.has('public')) return 'skipped — public sources are disabled';
+      const reputation = require('./aiseo/reputation');
+      const tracking = require('./aiseo/tracking');
+      const brands = tracking.brandsToSweep({ limit: 100 });
+      if (!brands.length) return 'no active brands';
+
+      const lastScan = new Map(db.prepare(`SELECT brand_id, MAX(finished_at) last
+        FROM aiseo_runs WHERE kind='reputation' AND status='completed' GROUP BY brand_id`)
+        .all().map((r) => [r.brand_id, r.last]));
+      brands.sort((a, b) => String(lastScan.get(a.id) || '').localeCompare(String(lastScan.get(b.id) || '')));
+
+      const perTick = Math.max(1, Number(process.env.AISEO_REPUTATION_BRANDS_PER_TICK || 1));
+      const out = [];
+      for (const b of brands.slice(0, perTick)) {
+        try {
+          /* eslint-disable no-await-in-loop */
+          // wantAi is off on the scheduled path. Triage costs money per call,
+          // and a cron job that spends the AI budget unattended is how the cap
+          // is reached before anyone has looked at a single finding. The
+          // findings themselves are complete without it; triage is one click
+          // away on the result page.
+          const r = await reputation.run({ userId: b.user_id, brand: b, wantAi: false });
+          /* eslint-enable no-await-in-loop */
+          const res = r.result || {};
+          out.push(`${b.name}: ${res.newThisScan || 0} new, ${(res.mix && res.mix.risky) || 0} risky`);
+        } catch (err) {
+          out.push(`${b.name}: FAILED ${String(err.message).slice(0, 120)}`);
+        }
+      }
+      return out.join('; ') || 'nothing scanned';
+    },
+  },
+  {
+    // Freshness and intent drift. Weekly, because both are slow-moving: a
+    // page's query mix does not shift meaningfully day to day, and a daily
+    // run would spend the crawl budget re-confirming yesterday's answer.
+    key: 'aiseo_freshness',
+    label: 'AI SEO freshness & drift sweep',
+    cron: () => process.env.AISEO_FRESHNESS_CRON || '10 6 * * 2',
+    async run() {
+      const freshness = require('./aiseo/freshness');
+      const tracking = require('./aiseo/tracking');
+      const brands = tracking.brandsToSweep({ limit: 100 }).filter((b) => b.gsc_property);
+      if (!brands.length) return 'no brands with a Search Console property';
+      const out = [];
+      for (const b of brands.slice(0, Math.max(1, Number(process.env.AISEO_FRESHNESS_BRANDS_PER_TICK || 2)))) {
+        try {
+          /* eslint-disable no-await-in-loop */
+          const r = await freshness.run({
+            userId: b.user_id, brand: b,
+            maxPages: Number(process.env.AISEO_FRESHNESS_PAGES || 40),
+            wantAi: false, // same reasoning as the reputation job
+          });
+          /* eslint-enable no-await-in-loop */
+          const c = (r.result && r.result.counts) || {};
+          out.push(`${b.name}: ${c.drift || 0} drifted, ${c.decaying || 0} decaying, ${c.stale || 0} stale`);
+        } catch (err) {
+          out.push(`${b.name}: FAILED ${String(err.message).slice(0, 120)}`);
+        }
+      }
+      return out.join('; ') || 'nothing swept';
+    },
+  },
+  {
+    // Keyword difficulty backfill.
+    //
+    // WHY THIS JOB EXISTS
+    // Difficulty without a paid credential costs one paced SERP fetch per
+    // keyword — about 1.4 seconds, enforced inside lib/aiseo/serpLite.js. That
+    // is far too slow to do for hundreds of keywords inside a run somebody is
+    // watching, which is why the inline scorer is capped at a dozen. Here
+    // nobody is waiting, so the cap is irrelevant and the queue simply drains.
+    //
+    // Hourly rather than nightly: a smaller batch every hour spreads the load,
+    // survives a restart with less lost work, and gets scores in front of the
+    // user during the working day instead of only after a night has passed.
+    key: 'aiseo_kd_backfill',
+    label: 'Keyword difficulty backfill',
+    cron: () => process.env.AISEO_KD_BACKFILL_CRON || '25 * * * *',
+    async run() {
+      const cache = require('./aiseo/difficultyCache');
+      const providers = require('./aiseo/providers');
+      if (!providers.has('serp-lite')) return 'serp-lite unavailable; nothing to score';
+
+      // Sized to the pacing, not guessed: serpLite allows roughly 43 requests
+      // a minute, so 120 keywords is about three minutes of work — short
+      // enough to finish well inside the hour, long enough to clear a typical
+      // research run's overflow in a few ticks.
+      const batchSize = Math.max(10, Number(process.env.AISEO_KD_BACKFILL_BATCH || 120));
+      const batch = cache.takeBatch(batchSize);
+      if (!batch.length) {
+        const st = cache.queueStats();
+        return `queue empty (${st.cachedScores} keyword(s) scored in cache)`;
+      }
+
+      let scored = 0;
+      let unscoreable = 0;
+      let failed = 0;
+      let throttled = 0;
+
+      for (const row of batch) {
+        try {
+          /* eslint-disable no-await-in-loop */
+          const kd = await cache.scoreOne(row.keyword, row.market);
+          /* eslint-enable no-await-in-loop */
+          // A null difficulty with a reason is a real answer — the SERP was
+          // read and had nothing scoreable in it. It is cached and dequeued so
+          // it is not retried forever.
+          if (kd.difficulty == null) unscoreable += 1; else scored += 1;
+          cache.dequeue(row.id);
+        } catch (err) {
+          // A throttle is NOT a failure of the keyword, so it must not burn an
+          // attempt — otherwise a rate-limited hour would exhaust every row in
+          // the batch and permanently abandon keywords that were never tried.
+          if (err.throttled) {
+            throttled += 1;
+            break; // stop the tick; the next one starts with a clean allowance
+          }
+          failed += 1;
+          cache.recordFailure(row.id, err.message);
+        }
+      }
+
+      const st = cache.queueStats();
+      return `${scored} scored, ${unscoreable} unscoreable, ${failed} failed`
+        + (throttled ? ', stopped early on rate limit' : '')
+        + ` — ${st.queued} still queued, ${st.cachedScores} in cache`;
+    },
+  },
+  {
     key: 'sessions',
     label: 'Expired session sweep',
     intervalMs: () => 3600000,
