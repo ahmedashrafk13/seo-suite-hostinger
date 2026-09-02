@@ -78,6 +78,10 @@ ENV REPORTS_DIR=/data/reports
 ENV TMP_DIR=/tmp/seo-suite
 ENV INPROCESS_CRON=1
 ENV TRUST_PROXY=1
+# Fly's own init is PID 1, so tini runs as a child and cannot reap by default.
+# Without this the crawler subprocesses accumulate as zombies on a long-lived
+# machine until it runs out of PIDs.
+ENV TINI_SUBREAPER=1
 
 WORKDIR /app
 

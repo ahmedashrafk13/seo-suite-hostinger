@@ -92,6 +92,14 @@ Then add whichever of these you use:
 The app refuses to start in production with the default session secret, so the
 first command above is not optional.
 
+**Set `SIGNUP_REQUIRES_INVITE=1` before the app is publicly reachable.** Without
+it, sign-up is open and anyone who finds the URL can create their own
+workspace. The app warns about this in its boot log and nowhere else.
+
+```bash
+fly secrets set SIGNUP_REQUIRES_INVITE=1 --app seo-suite-hostinger
+```
+
 ## 4. Point Google OAuth at the new domain
 
 This is the step that fails quietly. `src/config.js:69` derives the OAuth
