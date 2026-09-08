@@ -89,14 +89,12 @@
             <div style="font-size:12px;color:var(--text-2)">
               <% if (ads.devToken) { %>
                 Set in <code>GOOGLE_ADS_DEVELOPER_TOKEN</code>. If calls return no volumes, the token is
-                probably still on <em>test</em> access. Basic access is what fixes that, but Google declines it
-                for tools that only do keyword research &mdash; use DataForSEO instead for the same figures.
+                probably still on <em>test</em> access &mdash; apply for Basic access in
+                Google Ads &rsaquo; Tools &rsaquo; API Center.
               <% } else { %>
-                Not set, and <strong>not the recommended route</strong>: Google declines Ads API developer
-                tokens for tools that only perform keyword research, which is all this suite asks of it.
-                Set <code>DATAFORSEO_LOGIN</code> and <code>DATAFORSEO_PASSWORD</code> instead &mdash; the same
-                Google figures, plus keyword difficulty, with no token application. This card stays useful only
-                if you already hold an approved token.
+                Not set. Apply for a Basic access token in Google Ads &rsaquo; Tools &rsaquo; API Center (free,
+                15,000 operations/day), then put it in <code>GOOGLE_ADS_DEVELOPER_TOKEN</code> and restart. One
+                token serves the whole app &mdash; your clients do not need their own.
               <% } %>
             </div>
           </td>

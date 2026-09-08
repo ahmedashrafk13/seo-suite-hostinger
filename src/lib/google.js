@@ -769,7 +769,7 @@ async function listAccessibleAdsCustomers(userId) {
 // the thing the page has to render.
 async function probeKeywordPlanner(userId) {
   if (!adsDeveloperToken()) {
-    return { ok: false, stage: 'developer-token', message: 'GOOGLE_ADS_DEVELOPER_TOKEN is not set. Note that Google declines developer tokens for tools that only perform keyword research, so DataForSEO (DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD) is the supported route to the same Google figures.' };
+    return { ok: false, stage: 'developer-token', message: 'GOOGLE_ADS_DEVELOPER_TOKEN is not set. Apply for a Basic access token in Google Ads > Tools > API Center, or use DataForSEO for the same figures.' };
   }
   const p = resolveAdsPrincipal(userId);
   if (!p.ok) return { ok: false, stage: 'account', message: p.reason };
@@ -796,7 +796,7 @@ async function probeKeywordPlanner(userId) {
       return {
         ok: false,
         stage: 'empty',
-        message: `The call to ${where} succeeded but returned no keyword ideas. That is what a TEST-access developer token does against a real account. Basic access is what fixes it - but Google declines it for keyword-research-only tools, so DataForSEO is the practical alternative.`,
+        message: `The call to ${where} succeeded but returned no keyword ideas. That is what a TEST-access developer token does against a real account - apply for Basic access in the API Center.`,
       };
     }
     if (!withVolume) {

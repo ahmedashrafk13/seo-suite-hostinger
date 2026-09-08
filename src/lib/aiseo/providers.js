@@ -167,13 +167,16 @@ const PROVIDERS = [
     key: 'google-ads',
     label: 'Google Ads Keyword Planner',
     kind: 'keyword-tool',
-    // NOT the recommended path, despite being technically the best data.
+    // The best volume source available, and now the primary one.
     //
-    // Google REJECTED a Basic access application for this tool on 2026-09-07: "Tools that offer only keyword research are not allowed by the Google Ads API Policy." The Ads API requires campaign-management functionality (Required Minimum Functionality); a read-only keyword-volume consumer does not qualify, however accurately it is described. The code below still works and is kept for a future in which this suite manages campaigns, or for an account that already holds an approved token - but DO NOT send an operator to apply for one as the recommended path.
+    // A Basic access developer token for manager account 639-541-1674 was
+    // APPROVED on 2026-09-07, after an initial rejection on the grounds that
+    // keyword-research-only tools are barred by the Ads API policy. Verified
+    // working the same day: 2,186 keywords with volume returned for five seeds
+    // against customer 7780548005.
     //
-    // DataForSEO resells the identical Google Ads figures under its own
-    // licence, accepts 700 keywords per call against this API's 20, and adds
-    // keyword difficulty. It is the rung to configure instead.
+    // DataForSEO remains the next rung and resells the identical figures, so
+    // nothing breaks if the token is ever withdrawn.
     envKeys: ['GOOGLE_ADS_DEVELOPER_TOKEN'],
     // Availability is NOT a pure env check. The developer token is the app's
     // and lives in .env, but the Ads ACCOUNT is chosen per team on /connect,
@@ -214,7 +217,7 @@ const PROVIDERS = [
       }
     },
     provides: ['keyword-volume', 'keyword-cpc', 'keyword-competition', 'country-volume'],
-    note: 'Requires an approved Google Ads developer token. Google rejects applications from tools that only do keyword research, so DataForSEO is the practical route to the same figures - see DATAFORSEO_LOGIN below. This adapter works if you already hold an approved token.',
+    note: 'Set GOOGLE_ADS_DEVELOPER_TOKEN and connect Google on /connect, then choose the Ads account, to show the monthly search volumes Google itself reports, per country. Requires an approved developer token (Basic access).',
   },
   {
     key: 'bing-webmaster',

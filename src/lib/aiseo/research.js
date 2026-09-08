@@ -651,7 +651,7 @@ async function run({
         severity: 'info',
         action: measuredVolumes
           ? 'No action needed. The source of each number is shown on its own row.'
-          : 'Set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD to get Google\'s own volumes for this country. (The Google Ads API itself is not an option: Google declines developer tokens for tools that only do keyword research, and DataForSEO resells the same figures.)',
+          : 'Set GOOGLE_ADS_DEVELOPER_TOKEN and connect Google, or set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD, to get Google\'s own volumes for this country.',
         evidence: {
           market: { code: market.code, name: market.name },
           attempted: metrics.attempted,
