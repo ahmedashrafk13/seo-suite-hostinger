@@ -47,6 +47,11 @@ async function callOnce(apiKey, body) {
   return json;
 }
 
+// The largest cap a truncation retry may ask for. Deliberately finite: the
+// retry exists to rescue an answer that nearly fitted, not to let one call
+// consume the whole daily budget.
+const TRUNCATION_RETRY_CEILING = Number(process.env.AZURE_OPENAI_MAX_TOKENS_CEILING || 8000);
+
 // { feature, brandId, systemPrompt, userPrompt, maxTokens, temperature }
 // Returns { data, promptTokens, completionTokens, costUsd } where `data` is
 // the parsed JSON object the model returned.
@@ -78,16 +83,17 @@ async function generate({
     throw err;
   }
 
-  const body = {
+  const buildBody = (cap) => ({
     model: process.env.AZURE_OPENAI_MODEL,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
-    max_tokens: maxTokens,
+    max_tokens: cap,
     temperature,
     response_format: { type: 'json_object' },
-  };
+  });
+  const body = buildBody(maxTokens);
 
   // A fetch abort surfaces as a bare "This operation was aborted", which reads
   // as an unexplained network fault. Restated so a failed run says what
@@ -109,13 +115,77 @@ async function generate({
     }
   }
 
-  const message = json && json.choices && json.choices[0] && json.choices[0].message;
-  const content = message ? message.content : null;
+  // TRUNCATION IS THE COMMON FAILURE, AND IT USED TO LIE ABOUT ITSELF.
+  //
+  // response_format json_object guarantees the model AIMS at valid JSON, not
+  // that it finishes: when the answer needs more room than max_tokens allows,
+  // the reply is cut off mid-string and JSON.parse reports something like
+  // "Unterminated string in JSON at position 8401". That reads as a broken
+  // model or a broken prompt. It is neither — it is a budget that was too
+  // small, and the API says so plainly in finish_reason, which nothing here
+  // was reading.
+  //
+  // So: detect it, and RETRY ONCE with a bigger cap rather than merely
+  // explaining the failure. Most truncations clear on the second attempt
+  // because the first got most of the way there.
+  const readChoice = (payload) => {
+    const choice = payload && payload.choices && payload.choices[0];
+    return {
+      content: (choice && choice.message) ? choice.message.content : null,
+      finishReason: choice ? choice.finish_reason : null,
+    };
+  };
+
+  let { content, finishReason } = readChoice(json);
+  let effectiveCap = maxTokens;
+
+  if (finishReason === 'length') {
+    // Double it, but stay inside a ceiling: an unbounded retry could bill a
+    // large call twice over, and a prompt that needs more than this is asking
+    // the wrong question rather than needing more room.
+    const retryCap = Math.min(maxTokens * 2, TRUNCATION_RETRY_CEILING);
+    if (retryCap > maxTokens) {
+      // The retry costs real tokens, so it goes through the same budget gate
+      // as the first attempt rather than sneaking past it.
+      const retryPreflight = budget.preflightCheck({ systemPrompt, userPrompt, maxTokens: retryCap });
+      if (retryPreflight.allowed) {
+        try {
+          const retryJson = await callOnce(process.env.AZURE_OPENAI_KEY_A, buildBody(retryCap));
+          const retry = readChoice(retryJson);
+          if (retry.content) {
+            json = retryJson;
+            content = retry.content;
+            finishReason = retry.finishReason;
+            effectiveCap = retryCap;
+          }
+        } catch (retryErr) {
+          // Keep the first response and let the checks below report on it —
+          // a failed retry must not replace "the answer was too long" with a
+          // network error that happened afterwards.
+        }
+      }
+    }
+  }
+
   if (!content) throw new Error('Azure OpenAI returned no content.');
+
+  if (finishReason === 'length') {
+    throw new Error(
+      `Azure OpenAI ran out of output room: the reply was cut off at the ${effectiveCap}-token limit`
+      + `${effectiveCap !== maxTokens ? ` (retried from ${maxTokens})` : ''}`
+      + ', so the JSON it returned is incomplete. Ask for fewer items, or raise maxTokens for this feature.'
+    );
+  }
 
   let data;
   try { data = JSON.parse(content); } catch (e) {
-    throw new Error(`Azure OpenAI did not return valid JSON: ${e.message}`);
+    // Reaching here with a normal finish_reason means the model produced
+    // something that is genuinely not JSON, which is a different problem from
+    // truncation and deserves a different message.
+    throw new Error(
+      `Azure OpenAI did not return valid JSON: ${e.message}`
+      + ` (finish_reason=${finishReason || 'unknown'}, ${String(content).length} characters returned)`
+    );
   }
 
   const usage = json.usage || {};
