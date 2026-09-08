@@ -2,7 +2,7 @@
     <h1><%= typeof pageTitle !== 'undefined' && pageTitle ? pageTitle : title %></h1>
     <div class="user-chip">
       <span><%= currentUser ? (currentUser.name || currentUser.email) : '' %></span>
-      <form method="POST" action="/logout" style="display:inline">
+      <form method="POST" action="/logout" style="display:inline"><%- csrfField %>
         <button type="submit" class="btn ghost sm">Log out</button>
       </form>
     </div>

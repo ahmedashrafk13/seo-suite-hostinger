@@ -69,7 +69,7 @@
               <td class="muted"><%= fmtDate(c.created_at) %></td>
               <td>
                 <% if (perms.canWrite) { %>
-                  <form method="POST" action="/ai-seo/competitors/<%= c.id %>/remove" class="inline-form">
+                  <form method="POST" action="/ai-seo/competitors/<%= c.id %>/remove" class="inline-form"><%- csrfField %>
                     <input type="hidden" name="brand_id" value="<%= brand.id %>">
                     <button type="submit" class="btn danger-ghost xs">Remove</button>
                   </form>
@@ -81,7 +81,7 @@
         </table></div>
       <% } %>
 
-      <form method="POST" action="/ai-seo/competitors/add" style="margin-top:14px">
+      <form method="POST" action="/ai-seo/competitors/add" style="margin-top:14px"><%- csrfField %>
         <input type="hidden" name="brand_id" value="<%= brand.id %>">
         <div class="field">
           <label for="domains">Add competitors <span class="muted">(one per line — optionally <code>domain.com | Their label</code>)</span></label>
@@ -97,7 +97,7 @@
   <div class="card">
     <div class="card-head"><h3>Run the comparison</h3></div>
     <div class="card-body">
-      <form method="POST" action="/ai-seo/competitors/run">
+      <form method="POST" action="/ai-seo/competitors/run"><%- csrfField %>
         <input type="hidden" name="brand_id" value="<%= brand.id %>">
         <div class="field-row">
           <label class="field">

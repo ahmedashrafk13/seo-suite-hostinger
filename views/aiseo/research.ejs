@@ -33,7 +33,7 @@
   <div class="card">
     <div class="card-head"><h3>Run research</h3></div>
     <div class="card-body">
-      <form method="POST" action="/ai-seo/research/run">
+      <form method="POST" action="/ai-seo/research/run"><%- csrfField %>
         <input type="hidden" name="brand_id" value="<%= brand.id %>">
         <div class="field">
           <label for="seeds">Seed topics <span class="muted">(one per line — leave empty to use this site's own top non-branded queries)</span></label>

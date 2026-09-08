@@ -34,6 +34,13 @@ const express = require('express');
 const db = require('./src/db');
 const notify = require('./src/lib/notify');
 const teamLib = require('./src/lib/team');
+const csrf = require('./src/lib/csrf');
+
+// A fixed token, so the harness can put it in every POST body. Using the real
+// middleware rather than skipping it is the point: this file exists to prove
+// the write paths a tester clicks first still work, and every one of them now
+// goes through CSRF verification on the way in.
+const CSRF_TOKEN = 'verify-actions-fixed-token';
 
 const USER_ID = Number(process.env.SMOKE_USER_ID || 2);
 
@@ -42,7 +49,10 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(express.json({ limit: '5mb' }));
-app.use((req, res, next) => { req.session = { userId: USER_ID }; next(); });
+app.use((req, res, next) => {
+  req.session = { userId: USER_ID, csrfToken: CSRF_TOKEN };
+  next();
+});
 app.use((req, res, next) => {
   res.locals.currentUser = db.prepare('SELECT * FROM users WHERE id = ?').get(USER_ID) || null;
   // Team resolution, mirroring src/app.js: routes read req.dataUserId for data
@@ -74,12 +84,19 @@ app.use((req, res, next) => {
   res.locals.fmtDateTime = (s) => (s ? String(s).slice(0, 16).replace('T', ' ') : '—');
   res.locals.severityMeta = notify.severityMeta;
   res.locals.shortUrl = (u) => String(u || '—');
+  // Templates insert the token with <%- csrfField %>; without this, any POST
+  // that re-renders a page instead of redirecting throws ReferenceError.
+  csrf.expose(req, res, () => {});
   res.locals.query = req.query;
   res.locals.path = req.path;
   res.locals.navBrands = [];
   res.locals.navCounts = { openTasks: 0, needsApproval: 0, openAlerts: 0 };
   next();
 });
+// Mounted here, after the view globals, exactly as src/app.js does: a refusal
+// renders the error template and that template needs those locals.
+app.use(csrf.verify);
+
 const pass = (req, res, next) => next();
 app.set('requireAuth', pass);
 [['/brands', './src/routes/brands'], ['/keywords', './src/routes/keywords'],
@@ -94,7 +111,8 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
 });
 
 function post(server, url, form) {
-  const body = new URLSearchParams(form || {}).toString();
+  // The token is added here rather than at each of the ~40 call sites.
+  const body = new URLSearchParams(Object.assign({ _csrf: CSRF_TOKEN }, form || {})).toString();
   return new Promise((resolve) => {
     const req = http.request({
       host: '127.0.0.1',

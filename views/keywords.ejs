@@ -17,7 +17,7 @@
         <span class="sub">Paste or upload a keyword list, or pull straight from a brand's Search Console queries</span>
       </div>
       <div class="card-body">
-        <form method="POST" action="/keywords/run">
+        <form method="POST" action="/keywords/run"><%- csrfField %>
           <div class="form-row">
             <div>
               <label for="brand_id">Brand</label>

@@ -10,7 +10,7 @@
       <a class="btn ghost sm" href="/keywords/briefs">&larr; All briefs</a>
       <div class="spacer"></div>
       <form method="POST" action="/keywords/brief/<%= row.id %>/delete" style="display:inline"
-            onsubmit="return confirm('Delete this content brief? This cannot be undone.')">
+            onsubmit="return confirm('Delete this content brief? This cannot be undone.')"><%- csrfField %>
         <button type="submit" class="btn danger-ghost sm">Delete</button>
       </form>
     </div>

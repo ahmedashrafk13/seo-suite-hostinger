@@ -10,7 +10,7 @@
       <a class="btn ghost sm" href="/keywords">&larr; Keyword clustering</a>
       <div class="spacer"></div>
       <a class="btn secondary sm" href="/keywords/<%= run.id %>/csv">Download Excel</a>
-      <form method="POST" action="/keywords/<%= run.id %>/delete" onsubmit="return confirm('Delete this clustering run?')" style="display:inline">
+      <form method="POST" action="/keywords/<%= run.id %>/delete" onsubmit="return confirm('Delete this clustering run?')" style="display:inline"><%- csrfField %>
         <button class="btn danger-ghost sm" type="submit">Delete run</button>
       </form>
     </div>
@@ -37,7 +37,7 @@
       <div class="card-head">
         <h2><%= run.name || ('Run #' + run.id) %></h2>
         <div class="btn-row">
-          <form method="POST" action="/keywords/<%= run.id %>/create-tasks">
+          <form method="POST" action="/keywords/<%= run.id %>/create-tasks"><%- csrfField %>
             <input type="number" name="limit" value="25" min="1" max="100" style="width:70px">
             <button class="btn secondary sm" type="submit">Create content tasks</button>
           </form>
@@ -165,16 +165,16 @@
                     <td style="white-space:nowrap">
                       <% var approval = approvedById.get(c.id); %>
                       <% if (!approval) { %>
-                        <form method="POST" action="/keywords/<%= run.id %>/cluster/<%= c.id %>/approve">
+                        <form method="POST" action="/keywords/<%= run.id %>/cluster/<%= c.id %>/approve"><%- csrfField %>
                           <button type="submit" class="btn secondary sm">Approve for content</button>
                         </form>
                       <% } else { %>
                         <div class="btn-row" style="flex-wrap:nowrap">
-                          <form method="POST" action="/keywords/<%= run.id %>/cluster/<%= c.id %>/brief">
+                          <form method="POST" action="/keywords/<%= run.id %>/cluster/<%= c.id %>/brief"><%- csrfField %>
                             <button type="submit" class="btn secondary sm">Content brief</button>
                           </form>
                           <form method="POST" action="/keywords/<%= run.id %>/cluster/<%= c.id %>/unapprove"
-                                onsubmit="return confirm('Withdraw approval for this keyword?')">
+                                onsubmit="return confirm('Withdraw approval for this keyword?')"><%- csrfField %>
                             <button type="submit" class="btn ghost sm" title="Approved by <%= approval.approved_by %>">&#10003; Approved</button>
                           </form>
                         </div>

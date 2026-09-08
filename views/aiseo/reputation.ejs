@@ -52,7 +52,7 @@
           <% watchTerms.forEach(function (t) { %><span class="chip"><%= t %></span><% }) %>
         <% } %>
       </p>
-      <form method="POST" action="/ai-seo/reputation/terms">
+      <form method="POST" action="/ai-seo/reputation/terms"><%- csrfField %>
         <input type="hidden" name="brand_id" value="<%= brand.id %>">
         <div class="field">
           <label for="mention_terms">Additional terms <span class="muted">(one per line)</span></label>
@@ -83,7 +83,7 @@
   <div class="card">
     <div class="card-head"><h3>Run a scan</h3></div>
     <div class="card-body">
-      <form method="POST" action="/ai-seo/reputation/run">
+      <form method="POST" action="/ai-seo/reputation/run"><%- csrfField %>
         <input type="hidden" name="brand_id" value="<%= brand.id %>">
         <div class="field-row">
           <label class="field">
@@ -141,7 +141,7 @@
             <td>
               <% if (m.reviewed_at) { %><span class="badge good">reviewed</span>
               <% } else if (perms.canWrite) { %>
-                <form method="POST" action="/ai-seo/reputation/mention/<%= m.id %>/reviewed" class="inline-form">
+                <form method="POST" action="/ai-seo/reputation/mention/<%= m.id %>/reviewed" class="inline-form"><%- csrfField %>
                   <input type="hidden" name="brand_id" value="<%= brand.id %>">
                   <button type="submit" class="btn ghost xs">Mark reviewed</button>
                 </form>

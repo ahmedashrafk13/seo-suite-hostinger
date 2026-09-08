@@ -22,7 +22,7 @@
   <div class="card">
     <div class="card-head"><h3>Score a page</h3></div>
     <div class="card-body">
-      <form method="POST" action="/ai-seo/optimizer/run">
+      <form method="POST" action="/ai-seo/optimizer/run"><%- csrfField %>
         <% if (brand) { %><input type="hidden" name="brand_id" value="<%= brand.id %>"><% } %>
         <div class="field">
           <label for="url">Page URL</label>

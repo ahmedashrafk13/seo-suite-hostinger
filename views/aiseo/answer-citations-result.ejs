@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+<%- include('_partials/runhead') %>
+
+<% const r = run.result; %>
+<% if (run.status === 'completed' && r) { %>
+
+  <% if (r.empty) { %>
+    <div class="notice error">
+      <span class="notice-icon">&#9888;</span>
+      <div class="notice-body">
+        <strong>Nothing was checked.</strong> <%= r.note %>
+      </div>
+    </div>
+  <% } else { %>
+
+    <%
+    /* The headline row. Coverage sits beside the percentage rather than under
+       it, because the two are only meaningful together: 0% presence across 38
+       sampled questions is a finding, and 0% across 3 is a rate limit. */
+    const thin = r.counts.coverage < 70;
+    %>
+    <div class="stat-row">
+      <div class="stat">
+        <div class="label">Retrieval-pool presence</div>
+        <div class="value <%= r.eligibility && r.eligibility.pct < 20 ? 'bad' : (r.eligibility && r.eligibility.pct < 50 ? 'warn' : '') %>">
+          <%= r.eligibility ? r.eligibility.pct + '%' : '—' %>
+        </div>
+        <div class="meta"><%= r.counts.present %> of <%= r.counts.measured %> question(s) return this site</div>
+      </div>
+      <div class="stat">
+        <div class="label">Questions sampled</div>
+        <div class="value <%= thin ? 'warn' : '' %>"><%= r.counts.measured %>/<%= r.counts.requested %></div>
+        <div class="meta">
+          <%= r.counts.coverage %>% coverage<%= r.counts.unknown ? ' · ' + r.counts.unknown + ' could not be sampled' : '' %>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="label">Competitor gaps</div>
+        <div class="value <%= r.gaps.length ? 'warn' : '' %>"><%= r.gaps.length %></div>
+        <div class="meta">questions a named rival can be quoted on</div>
+      </div>
+      <div class="stat">
+        <div class="label">Unclaimed questions</div>
+        <div class="value"><%= r.openQuestions.length %></div>
+        <div class="meta">nobody strong in the pool</div>
+      </div>
+    </div>
+
+    <div class="notice info">
+      <span class="notice-icon">&#9432;</span>
+      <div class="notice-body">
+        <strong>Read this as eligibility, not as citations.</strong> <%= r.scoreMeaning %>
+        Presence means an assistant <em>could</em> quote the page; it is not evidence that one did.
+        <% if (r.referralEvidence) { %>
+          <br><strong>Ground truth is available for this brand:</strong> GA4 measured
+          <%= fmtInt(r.referralEvidence.sessions) %> session(s) arriving from AI assistants.
+          <a href="/ai-seo/ai-referrals<%= run.brand_id ? '?brand=' + run.brand_id : '' %>">Those are real
+          citations that were clicked</a> — read them ahead of anything on this page.
+        <% } %>
+      </div>
+    </div>
+
+    <% if (thin) { %>
+      <div class="notice error">
+        <span class="notice-icon">&#9888;</span>
+        <div class="notice-body">
+          <strong>Thin sample — do not report the percentage above as a site-level figure.</strong>
+          Only <%= r.counts.coverage %>% of the question set returned a result, normally because the keyless
+          endpoints rate-limited the run. The questions that failed are listed as "not sampled" below and are
+          excluded from every percentage rather than counted as absent. Re-run with fewer questions, or later.
+        </div>
+      </div>
+    <% } %>
+
+    <%- include('_partials/findings', { findings: run.findings }) %>
+
+    <% if (r.gaps.length) { %>
+      <div class="card">
+        <div class="card-head">
+          <h3>Gaps — a competitor is in the pool and this site is not</h3>
+          <span class="muted" style="font-size:12px"><%= r.gaps.length %> question(s)</span>
+        </div>
+        <div class="card-body">
+          <p class="hint mt-0">
+            Ordered by how high the rival sits. Each row is a question with demonstrated retrieval demand where
+            a named competitor is eligible to be quoted and this site is not. This is the part of the report
+            that turns into work.
+          </p>
+          <div class="table-wrap"><table class="data">
+            <thead><tr>
+              <th>Question</th><th>Job</th><th>Intent</th><th>Who is in the pool</th>
+            </tr></thead>
+            <tbody>
+            <% r.gaps.forEach(function (g) { %>
+              <tr>
+                <td><strong><%= g.prompt %></strong></td>
+                <td class="muted" style="font-size:12px"><%= g.job || '—' %></td>
+                <td><% if (g.intent) { %><span class="badge neutral"><%= g.intent %></span><% } else { %>—<% } %></td>
+                <td>
+                  <% g.competitors.forEach(function (c) { %>
+                    <span class="chip">#<%= c.position %> <%= c.domain %></span>
+                  <% }) %>
+                </td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Who occupies the pool across these questions</h3>
+      </div>
+      <div class="card-body">
+        <p class="hint mt-0">
+          Share is the percentage of <strong>sampled</strong> questions each domain appears in — not of the
+          whole question set. A denominator that quietly included the questions that failed would rank every
+          domain too low by the same unknown amount.
+        </p>
+        <div class="table-wrap"><table class="data">
+          <thead><tr>
+            <th>Domain</th><th class="num">Questions</th><th class="num">Share</th>
+            <th class="num">Best position</th><th class="num">Average position</th>
+          </tr></thead>
+          <tbody>
+          <% r.leaderboard.forEach(function (d) { %>
+            <tr>
+              <td>
+                <%= d.domain %>
+                <% if (d.isBrand) { %><span class="badge good">this brand</span><% } %>
+                <% if (d.isNamedCompetitor) { %><span class="badge medium">named competitor</span><% } %>
+              </td>
+              <td class="num"><%= d.prompts %></td>
+              <td class="num"><%= d.share == null ? '—' : d.share + '%' %></td>
+              <td class="num"><%= d.bestPosition == null ? '—' : '#' + d.bestPosition %></td>
+              <td class="num"><%= d.avgPosition == null ? '—' : d.avgPosition %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+        <% if (!r.brandSummary) { %>
+          <p class="hint" style="margin-bottom:0;color:var(--critical,#b91c1c)">
+            <strong>This site appears nowhere in the sampled pools.</strong> For these questions, no grounded
+            assistant can currently quote it — not because of how the pages are written, but because no index
+            returns them for the question. That is a content and retrieval problem before it is a citability one.
+          </p>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (r.openQuestions.length) { %>
+      <div class="card">
+        <div class="card-head">
+          <h3>Unclaimed questions</h3>
+          <span class="muted" style="font-size:12px"><%= r.openQuestions.length %></span>
+        </div>
+        <div class="card-body">
+          <p class="hint mt-0">
+            Neither this site nor any named competitor is in the pool. Cheapest available wins — but check the
+            pool column: a question answered only by forums and directories is usually one where the intent is
+            not commercial, and worth answering for citation reach rather than for pipeline.
+          </p>
+          <div class="table-wrap"><table class="data compact">
+            <thead><tr><th>Question</th><th>Intent</th><th>Who does answer it</th></tr></thead>
+            <tbody>
+            <% r.openQuestions.forEach(function (q) { %>
+              <tr>
+                <td><%= q.prompt %></td>
+                <td><% if (q.intent) { %><span class="badge neutral"><%= q.intent %></span><% } else { %>—<% } %></td>
+                <td class="muted" style="font-size:12px">
+                  <%= (q.pool || []).slice(0, 3).map(function (p) { return p.domain; }).join(', ') || '—' %>
+                </td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="card">
+      <div class="card-head"><h3>Every question checked</h3></div>
+      <div class="card-body">
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr>
+            <th>Question</th><th>Verdict</th><th>Our position</th><th>Top of the pool</th><th>Sampled from</th>
+          </tr></thead>
+          <tbody>
+          <% r.rows.forEach(function (row) { %>
+            <tr>
+              <td><%= row.prompt %></td>
+              <td>
+                <% if (row.state === 'present') { %>
+                  <span class="badge good">in the pool</span>
+                <% } else if (row.state === 'absent') { %>
+                  <span class="badge critical">not in the pool</span>
+                <% } else { %>
+                  <span class="badge neutral" title="<%= row.error || '' %>">not sampled</span>
+                <% } %>
+              </td>
+              <td><%= row.brand ? '#' + row.brand.position : '—' %></td>
+              <td class="muted" style="font-size:12px">
+                <% if (row.state === 'unknown') { %>
+                  <%= row.error || 'no result' %>
+                <% } else { %>
+                  <%= (row.pool || []).slice(0, 3).map(function (p) { return '#' + p.position + ' ' + p.domain; }).join(' · ') %>
+                <% } %>
+              </td>
+              <td class="muted" style="font-size:12px"><%= row.engine || '—' %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>What this run could and could not see</h3></div>
+      <div class="card-body">
+        <ul class="tight">
+          <% r.limits.forEach(function (l) { %><li><%= l %></li><% }) %>
+        </ul>
+        <p class="hint" style="margin-bottom:0">
+          Market: <strong><%= r.marketLabel || r.market %></strong>.
+          Questions came from
+          <strong><%= r.promptSource === 'pasted' ? 'a pasted list' : (r.promptSource === 'research-run' ? 'the last keyword research run' : 'unknown') %></strong><%
+          if (r.researchRunId) { %> (<a href="/ai-seo/research/<%= r.researchRunId %>">run #<%= r.researchRunId %></a>)<% } %>.
+        </p>
+      </div>
+    </div>
+
+    <%- include('_partials/provenance', { prov: r.provenance }) %>
+
+  <% } %>
+<% } %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

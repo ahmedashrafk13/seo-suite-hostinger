@@ -48,7 +48,7 @@ const delta = (run.score != null && previous && previous.score != null)
     <div class="btn-row">
       <% if (run.status === 'completed') { %>
         <% if (perms.canWrite) { %>
-          <form method="POST" action="/ai-seo/<%= slug %>/<%= run.id %>/tasks" class="inline-form">
+          <form method="POST" action="/ai-seo/<%= slug %>/<%= run.id %>/tasks" class="inline-form"><%- csrfField %>
             <button type="submit" class="btn secondary sm">Create tasks from findings</button>
           </form>
         <% } %>
@@ -57,7 +57,7 @@ const delta = (run.score != null && previous && previous.score != null)
       <a class="btn ghost sm" href="/ai-seo/<%= slug %><%= run.brand_id ? '?brand=' + run.brand_id : '' %>">Run again</a>
       <% if (perms.canWrite && run.status !== 'running') { %>
         <form method="POST" action="/ai-seo/<%= slug %>/<%= run.id %>/delete" class="inline-form"
-              onsubmit="return confirm('Delete this run and its findings?')">
+              onsubmit="return confirm('Delete this run and its findings?')"><%- csrfField %>
           <button type="submit" class="btn danger-ghost sm">Delete run</button>
         </form>
       <% } %>

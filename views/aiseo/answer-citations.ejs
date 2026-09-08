@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('../partials/head') %></head>
+<body>
+<div class="app">
+<%- include('../partials/sidebar') %>
+<%- include('../partials/topbar') %>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="hint mt-0">
+        <strong>Keyword research says what people ask an assistant. This says who the assistant can answer
+        them from.</strong> A grounded assistant — ChatGPT search, Copilot, Perplexity — answers a question by
+        running its own search first and reading the pages that come back. That result set is the population
+        every citation is drawn from, so this report samples it for each question and reports whether this
+        site is in it.
+      </p>
+      <p class="hint">
+        <strong>What this is, said precisely.</strong> Being in the pool means an assistant <em>could</em> quote
+        the page — necessary, not sufficient. Being absent from it means no citation is possible for that
+        question today, which is the finding worth acting on. That asymmetry is the value here; a percentage
+        labelled "citation rate" would not be.
+      </p>
+      <p class="hint" style="margin-bottom:0">
+        <strong>What it is not.</strong> It is not a measurement of citations actually made. No keyless endpoint
+        reports what ChatGPT, Gemini or Perplexity cited, and this deployment holds no citation-tracking
+        credential — so that number is not knowable here and nothing on this page estimates it. For proof of
+        real citations, read <a href="/ai-seo/ai-referrals">AI referral traffic</a>: a session arriving from an
+        assistant is a person who read an answer and clicked the link in it.
+      </p>
+    </div>
+  </div>
+
+  <%- include('_partials/brandpicker') %>
+
+  <div class="split">
+    <div>
+      <div class="card">
+        <div class="card-head"><h3>Check who gets cited</h3></div>
+        <div class="card-body">
+          <% if (brand && !derivedPrompts.length) { %>
+            <p class="hint" style="color:var(--critical,#b91c1c)">
+              <strong>No questions are available for this brand yet.</strong>
+              <% if (!researchRun) { %>
+                Nothing has been produced by <a href="/ai-seo/research?brand=<%= brand.id %>">keyword
+                research</a> for it. Run that first — its assistant prompts and question-shaped keywords are
+                picked up here automatically — or paste a list below.
+              <% } else { %>
+                The last research run produced no assistant prompts and no question-shaped keywords. That
+                happens when AI assistance was switched off for the run (the prompt half needs the model) and
+                the keyword set contained no questions. Paste a list below, or re-run research with AI on.
+              <% } %>
+            </p>
+          <% } %>
+
+          <form method="POST" action="/ai-seo/answer-citations/run"><%- csrfField %>
+            <% if (brand) { %><input type="hidden" name="brand_id" value="<%= brand.id %>"><% } %>
+
+            <div class="field">
+              <label for="prompts">Questions to check
+                <span style="font-weight:400;color:var(--text-3)">(one per line — leave empty to use the
+                <%= derivedPrompts.length %> from the last research run)</span>
+              </label>
+              <textarea id="prompts" name="prompts" rows="6"
+                placeholder="how long does iso 27001 certification take&#10;what is the difference between iso 27001 and soc 2&#10;is a cissp worth it for a cloud engineer"></textarea>
+              <p class="hint mt-0" style="margin-bottom:0">
+                Whole questions, not keywords. The sample is taken on the question as written, because that is
+                what an assistant's own grounding search runs on. Lines shorter than 12 characters are ignored.
+              </p>
+            </div>
+
+            <div class="field">
+              <label for="country">Market</label>
+              <select id="country" name="country">
+                <% marketList.forEach(function (m) { %>
+                  <option value="<%= m.code %>" <%= m.code === selectedMarket ? 'selected' : '' %>><%= m.label %></option>
+                <% }) %>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="per_prompt">Pool depth per question</label>
+              <select id="per_prompt" name="per_prompt">
+                <option value="5">Top 5</option>
+                <option value="10" selected>Top 10</option>
+                <option value="20">Top 20</option>
+              </select>
+              <p class="hint mt-0" style="margin-bottom:0">
+                Ten matches what a grounded assistant typically reads before answering. Twenty finds more
+                near-misses but takes longer and tells you less about what would actually be quoted.
+              </p>
+            </div>
+
+            <div class="field">
+              <label for="limit">Maximum questions this run</label>
+              <input type="number" id="limit" name="limit" min="1" max="<%= maxPrompts %>" value="<%= maxPrompts %>">
+              <p class="hint mt-0" style="margin-bottom:0">
+                Each question is one paced request against an endpoint that rate-limits, so they run one at a
+                time with a gap. <%= maxPrompts %> questions is roughly two to three minutes.
+              </p>
+            </div>
+
+            <div class="btn-row">
+              <button type="submit" class="btn" <%= perms.canWrite && brand ? '' : 'disabled' %>>Check the retrieval pool</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <% if (competitorDomains.length) { %>
+        <div class="card">
+          <div class="card-head"><h3>Compared against</h3></div>
+          <div class="card-body">
+            <p class="mt-0">
+              <% competitorDomains.forEach(function (d) { %><span class="chip"><%= d %></span><% }) %>
+            </p>
+            <p class="hint" style="margin-bottom:0">
+              The brand's named competitors, from <a href="/ai-seo/competitors<%= brand ? '?brand=' + brand.id : '' %>">competitive
+              intelligence</a>. A question where one of these is in the pool and this site is not becomes a gap
+              row — the actionable half of the report. Discovered competitors are deliberately not used: an
+              auto-built list fills the table with directories and aggregators nobody is trying to outrank.
+            </p>
+          </div>
+        </div>
+      <% } else if (brand) { %>
+        <div class="card">
+          <div class="card-body">
+            <p class="hint mt-0" style="margin-bottom:0">
+              <strong>No competitors are named for this brand.</strong> The run still works — it reports pool
+              presence and the domains that occupy it — but the gap list needs named competitors to separate
+              "a rival can be quoted here and we cannot" from "nobody strong answers this". Add them on
+              <a href="/ai-seo/competitors<%= '?brand=' + brand.id %>">competitive intelligence</a>.
+            </p>
+          </div>
+        </div>
+      <% } %>
+    </div>
+
+    <div>
+      <% if (derivedPrompts.length) { %>
+        <div class="card">
+          <div class="card-head">
+            <h3>Questions from the last research run</h3>
+            <span class="muted" style="font-size:12px"><%= derivedPrompts.length %> found</span>
+          </div>
+          <div class="card-body">
+            <p class="hint mt-0">
+              Used automatically when the box on the left is empty. From
+              <a href="/ai-seo/research/<%= researchRun.id %>">research run #<%= researchRun.id %></a>,
+              finished <%= fmtDate(researchRun.finished_at) %>.
+            </p>
+            <div class="table-wrap"><table class="data compact">
+              <thead><tr><th>Question</th><th>Source</th><th>Job</th></tr></thead>
+              <tbody>
+              <% derivedPrompts.forEach(function (p) { %>
+                <tr>
+                  <td><%= p.prompt %></td>
+                  <td>
+                    <span class="badge <%= p.origin === 'assistant-prompt' ? 'accent' : 'neutral' %>">
+                      <%= p.origin === 'assistant-prompt' ? 'assistant prompt' : 'search question' %>
+                    </span>
+                  </td>
+                  <td class="muted" style="font-size:12px"><%= p.job || '—' %></td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table></div>
+            <p class="hint" style="margin-bottom:0">
+              <strong>Two origins, and the difference matters.</strong> An <em>assistant prompt</em> is a whole
+              question with a stated situation, written by the model because it cannot be derived from a keyword
+              list. A <em>search question</em> is a question-shaped query this site already earns impressions
+              for — smaller, but observed rather than generated.
+            </p>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <%- include('_partials/runs') %>
+
+<%- include('../partials/sidebar-end') %>
+<%- include('../partials/foot') %>

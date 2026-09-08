@@ -78,7 +78,7 @@ const VERDICTS = {
   <div class="card">
     <div class="card-head"><h3>Schedule the refresh work</h3></div>
     <div class="card-body">
-      <form method="POST" action="/ai-seo/freshness/<%= run.id %>/schedule">
+      <form method="POST" action="/ai-seo/freshness/<%= run.id %>/schedule"><%- csrfField %>
         <p class="hint mt-0">
           Creates one dated task per flagged page — drift first, then decay, then age, and within each by the
           impressions at stake. Due dates are staggered by your weekly capacity, because twelve tasks all due

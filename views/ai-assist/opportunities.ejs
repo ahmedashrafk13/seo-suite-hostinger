@@ -15,7 +15,7 @@
     <div class="card">
       <div class="card-head">
         <h3>AI Opportunity Recommendations — <%= brand.name %></h3>
-        <form method="POST" action="/ai-assist/<%= brand.id %>/opportunities/generate">
+        <form method="POST" action="/ai-assist/<%= brand.id %>/opportunities/generate"><%- csrfField %>
           <button class="btn sm" type="submit"><%= row ? 'Regenerate (new billed call)' : 'Generate with AI' %></button>
           <% if (row) { %><input type="hidden" name="force" value="1"><% } %>
         </form>

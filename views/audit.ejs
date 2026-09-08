@@ -34,7 +34,7 @@
           <% if (perms.isAdmin) { %>
             <div style="margin-top:10px" class="btn-row">
               <form method="POST" action="/audit/install-deps" style="display:inline"
-                    onsubmit="this.querySelector('button').classList.add('is-loading')">
+                    onsubmit="this.querySelector('button').classList.add('is-loading')"><%- csrfField %>
                 <button class="btn sm" type="submit">Install them now</button>
               </form>
               <span class="hint" style="margin:0">or run: <code><%= pythonStatus.command %></code></span>
@@ -58,7 +58,7 @@
       <div class="card-body">
       <h2 class="mt-0">Run a technical SEO audit</h2>
       <p class="muted">Crawls the domain, scores site health, and groups findings by severity with the affected URLs and a recommended action for each.</p>
-      <form method="POST" action="/audit/start">
+      <form method="POST" action="/audit/start"><%- csrfField %>
         <div class="form-row">
           <div class="field">
             <label for="brand_id">Brand</label>

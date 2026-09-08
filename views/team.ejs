@@ -24,7 +24,7 @@ function roleBadge(role) {
         them — pick the role they should have first.
       </p>
       <% pending.forEach(function(m){ %>
-        <form method="POST" action="/team/members/<%= m.id %>/approve" class="approval-row">
+        <form method="POST" action="/team/members/<%= m.id %>/approve" class="approval-row"><%- csrfField %>
           <div class="ar-who">
             <span class="avatar"><%= (m.name || m.email).slice(0,2) %></span>
             <div>
@@ -73,7 +73,7 @@ function roleBadge(role) {
                   <% if (m.is_owner) { %>
                     <span class="badge accent">Admin</span>
                   <% } else { %>
-                    <form method="POST" action="/team/members/<%= m.id %>/role" class="inline-form">
+                    <form method="POST" action="/team/members/<%= m.id %>/role" class="inline-form"><%- csrfField %>
                       <label class="sr-only" for="r-<%= m.id %>">Role for <%= m.email %></label>
                       <select id="r-<%= m.id %>" name="role" onchange="this.form.submit()" style="width:auto;min-width:120px">
                         <% roles.forEach(function(r){ %>
@@ -89,7 +89,7 @@ function roleBadge(role) {
                   <% } else if (m.role === 'dev') { %>
                     <span class="badge neutral">no</span>
                   <% } else { %>
-                    <form method="POST" action="/team/members/<%= m.id %>/assign-rights" class="inline-form">
+                    <form method="POST" action="/team/members/<%= m.id %>/assign-rights" class="inline-form"><%- csrfField %>
                       <input type="hidden" name="allowed" value="<%= m.can_assign ? '0' : '1' %>">
                       <button class="btn <%= m.can_assign ? 'success' : 'secondary' %> xs" type="submit">
                         <%= m.can_assign ? 'Allowed' : 'Not allowed' %>
@@ -103,16 +103,16 @@ function roleBadge(role) {
                 <td style="white-space:nowrap">
                   <% if (!m.is_owner) { %>
                     <% if (m.status === 'active') { %>
-                      <form method="POST" action="/team/members/<%= m.id %>/suspend" class="inline-form">
+                      <form method="POST" action="/team/members/<%= m.id %>/suspend" class="inline-form"><%- csrfField %>
                         <button class="btn ghost xs" type="submit">Suspend</button>
                       </form>
                     <% } else { %>
-                      <form method="POST" action="/team/members/<%= m.id %>/reactivate" class="inline-form">
+                      <form method="POST" action="/team/members/<%= m.id %>/reactivate" class="inline-form"><%- csrfField %>
                         <button class="btn ghost xs" type="submit">Reactivate</button>
                       </form>
                     <% } %>
                     <form method="POST" action="/team/members/<%= m.id %>/remove" class="inline-form"
-                          onsubmit="return confirm('Remove <%= m.email %> from the team?')">
+                          onsubmit="return confirm('Remove <%= m.email %> from the team?')"><%- csrfField %>
                       <button class="btn danger-ghost xs" type="submit">Remove</button>
                     </form>
                   <% } %>
@@ -163,7 +163,7 @@ function roleBadge(role) {
                 <td class="narrow"><%= p.last_assigned_at ? fmtDateTime(p.last_assigned_at) : '—' %></td>
                 <td>
                   <% if (p.active) { %>
-                    <form method="POST" action="/team/people/<%= p.id %>/remove" class="inline-form">
+                    <form method="POST" action="/team/people/<%= p.id %>/remove" class="inline-form"><%- csrfField %>
                       <button class="btn ghost xs" type="submit">Remove</button>
                     </form>
                   <% } else { %><span class="hint">removed</span><% } %>
@@ -180,7 +180,7 @@ function roleBadge(role) {
           A name and an email is all that is needed. They never get a login — email is how they receive work, so the
           address is required.
         </p>
-        <form method="POST" action="/team/people">
+        <form method="POST" action="/team/people"><%- csrfField %>
           <div class="form-row">
             <div>
               <label for="p-name">Name</label>
@@ -254,7 +254,7 @@ function roleBadge(role) {
                onclick="this.select()" style="font-family:var(--mono);font-size:11.5px">
         <div class="hint">Invite code: <code><%= team ? team.invite_code : '—' %></code></div>
         <form method="POST" action="/team/invite/rotate" style="margin-top:12px"
-              onsubmit="return confirm('Generate a new code? The current link will stop working.')">
+              onsubmit="return confirm('Generate a new code? The current link will stop working.')"><%- csrfField %>
           <button class="btn secondary sm block" type="submit">Generate a new code</button>
         </form>
       </div>

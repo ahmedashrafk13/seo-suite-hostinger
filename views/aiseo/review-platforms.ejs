@@ -31,7 +31,7 @@
   <div class="card">
     <div class="card-head"><h3>Check review platform coverage</h3></div>
     <div class="card-body">
-      <form method="POST" action="/ai-seo/review-platforms/run">
+      <form method="POST" action="/ai-seo/review-platforms/run"><%- csrfField %>
         <input type="hidden" name="brand_id" value="<%= brand.id %>">
         <div class="field-row">
           <label class="field">

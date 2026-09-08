@@ -20,7 +20,7 @@
         <h3 class="mt-0">Google Connection</h3>
         <% if (connection) { %>
           <p>Connected as <strong><%= connection.connected_email || 'unknown' %></strong>.</p>
-          <form method="POST" action="/settings/disconnect">
+          <form method="POST" action="/settings/disconnect"><%- csrfField %>
             <button class="btn danger" type="submit">Disconnect Google Account</button>
           </form>
         <% } else { %>

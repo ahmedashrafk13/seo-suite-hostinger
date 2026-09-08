@@ -1,13 +1,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><%= typeof title !== 'undefined' && title ? title + ' · SEO Suite' : 'SEO Automation Suite' %></title>
+<%
+/* The charting libraries used to be loaded here on every page — 660 KB of
+   JavaScript on all ~60 views, when only dashboard.ejs and performance.ejs
+   draw a chart. They are now fetched on demand by the chart partials
+   themselves, through /js/chart-assets.js. See that file's header.
+
+   chart-assets.js is deliberately NOT deferred: the chart partials are inline
+   <script> blocks in the body, and a deferred loader would not have defined
+   window.ChartAssets by the time they run. It is ~4 KB, defines one object and
+   touches no DOM at parse time, so it costs nothing to run early. */
+%>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="/css/style.css?v=<%= typeof assetVersion !== 'undefined' ? assetVersion : '1' %>">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%232563eb'/></svg>">
-<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.1/dist/apexcharts.min.js" defer></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/css/jsvectormap.min.css">
-<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js" defer></script>
-<script src="/js/country-codes.js" defer></script>
+<script src="/js/chart-assets.js?v=<%= typeof assetVersion !== 'undefined' ? assetVersion : '1' %>"></script>

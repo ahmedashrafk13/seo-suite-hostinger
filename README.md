@@ -15,7 +15,7 @@ audit, clusters keywords, detects content opportunities, raises configurable
 alerts, and turns all of it into a managed task backlog — with an approval
 gate on any change that could affect rankings if done wrong.
 
-On top of that sits the **AI SEO suite** (`/ai-seo`): nine analyses aimed at
+On top of that sits the **AI SEO suite** (`/ai-seo`): a set of analyses aimed at
 the question classic SEO tooling does not answer — whether an AI answer engine
 can find, read, and cite the site. See
 [The AI SEO suite](#the-ai-seo-suite) below.
@@ -268,7 +268,7 @@ a content warning and a capped health score, never a healthy one, which is
 asserted rather than assumed.
 
 - **The AI SEO suite** (`src/lib/aiseo/`, routes in `src/routes/aiseo.js`,
-  views in `views/aiseo/`) — nine analyses plus a twenty-check tracking board.
+  views in `views/aiseo/`) — the analyses plus a twenty-check tracking board.
   Unlike the two crawlers above these run **in this process**, because they
   read one page or a handful rather than sweeping a whole site, and because a
   second process opening `data/app.db` while the app is running has corrupted
@@ -339,7 +339,7 @@ lives there too.
 
 ## The AI SEO suite
 
-Nine analyses at `/ai-seo`, aimed at a question the rest of the app does not
+The analyses at `/ai-seo`, aimed at a question the rest of the app does not
 ask: can an AI answer engine find this site, read it, and cite it?
 
 | Analysis | What it measures |
@@ -353,7 +353,18 @@ ask: can an AI answer engine find this site, read it, and cite it?
 | **Competitive intelligence** | Crawls named competitors for topic coverage, sections, publishing velocity, schema, author signals, retrieval posture and internal anchor patterns. |
 | **Reputation & ambient signals** | Reddit, Hacker News and Google/Bing News — the third-party discussion an assistant weighs when asked whether a brand is credible. Reddit gets its own tiered, block-aware scraper (see below). |
 | **Freshness & intent drift** | Decay measured relative to the whole site, and drift measured as Jensen-Shannon divergence over the query mix between two Search Console snapshots. |
+| **Answer citations** | The answer side of keyword research: when somebody puts one of those questions to an assistant, whose site can it answer from? A grounded assistant (ChatGPT search, Copilot, Perplexity) runs its own search before answering, so the result set for the question is the population every citation is drawn from. Each question is sampled keylessly and the report says whether this site is in that pool, which named competitors are, and which questions nobody strong answers. Reported as **eligibility, never as a citation rate** — no keyless endpoint reports what an assistant actually cited, so a failed sample is a third state (`unknown`) excluded from both sides of every percentage. |
 | **Tracking board** | Twenty checks covering every tracking element — crawl errors, robots changes, sitemap health, index coverage, Core Web Vitals, TTFB, page load, SSL and security headers, redirect chains, canonicals, URL structure, titles and meta, headings, content quality and cannibalisation, internal linking, images, structured data, JS rendering, mobile usability, AI crawler access. |
+
+### Where keyword research lives
+
+**Keyword research is under *Analyse*, next to the technical audit — not in this
+section.** It was built here because the prompt half needs the model, but that
+is an implementation detail: the person using it is doing keyword research at
+the start of an engagement, alongside the audit, and looked for it there every
+time. The route is unchanged (`/ai-seo/research`), so existing links and
+bookmarks still work; only the nav item moved, and `navKey` on the feature
+definition is what keeps the right sidebar item highlighted.
 
 ### The rule the whole suite is built on
 
@@ -463,6 +474,55 @@ Run it with the server **stopped**: the WebAssembly SQLite driver is
 single-writer, and a second process opening `data/app.db` while the app is
 running has corrupted it before.
 
+## Security posture
+
+Every response carries a Content-Security-Policy, `nosniff`, `X-Frame-Options`,
+a `Referrer-Policy` and a `Permissions-Policy`, plus HSTS once the app knows TLS
+is terminated in front of it (`TRUST_PROXY=1`). The policy keeps
+`'unsafe-inline'` for scripts and styles — the views carry inline handlers that
+a nonce cannot cover — and spends itself on `frame-ancestors`, `form-action`,
+`base-uri` and `object-src` instead. See `src/lib/securityHeaders.js` for why
+that trade is the honest one.
+
+Every state-changing POST requires the session's CSRF token
+(`src/lib/csrf.js`). The `SameSite=Lax` cookie already blocks the classic
+cross-site POST, but it is a browser behaviour rather than a server check, and
+it does not isolate a sibling subdomain — so the token is what the guarantee
+actually rests on. Templates insert it with `<%- csrfField %>`; **a new POST
+form needs that line or it will be refused with a 403.**
+
+Logging in regenerates the session id, so an id planted beforehand cannot
+survive the privilege change. Failed logins are throttled per IP *and* per
+ip+address, which is what stops one password being sprayed across a team's
+whole address list. In production the error page shows a reference code instead
+of the underlying exception message.
+
+```bash
+npm run verify:security        # 35 checks: headers, CSRF, session handling,
+                               # login throttle, team data scoping, asset
+                               # budget, and a render sweep of every page
+npm run doctor                 # deployment posture, including CSP and HSTS
+```
+
+`verify:security` runs against a throwaway database in the system temp
+directory, so unlike the other verifiers it is safe to run with the server up.
+
+### The asset budget it enforces
+
+The charting libraries are **not** in the shared `<head>`. They used to be, and
+that put ApexCharts (510 KB), jsVectorMap (32 KB), its world map (100 KB) and
+the country-code table on all ~60 pages when only `/dashboard` and
+`/performance` draw a chart — the login page included. They are now fetched on
+demand by the chart partials themselves through `public/js/chart-assets.js`,
+which loads each library at most once per page, pins an SRI hash per CDN file,
+and renders "this chart could not be loaded — the figures are in the table
+below" if the CDN is unreachable. A page with no chart on it now ships 7 KB
+instead of 651 KB.
+
+Because the partials declare their own dependency, a chart can be dropped into
+any view and it will work. Adding a library back to `head.ejs` will fail
+`verify:security`.
+
 ## Database
 
 SQLite via `better-sqlite3`, file at `data/app.db` (gitignored — it holds
@@ -475,7 +535,7 @@ automatically on boot. Brand-keyed consolidated tables: `gsc_daily`,
 those.
 
 The AI SEO suite adds four generic tables rather than a pair per feature, since
-all nine analyses have the same shape: `aiseo_runs` (one row per analysis,
+every analysis has the same shape: `aiseo_runs` (one row per analysis,
 `kind` says which), `aiseo_findings` (normalised out of the payload so the task
 bridge and alert engine never parse JSON), `aiseo_metrics` (the tracking time
 series — one row per brand/metric/url/capture, storing the value *and* the

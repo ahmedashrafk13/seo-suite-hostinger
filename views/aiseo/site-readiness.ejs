@@ -25,7 +25,7 @@
   <div class="card">
     <div class="card-head"><h3>Check a whole site</h3></div>
     <div class="card-body">
-      <form method="POST" action="/ai-seo/site-readiness/run">
+      <form method="POST" action="/ai-seo/site-readiness/run"><%- csrfField %>
         <% if (brand) { %><input type="hidden" name="brand_id" value="<%= brand.id %>"><% } %>
         <div class="field">
           <label for="site">Site URL

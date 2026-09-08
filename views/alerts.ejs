@@ -42,26 +42,26 @@
   <% if (brand) { %>
     <div class="card">
       <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <form method="POST" action="/alerts/apply-defaults">
+        <form method="POST" action="/alerts/apply-defaults"><%- csrfField %>
           <input type="hidden" name="brand_id" value="<%= brand.id %>">
           <button type="submit" class="btn secondary sm">Apply recommended defaults</button>
         </form>
-        <form method="POST" action="/alerts/enable-all">
+        <form method="POST" action="/alerts/enable-all"><%- csrfField %>
           <input type="hidden" name="brand_id" value="<%= brand.id %>">
           <button type="submit" class="btn ghost sm">Enable all available</button>
         </form>
-        <form method="POST" action="/alerts/disable-all">
+        <form method="POST" action="/alerts/disable-all"><%- csrfField %>
           <input type="hidden" name="brand_id" value="<%= brand.id %>">
           <button type="submit" class="btn ghost sm">Disable all</button>
         </form>
-        <form method="POST" action="/alerts/run-now">
+        <form method="POST" action="/alerts/run-now"><%- csrfField %>
           <input type="hidden" name="brand_id" value="<%= brand.id %>">
           <button type="submit" class="btn sm">Check now</button>
         </form>
         <div class="spacer"></div>
         <details class="plain" style="position:relative">
           <summary>Send a test notification</summary>
-          <form method="POST" action="/alerts/test-notification" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <form method="POST" action="/alerts/test-notification" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><%- csrfField %>
             <input type="hidden" name="brand_id" value="<%= brand.id %>">
             <select name="channel" style="width:auto">
               <% catalogMeta.channels.forEach(function(c){ %><option value="<%= c.value %>"><%= c.label %></option><% }) %>
@@ -90,7 +90,7 @@
                   <div class="ah-desc"><%= it.def.description %></div>
                 </div>
                 <div class="ah-right">
-                  <form method="POST" action="/alerts/toggle" onclick="event.stopPropagation()">
+                  <form method="POST" action="/alerts/toggle" onclick="event.stopPropagation()"><%- csrfField %>
                     <input type="hidden" name="brand_id" value="<%= brand.id %>">
                     <input type="hidden" name="alert_key" value="<%= it.def.key %>">
                     <label class="switch" onclick="event.stopPropagation()">
@@ -101,7 +101,7 @@
                 </div>
               </summary>
               <div class="alert-body">
-                <form method="POST" action="/alerts/save">
+                <form method="POST" action="/alerts/save"><%- csrfField %>
                   <input type="hidden" name="brand_id" value="<%= brand.id %>">
                   <input type="hidden" name="alert_key" value="<%= it.def.key %>">
                   <input type="hidden" name="enabled" value="<%= it.enabled ? 'on' : '' %>">

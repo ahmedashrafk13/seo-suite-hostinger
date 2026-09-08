@@ -35,7 +35,7 @@
           it has nothing to read until a property is linked on the brand.
         </p>
       <% } %>
-      <form method="POST" action="/ai-seo/ai-referrals/run">
+      <form method="POST" action="/ai-seo/ai-referrals/run"><%- csrfField %>
         <% if (brand) { %><input type="hidden" name="brand_id" value="<%= brand.id %>"><% } %>
         <div class="field">
           <label for="days">Window</label>

@@ -18,6 +18,7 @@ const providers = require('../lib/aiseo/providers');
 const budget = require('../lib/ai/budget');
 
 const research = require('../lib/aiseo/research');
+const promptCitations = require('../lib/aiseo/promptCitations');
 const onpage = require('../lib/aiseo/onpage');
 const schemaAuto = require('../lib/aiseo/schemaAuto');
 const readiness = require('../lib/aiseo/readiness');
@@ -106,6 +107,12 @@ router.get('/', (req, res, next) => {
 function feature({
   slug, kind, engine, listView, resultView, title, needsBrand = true,
   argsFrom, extraLocals = null, targetFrom = null, labelFrom = null,
+  // Which sidebar item lights up for this feature. Defaults to the AI SEO
+  // section, which is where all of these were originally grouped. Keyword
+  // research overrides it because the nav item moved to "Analyse" (see
+  // views/partials/sidebar.ejs) while the route stayed put, and a page that
+  // highlights a nav item the user did not click reads as a broken link.
+  navKey = 'aiseo',
   // Called with the stored run just before it is rendered, for features whose
   // report improves after the run finished. Only difficulty backfill uses it:
   // scores computed by the background job land in the cache, not in the run's
@@ -122,7 +129,7 @@ function feature({
       const brand = resolveBrand(req, brands);
       res.render(listView, {
         title,
-        active: 'aiseo',
+        active: navKey,
         pageTitle: title,
         slug,
         kind,
@@ -197,7 +204,7 @@ function feature({
       }
       res.render(resultView, {
         title: `${title} · ${run.target || run.id}`,
-        active: 'aiseo',
+        active: navKey,
         pageTitle: title,
         slug,
         kind,
@@ -279,7 +286,8 @@ feature({
   engine: research,
   listView: 'aiseo/research',
   resultView: 'aiseo/research-result',
-  title: 'Keyword & prompt research',
+  title: 'Keyword research',
+  navKey: 'research',
   // Fills in difficulties scored by the background job since this run
   // finished. Without it, a run would show the dozen keywords it could afford
   // to score inline and nothing else, forever — even once the backfill had
@@ -671,6 +679,46 @@ feature({
     ambiguousSources: aiReferrals.AMBIGUOUS_SOURCES,
     ga4Linked: Boolean(brand && brand.ga4_property_id),
   }),
+});
+
+// --------------------------- 9b. who gets cited for the assistant questions
+//
+// The answer side of keyword research. ./research.js produces the questions
+// people put to an assistant; this checks who is actually in the retrieval
+// pool for them, which is the population a grounded assistant draws its
+// citations from. Deliberately NOT presented as a citation rate — see the
+// header of lib/aiseo/promptCitations.js for what is and is not knowable
+// without a citation-tracking credential.
+feature({
+  slug: 'answer-citations',
+  kind: 'prompt_citations',
+  engine: promptCitations,
+  listView: 'aiseo/answer-citations',
+  resultView: 'aiseo/answer-citations-result',
+  title: 'Answer citations',
+  argsFrom: (req) => ({
+    promptText: req.body.prompts || null,
+    market: req.body.country || null,
+    perPrompt: Math.min(20, Math.max(5, parseInt(req.body.per_prompt, 10) || 10)),
+    limit: Math.min(promptCitations.MAX_PROMPTS, Math.max(1, parseInt(req.body.limit, 10) || promptCitations.MAX_PROMPTS)),
+  }),
+  extraLocals: (req, brand, userId) => {
+    // The question set this run WOULD use, shown on the form before anything
+    // is started. Without it the user cannot tell whether the brand has any
+    // questions to check, and an empty run is the way they find out.
+    const researchRun = brand ? store.latestRun({ userId, kind: 'research', brandId: brand.id }) : null;
+    const derived = researchRun && researchRun.result
+      ? promptCitations.promptsFromResearch(researchRun.result)
+      : [];
+    return {
+      researchRun,
+      derivedPrompts: derived,
+      marketList: markets.all(),
+      selectedMarket: markets.resolve(req.query.country || (brand && brand.market)).code,
+      maxPrompts: promptCitations.MAX_PROMPTS,
+      competitorDomains: brand ? competitive.list(brand.id).filter((c) => c.active).map((c) => c.domain) : [],
+    };
+  },
 });
 
 // ------------------------------------------------------- 5. architecture

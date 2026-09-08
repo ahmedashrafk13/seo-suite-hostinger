@@ -112,7 +112,7 @@
 
         <div class="btn-row">
           <% if (!event.acknowledged_at) { %>
-            <form method="POST" action="/alerts/event/<%= event.id %>/acknowledge">
+            <form method="POST" action="/alerts/event/<%= event.id %>/acknowledge"><%- csrfField %>
               <input type="hidden" name="back" value="/alerts/event/<%= event.id %>">
               <button class="btn success" type="submit">Acknowledge</button>
             </form>

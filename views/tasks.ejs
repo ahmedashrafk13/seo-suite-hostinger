@@ -304,7 +304,7 @@
           <span class="sub"><%= tasks.length %> shown</span>
         </div>
         <div class="card-body">
-          <form method="POST" action="/tasks/bulk">
+          <form method="POST" action="/tasks/bulk"><%- csrfField %>
             <div class="btn-row" style="margin-bottom:10px">
               <label for="bulk-action" class="sr-only">Bulk action</label>
               <select id="bulk-action" name="action" style="width:auto;min-width:170px">
@@ -359,7 +359,7 @@
       <div class="card-body">
         <details class="disclosure">
           <summary>New task</summary>
-          <form method="POST" action="/tasks/create">
+          <form method="POST" action="/tasks/create"><%- csrfField %>
             <div class="form-row">
               <div>
                 <label for="title">Title</label>

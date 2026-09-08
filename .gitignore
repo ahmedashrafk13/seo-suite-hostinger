@@ -41,3 +41,6 @@ cloudflared.exe
 /npm
 /cd
 seo-automation-suite@1.0.0
+
+# Local editor/agent launch config, not part of the deployed app.
+.claude/

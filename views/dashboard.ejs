@@ -70,7 +70,7 @@ function deltaHtml(recent, prior, invert) {
         <% if (lastSync.status === 'error') { %><span class="badge critical" style="margin-left:5px">failed</span><% } %>
       </span>
     <% } %>
-    <form method="POST" action="/dashboard/refresh">
+    <form method="POST" action="/dashboard/refresh"><%- csrfField %>
       <button type="submit" class="btn secondary sm">Sync &amp; check alerts now</button>
     </form>
   </div>

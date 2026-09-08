@@ -15,11 +15,11 @@ function n(v) { return fmtInt(v); }
       <% if (report) { %>
         <a class="btn secondary sm" href="/audit/<%= run.id %>/export" target="_blank">Print / export</a>
         <a class="btn secondary sm" href="/audit/<%= run.id %>/csv">Download Excel</a>
-        <form method="POST" action="/audit/<%= run.id %>/create-tasks" style="display:inline">
+        <form method="POST" action="/audit/<%= run.id %>/create-tasks" style="display:inline"><%- csrfField %>
           <button type="submit" class="btn sm">Create tasks from findings</button>
         </form>
       <% } %>
-      <form method="POST" action="/audit/<%= run.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this audit run? This cannot be undone.')">
+      <form method="POST" action="/audit/<%= run.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this audit run? This cannot be undone.')"><%- csrfField %>
         <button type="submit" class="btn danger-ghost sm">Delete</button>
       </form>
     </div>

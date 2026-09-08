@@ -23,11 +23,7 @@ _rows.forEach((r) => { _values[r[_nameKey]] = Number(r[_valueKey]) || 0; });
   (function () {
     var raw = <%- JSON.stringify(_values) %>;
     var codeType = <%- JSON.stringify(_codeType) %>;
-    function ready(fn) {
-      if (window.jsVectorMap && window.CountryCodes) fn();
-      else setTimeout(function () { ready(fn); }, 60);
-    }
-    ready(function () {
+    function draw() {
       var values = {};
       var max = 1;
       Object.keys(raw).forEach(function (k) {
@@ -58,6 +54,11 @@ _rows.forEach((r) => { _values[r[_nameKey]] = Number(r[_valueKey]) || 0; });
           tooltip.text((tooltip.text() || code) + (v != null ? ': ' + v.toLocaleString('en-US') : ': no data'), true);
         },
       });
+    }
+    // jsVectorMap, its 102 KB world map and the country-code table are pulled
+    // in only for the one page that has a map on it.
+    window.ChartAssets.need('map').then(draw).catch(function () {
+      window.ChartAssets.unavailable('#<%= _uid %>', 'The country map');
     });
   })();
 </script>

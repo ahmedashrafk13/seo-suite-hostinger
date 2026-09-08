@@ -25,6 +25,7 @@ const express = require('express');
 const db = require('./src/db');
 const notify = require('./src/lib/notify');
 const teamLib = require('./src/lib/team');
+const csrf = require('./src/lib/csrf');
 
 const USER_ID = Number(process.env.SMOKE_USER_ID || 2);
 
@@ -92,6 +93,10 @@ app.use((req, res, next) => {
       return String(u).length > max ? `${String(u).slice(0, max)}…` : String(u);
     }
   };
+  // Templates insert the CSRF token with <%- csrfField %>, so the harness
+  // must provide it exactly as src/app.js does or every page with a form
+  // on it throws ReferenceError.
+  csrf.expose(req, res, () => {});
   res.locals.query = req.query;
   res.locals.path = req.path;
   next();
@@ -103,11 +108,11 @@ app.set('requireAuth', passThrough);
 app.use((req, res, next) => {
   const u = res.locals.currentUser;
   if (u) {
-    res.locals.navBrands = db.prepare('SELECT id, name FROM brands WHERE user_id=? AND active=1 ORDER BY name').all(u.id);
+    res.locals.navBrands = db.prepare('SELECT id, name FROM brands WHERE user_id=? AND active=1 ORDER BY name').all(req.dataUserId);
     res.locals.navCounts = {
-      openTasks: db.prepare("SELECT COUNT(*) n FROM tasks WHERE user_id=? AND status IN ('backlog','in_progress','awaiting_approval','blocked')").get(u.id).n,
-      needsApproval: db.prepare("SELECT COUNT(*) n FROM tasks WHERE user_id=? AND requires_approval=1 AND approved_at IS NULL AND status NOT IN ('done','dismissed')").get(u.id).n,
-      openAlerts: db.prepare('SELECT COUNT(*) n FROM alert_events WHERE user_id=? AND acknowledged_at IS NULL').get(u.id).n,
+      openTasks: db.prepare("SELECT COUNT(*) n FROM tasks WHERE user_id=? AND status IN ('backlog','in_progress','awaiting_approval','blocked')").get(req.dataUserId).n,
+      needsApproval: db.prepare("SELECT COUNT(*) n FROM tasks WHERE user_id=? AND requires_approval=1 AND approved_at IS NULL AND status NOT IN ('done','dismissed')").get(req.dataUserId).n,
+      openAlerts: db.prepare('SELECT COUNT(*) n FROM alert_events WHERE user_id=? AND acknowledged_at IS NULL').get(req.dataUserId).n,
     };
   } else {
     res.locals.navBrands = [];
@@ -133,6 +138,10 @@ const MOUNTS = [
   ['/onboarding', './src/routes/onboarding'],
   ['/workflow', './src/routes/workflow'],
   ['/ai-assist', './src/routes/aiAssist'],
+  // The sidebar links to fifteen /ai-seo/* pages on every page of the app.
+  // Without this mount they were all reported as broken on every run --
+  // fifteen false failures that make the real ones easy to miss.
+  ['/ai-seo', './src/routes/aiseo'],
 ];
 MOUNTS.forEach(([mount, mod]) => {
   try { app.use(mount, passThrough, require(mod)); } catch (err) {

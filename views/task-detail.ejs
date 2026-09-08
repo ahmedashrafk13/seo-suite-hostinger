@@ -16,7 +16,7 @@
           <div>
             <strong>Approved</strong> by <%= task.approved_by %> on <%= task.approved_at %>.
             This task can be marked done.
-            <form method="POST" action="/tasks/<%= task.id %>/revoke-approval" style="display:inline-block;margin-left:8px">
+            <form method="POST" action="/tasks/<%= task.id %>/revoke-approval" style="display:inline-block;margin-left:8px"><%- csrfField %>
               <input type="hidden" name="back" value="/tasks/<%= task.id %>">
               <button class="btn danger-ghost xs" type="submit">Revoke approval</button>
             </form>
@@ -24,7 +24,7 @@
         <% } else { %>
           <div>
             <strong>This task requires SEO-team approval</strong> before it can be marked done — it touches a restricted action (publishing, URL/redirect changes, canonical, robots.txt, sitemap, bulk internal links, or titles on high-performing pages).
-            <form method="POST" action="/tasks/<%= task.id %>/approve" style="margin-top:8px">
+            <form method="POST" action="/tasks/<%= task.id %>/approve" style="margin-top:8px"><%- csrfField %>
               <input type="hidden" name="back" value="/tasks/<%= task.id %>">
               <div class="form-row">
                 <div>
@@ -91,7 +91,7 @@
 
           <div class="section-divider"></div>
           <h4>Change status</h4>
-          <form method="POST" action="/tasks/<%= task.id %>/status">
+          <form method="POST" action="/tasks/<%= task.id %>/status"><%- csrfField %>
             <input type="hidden" name="back" value="/tasks/<%= task.id %>">
             <div class="form-row">
               <div>
@@ -112,7 +112,7 @@
 
           <div class="section-divider"></div>
           <h4>Edit</h4>
-          <form method="POST" action="/tasks/<%= task.id %>/update">
+          <form method="POST" action="/tasks/<%= task.id %>/update"><%- csrfField %>
             <div class="form-row">
               <div>
                 <label for="e-title">Title</label>
@@ -156,7 +156,7 @@
           </form>
 
           <div class="section-divider"></div>
-          <form method="POST" action="/tasks/<%= task.id %>/delete" onsubmit="return confirm('Delete this task? This cannot be undone.');">
+          <form method="POST" action="/tasks/<%= task.id %>/delete" onsubmit="return confirm('Delete this task? This cannot be undone.');"><%- csrfField %>
             <button class="btn danger sm" type="submit">Delete task</button>
           </form>
         </div>
@@ -187,7 +187,7 @@
               You do not have permission to change assignments — a team admin can grant it.
             </p>
           <% } else { %>
-            <form method="POST" action="/tasks/<%= task.id %>/assign" id="assign-form">
+            <form method="POST" action="/tasks/<%= task.id %>/assign" id="assign-form"><%- csrfField %>
               <input type="hidden" name="back" value="/tasks/<%= task.id %>">
               <div class="form-row">
                 <div>
@@ -235,7 +235,7 @@
 
             <% if (task.assignee_email) { %>
               <div class="section-divider"></div>
-              <form method="POST" action="/tasks/<%= task.id %>/resend-assignment" class="inline-form">
+              <form method="POST" action="/tasks/<%= task.id %>/resend-assignment" class="inline-form"><%- csrfField %>
                 <button class="btn secondary sm" type="submit">Re-send the email to <%= task.assignee_email %></button>
               </form>
             <% } %>
@@ -289,7 +289,7 @@
       <div class="card">
         <div class="card-head"><h3>Activity</h3></div>
         <div class="card-body">
-          <form method="POST" action="/tasks/<%= task.id %>/comment">
+          <form method="POST" action="/tasks/<%= task.id %>/comment"><%- csrfField %>
             <label for="c-note">Add a comment</label>
             <textarea id="c-note" name="note" rows="2" required></textarea>
             <button class="btn secondary sm" type="submit">Comment</button>

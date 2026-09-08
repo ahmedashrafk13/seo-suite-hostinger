@@ -81,7 +81,6 @@ const _canGroup = _pts.length >= 10;
         };
       }
       function render() {
-        if (!window.ApexCharts) { setTimeout(render, 60); return; }
         var chart = new ApexCharts(document.querySelector('#<%= _uid %>'), {
           chart: {
             type: 'area', height: 160, toolbar: { show: false }, sparkline: { enabled: false },
@@ -116,7 +115,12 @@ const _canGroup = _pts.length >= 10;
           });
         }
       }
-      render();
+      // Fetches ApexCharts only if a trend chart is actually on the page, and
+      // says so plainly if the library cannot be reached — the old code
+      // retried every 60ms forever and showed an empty box.
+      window.ChartAssets.need('apex').then(render).catch(function () {
+        window.ChartAssets.unavailable('#<%= _uid %>', 'This trend chart');
+      });
     })();
   </script>
   <% } %>

@@ -10,7 +10,7 @@
       <div class="card-head"><h2 class="mt-0">Generate a weekly report</h2></div>
       <div class="card-body">
         <p class="muted">Builds a standard weekly report from the consolidated Search Console, analytics, technical audit and internal linking data already on file for the brand — no live API call at read time.</p>
-        <form method="POST" action="/reports/generate">
+        <form method="POST" action="/reports/generate"><%- csrfField %>
           <div class="form-row">
             <div>
               <label for="brand_id">Brand</label>

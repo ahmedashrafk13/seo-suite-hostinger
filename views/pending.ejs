@@ -28,7 +28,7 @@
 
     <div class="btn-row" style="margin-top:16px">
       <a class="btn secondary sm" href="/pending">Check again</a>
-      <form method="POST" action="/logout" style="display:inline">
+      <form method="POST" action="/logout" style="display:inline"><%- csrfField %>
         <button type="submit" class="btn ghost sm">Log out</button>
       </form>
     </div>

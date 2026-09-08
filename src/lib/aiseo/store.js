@@ -38,6 +38,12 @@ const KINDS = {
   // what AI visibility actually DELIVERED rather than whether it is possible,
   // which is why it is a kind of its own and not a panel on another report.
   ai_referrals: 'AI referral traffic (measured)',
+  // Who is in the retrieval pool for the questions people ask an assistant.
+  // Its own kind rather than a panel on the research report because it answers
+  // the answer side rather than the demand side, it takes minutes of paced
+  // requests to produce, and it needs its own history: the whole point is
+  // whether pool presence moves after the content work is done.
+  prompt_citations: 'Answer citations for assistant questions',
 };
 
 const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'];

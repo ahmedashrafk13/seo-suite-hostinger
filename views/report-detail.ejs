@@ -25,18 +25,18 @@ function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
   <a class="btn secondary sm" href="/reports/<%= row.id %>/xlsx">Excel export</a>
   <a class="btn secondary sm" href="/reports/<%= row.id %>/json">JSON export</a>
   <% if (!d.full) { %>
-    <form method="POST" action="/reports/generate" style="display:inline">
+    <form method="POST" action="/reports/generate" style="display:inline"><%- csrfField %>
       <input type="hidden" name="brand_id" value="<%= row.brand_id %>">
       <input type="hidden" name="week_end" value="<%= d.period.endDate %>">
       <input type="hidden" name="full_data" value="1">
       <button type="submit" class="btn secondary sm" title="Rebuilds this week's report with every Search Console and GA4 dimension attached">Add full data</button>
     </form>
   <% } %>
-  <form method="POST" action="/reports/<%= row.id %>/send" style="display:inline">
+  <form method="POST" action="/reports/<%= row.id %>/send" style="display:inline"><%- csrfField %>
     <button type="submit" class="btn sm">Email now</button>
   </form>
   <form method="POST" action="/reports/<%= row.id %>/delete" style="display:inline"
-        onsubmit="return confirm('Delete this report? This cannot be undone.')">
+        onsubmit="return confirm('Delete this report? This cannot be undone.')"><%- csrfField %>
     <button type="submit" class="btn danger-ghost sm">Delete</button>
   </form>
 </div>

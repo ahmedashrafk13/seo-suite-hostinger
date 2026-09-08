@@ -1206,6 +1206,330 @@ CREATE TABLE IF NOT EXISTS sitemap_history_runs (
 CREATE INDEX IF NOT EXISTS idx_sitemap_history_runs_site ON sitemap_history_runs (brand_id, site, run_at);
 `);
 
+/// ==========================================================================
+// SPECIALIST TOOLING — eight capabilities the suite was missing
+// ==========================================================================
+//
+// These table groups back the features added for day-to-day client-side SEO
+// work: change annotations, imported rank data, server-log analysis, hreflang
+// audits, redirect maps, IndexNow submissions and client report sharing. (The
+// portfolio roll-up stores nothing of its own — it reads what is already
+// here, which is the reason it was cheap to build.)
+//
+// Every one follows the rule the rest of the schema follows: user_id for team
+// scoping, brand_id for the subject, and a stored provenance field naming
+// where a number came from — because a rank imported from a tracker's CSV and
+// a position averaged out of Search Console are not the same measurement, and
+// must never be rendered as though they were.
+db.exec(`
+-- ------------------------------------------------------------- annotations
+-- The timeline of things a human did, or that happened to the site, so a
+-- movement in a chart can be attributed instead of guessed at.
+--
+-- WHY THIS IS A FIRST-CLASS TABLE
+-- Every "what caused this" conversation was previously answered from memory:
+-- someone recalled that the redesign shipped "sometime in March". A deploy, a
+-- content push, a migration and a Google update produce very similar-looking
+-- inflections, and telling them apart after the fact is impossible without a
+-- record made at the time.
+--
+-- The kind column is a small closed vocabulary (see lib/annotations.js); a free-text
+-- category fragments into "deploy", "Deploy" and "release" within a month and
+-- stops being filterable.
+--
+-- brand_id NULL means the event affects every brand — which is exactly what a
+-- Google algorithm update is, and the reason the column is nullable.
+CREATE TABLE IF NOT EXISTS annotations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  brand_id INTEGER REFERENCES brands(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT 'other',
+  title TEXT NOT NULL,
+  detail TEXT,
+  url TEXT,
+  starts_on TEXT NOT NULL,
+  ends_on TEXT,
+  source TEXT NOT NULL DEFAULT 'manual',
+  external_key TEXT,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_annotations_scope ON annotations (user_id, brand_id, starts_on);
+-- Seeded algorithm updates must not be inserted twice by a re-seed. A manual
+-- annotation has no external_key, and SQLite treats NULLs as distinct, so the
+-- constraint binds only the seeded rows.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_annotations_external ON annotations (user_id, external_key);
+
+-- ----------------------------------------------------------- rank tracking
+-- Positions imported from a dedicated rank tracker.
+--
+-- WHY THIS IS NOT gsc_query_daily
+-- Search Console reports an average position blended across every device and
+-- location that saw an impression, so a keyword ranking 3rd in Manchester and
+-- 40th nationally arrives as one number near 20 that describes neither. A
+-- rank tracker measures one keyword, at one location, on one device. Mixing
+-- the two in one table would make the blend and the measurement
+-- indistinguishable at read time, so they are kept apart and every rank row
+-- carries the location, device and engine it was measured at.
+--
+-- captured_on is a DATE, not a timestamp: trackers report one position per
+-- keyword per day, so a second import covering the same day is a correction
+-- of the first rather than a second data point. That is what the UNIQUE
+-- constraint encodes, and it is what makes a re-import idempotent.
+CREATE TABLE IF NOT EXISTS rank_imports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  filename TEXT,
+  provider TEXT,
+  captured_on TEXT,
+  rows_seen INTEGER NOT NULL DEFAULT 0,
+  rows_imported INTEGER NOT NULL DEFAULT 0,
+  rows_skipped INTEGER NOT NULL DEFAULT 0,
+  keywords INTEGER NOT NULL DEFAULT 0,
+  mapping_json TEXT,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_rank_imports_brand ON rank_imports (brand_id, created_at);
+
+CREATE TABLE IF NOT EXISTS rank_positions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  import_id INTEGER REFERENCES rank_imports(id) ON DELETE SET NULL,
+  keyword TEXT NOT NULL,
+  position REAL,
+  url TEXT,
+  location TEXT NOT NULL DEFAULT 'default',
+  device TEXT NOT NULL DEFAULT 'desktop',
+  engine TEXT NOT NULL DEFAULT 'google',
+  search_volume INTEGER,
+  captured_on TEXT NOT NULL,
+  provider TEXT,
+  UNIQUE (brand_id, keyword, location, device, engine, captured_on)
+);
+CREATE INDEX IF NOT EXISTS idx_rank_pos_series ON rank_positions (brand_id, keyword, captured_on);
+CREATE INDEX IF NOT EXISTS idx_rank_pos_day ON rank_positions (brand_id, captured_on);
+
+-- -------------------------------------------------------- log file analysis
+-- Server access logs, reduced to aggregates on import.
+--
+-- WHY AGGREGATES AND NOT RAW LINES
+-- A month of access logs for a modest site is millions of lines and hundreds
+-- of megabytes. Storing them in a single-writer WebAssembly SQLite on shared
+-- hosting would be the last thing this database ever did. Every question a
+-- log answers for SEO — which bot hit what, how often, with what status, how
+-- much crawl budget went to junk, which pages Googlebot has never touched —
+-- is answerable from per-day-per-bot and per-URL-per-bot counters, so the
+-- parse happens in a stream and only the counters are written.
+--
+-- The consequence is stated rather than hidden: individual requests cannot be
+-- inspected after import, and a question that needs them means re-importing.
+CREATE TABLE IF NOT EXISTS log_imports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  filename TEXT,
+  log_format TEXT,
+  lines_seen INTEGER NOT NULL DEFAULT 0,
+  lines_parsed INTEGER NOT NULL DEFAULT 0,
+  lines_unparsed INTEGER NOT NULL DEFAULT 0,
+  first_hit_at TEXT,
+  last_hit_at TEXT,
+  bot_hits INTEGER NOT NULL DEFAULT 0,
+  human_hits INTEGER NOT NULL DEFAULT 0,
+  bytes_total INTEGER NOT NULL DEFAULT 0,
+  verified_bots INTEGER NOT NULL DEFAULT 0,
+  spoofed_bots INTEGER NOT NULL DEFAULT 0,
+  sample_unparsed TEXT,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_log_imports_brand ON log_imports (brand_id, created_at);
+
+-- One row per brand/bot/day. Re-importing an overlapping window ADDS to these
+-- counters — the honest fix is to show which date ranges have been imported
+-- (which log_imports records) rather than to pretend lines carrying no unique
+-- id can be de-duplicated.
+CREATE TABLE IF NOT EXISTS log_bot_daily (
+  brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  date TEXT NOT NULL,
+  bot TEXT NOT NULL,
+  hits INTEGER NOT NULL DEFAULT 0,
+  bytes INTEGER NOT NULL DEFAULT 0,
+  status_2xx INTEGER NOT NULL DEFAULT 0,
+  status_3xx INTEGER NOT NULL DEFAULT 0,
+  status_4xx INTEGER NOT NULL DEFAULT 0,
+  status_5xx INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (brand_id, date, bot)
+);
+
+CREATE TABLE IF NOT EXISTS log_url_stats (
+  brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  bot TEXT NOT NULL,
+  path TEXT NOT NULL,
+  hits INTEGER NOT NULL DEFAULT 0,
+  bytes INTEGER NOT NULL DEFAULT 0,
+  status_2xx INTEGER NOT NULL DEFAULT 0,
+  status_3xx INTEGER NOT NULL DEFAULT 0,
+  status_4xx INTEGER NOT NULL DEFAULT 0,
+  status_5xx INTEGER NOT NULL DEFAULT 0,
+  last_status INTEGER,
+  first_seen_at TEXT,
+  last_seen_at TEXT,
+  PRIMARY KEY (brand_id, bot, path)
+);
+CREATE INDEX IF NOT EXISTS idx_log_url_hits ON log_url_stats (brand_id, bot, hits);
+
+-- ---------------------------------------------------------------- hreflang
+-- One row per audited page set, with the issue counts kept as columns so a
+-- list page can be rendered without parsing every payload — the same reason
+-- aiseo_findings exists.
+CREATE TABLE IF NOT EXISTS hreflang_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  brand_id INTEGER REFERENCES brands(id) ON DELETE CASCADE,
+  start_url TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'running',
+  pages_crawled INTEGER NOT NULL DEFAULT 0,
+  pages_with_hreflang INTEGER NOT NULL DEFAULT 0,
+  clusters INTEGER NOT NULL DEFAULT 0,
+  issues_critical INTEGER NOT NULL DEFAULT 0,
+  issues_warning INTEGER NOT NULL DEFAULT 0,
+  error TEXT,
+  data_json TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_hreflang_runs_brand ON hreflang_runs (brand_id, created_at);
+
+-- ----------------------------------------------------------- redirect maps
+-- A migration's old-URL list, the target chosen for each, and how that target
+-- was arrived at. confidence and matched_by exist because a redirect map
+-- gets signed off by a human: a row matched on an identical slug needs a
+-- glance, and a row matched on 0.42 token similarity needs a decision.
+CREATE TABLE IF NOT EXISTS redirect_maps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  brand_id INTEGER REFERENCES brands(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  old_origin TEXT,
+  new_origin TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'draft',
+  rows_total INTEGER NOT NULL DEFAULT 0,
+  rows_matched INTEGER NOT NULL DEFAULT 0,
+  rows_unmatched INTEGER NOT NULL DEFAULT 0,
+  target_pages INTEGER NOT NULL DEFAULT 0,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_redirect_maps_brand ON redirect_maps (brand_id, created_at);
+
+CREATE TABLE IF NOT EXISTS redirect_map_rows (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  map_id INTEGER NOT NULL REFERENCES redirect_maps(id) ON DELETE CASCADE,
+  old_path TEXT NOT NULL,
+  new_path TEXT,
+  matched_by TEXT,
+  confidence REAL,
+  alternatives_json TEXT,
+  live_status INTEGER,
+  live_final_url TEXT,
+  hops INTEGER,
+  checked_at TEXT,
+  approved INTEGER NOT NULL DEFAULT 0,
+  note TEXT,
+  UNIQUE (map_id, old_path)
+);
+CREATE INDEX IF NOT EXISTS idx_redirect_rows_map ON redirect_map_rows (map_id, confidence);
+
+-- ---------------------------------------------------------------- IndexNow
+-- Submissions are logged because the protocol gives no read-back: there is no
+-- endpoint that answers "what have I submitted". Without a local ledger the
+-- only answer to "did we ping Bing about this page" is somebody's memory, and
+-- a resubmission storm is the usual result.
+CREATE TABLE IF NOT EXISTS indexnow_submissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL,
+  url_count INTEGER NOT NULL DEFAULT 0,
+  http_status INTEGER,
+  ok INTEGER NOT NULL DEFAULT 0,
+  response_note TEXT,
+  urls_json TEXT,
+  source TEXT NOT NULL DEFAULT 'manual',
+  submitted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_indexnow_brand ON indexnow_submissions (brand_id, created_at);
+
+-- One row per URL ever submitted, so the ledger can answer "when did we last
+-- ping this page" without scanning every submission payload.
+CREATE TABLE IF NOT EXISTS indexnow_urls (
+  brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  submissions INTEGER NOT NULL DEFAULT 0,
+  first_submitted_at TEXT,
+  last_submitted_at TEXT,
+  last_ok INTEGER,
+  PRIMARY KEY (brand_id, url)
+);
+
+-- ------------------------------------------------------------ report shares
+-- A read-only client link to one weekly report.
+--
+-- The token IS the whole access control, so it is 32 random bytes and stored
+-- hashed: a share link in an email thread is a bearer credential, and a
+-- database dump must not hand over every client's reports. revoked_at rather
+-- than DELETE keeps the audit trail of what was shared, with whom, and when
+-- access was withdrawn.
+CREATE TABLE IF NOT EXISTS report_shares (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  report_id INTEGER NOT NULL REFERENCES weekly_reports(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  token_hint TEXT NOT NULL,
+  label TEXT,
+  expires_on TEXT,
+  views INTEGER NOT NULL DEFAULT 0,
+  last_viewed_at TEXT,
+  revoked_at TEXT,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_report_shares_report ON report_shares (report_id, created_at);
+`);
+
+// White-label fields, and the commentary that turns a table of numbers into a
+// report a client can read. Additive and optional: unset means the report
+// renders exactly as it did before.
+try {
+  addColumn('brands', 'report_company', 'report_company TEXT');
+  addColumn('brands', 'report_logo_url', 'report_logo_url TEXT');
+  addColumn('brands', 'report_accent', 'report_accent TEXT');
+  addColumn('brands', 'report_footer', 'report_footer TEXT');
+  addColumn('brands', 'report_contact', 'report_contact TEXT');
+  // The IndexNow key for this site. Held per brand because the key must be
+  // published as a file at the site's own root — one key cannot cover two
+  // domains.
+  addColumn('brands', 'indexnow_key', 'indexnow_key TEXT');
+  addColumn('brands', 'indexnow_key_location', 'indexnow_key_location TEXT');
+  // A staging origin, used by the redirect-map differ to compare a build
+  // against production before it goes live.
+  addColumn('brands', 'staging_origin', 'staging_origin TEXT');
+  // The specialist's own narrative on a report, written once and re-rendered
+  // by the report page, the print view and the client share link — so all
+  // three carry the same commentary rather than three drafts of it.
+  addColumn('weekly_reports', 'commentary', 'commentary TEXT');
+  addColumn('weekly_reports', 'commentary_updated_at', 'commentary_updated_at TEXT');
+} catch (e) {
+  console.error('[db] specialist tooling migration warning:', e.message);
+}
+
 // Brand-level configuration the AI SEO features need and cannot derive.
 // Additive, and every one is optional: unset means "fall back to the generic
 // behaviour", never "crash".

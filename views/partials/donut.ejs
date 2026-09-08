@@ -22,7 +22,6 @@ const _uid = `dn${Math.random().toString(36).slice(2, 9)}`;
         var values = <%- JSON.stringify(_rows.map((r) => Number(r[_valueKey]) || 0)) %>;
         var colors = <%- JSON.stringify(_palette) %>;
         function render() {
-          if (!window.ApexCharts) { setTimeout(render, 60); return; }
           var total = values.reduce(function (a, b) { return a + b; }, 0);
           new ApexCharts(document.querySelector('#<%= _uid %>'), {
             chart: {
@@ -56,7 +55,9 @@ const _uid = `dn${Math.random().toString(36).slice(2, 9)}`;
             tooltip: { theme: 'light', y: { formatter: function (v) { return v.toLocaleString('en-US') + ' (' + (total > 0 ? Math.round((v / total) * 100) : 0) + '%)'; } } },
           }).render();
         }
-        render();
+        window.ChartAssets.need('apex').then(render).catch(function () {
+          window.ChartAssets.unavailable('#<%= _uid %>', 'This breakdown chart');
+        });
       })();
     </script>
   <% } %>

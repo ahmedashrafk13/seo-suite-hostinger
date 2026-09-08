@@ -27,10 +27,10 @@ function fmtCell(row, col) {
       <a class="btn secondary sm" href="/linking">&larr; All linking runs</a>
       <div class="spacer"></div>
       <% if (inv.docxName) { %><a class="btn secondary sm" href="/linking/<%= run.id %>/report">Download .docx report</a><% } %>
-      <form method="POST" action="/linking/<%= run.id %>/create-tasks" style="display:inline">
+      <form method="POST" action="/linking/<%= run.id %>/create-tasks" style="display:inline"><%- csrfField %>
         <button type="submit" class="btn sm">Create tasks from findings</button>
       </form>
-      <form method="POST" action="/linking/<%= run.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this linking run? This cannot be undone.')">
+      <form method="POST" action="/linking/<%= run.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this linking run? This cannot be undone.')"><%- csrfField %>
         <button type="submit" class="btn danger-ghost sm">Delete</button>
       </form>
     </div>

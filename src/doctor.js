@@ -81,6 +81,25 @@ else warn('NODE_ENV is not production', 'error pages will show stack traces to v
 if (process.env.SIGNUP_REQUIRES_INVITE === '1') ok('Sign-up requires an invite');
 else warn('Sign-up is open', 'anyone who finds the URL can create a workspace. Set SIGNUP_REQUIRES_INVITE=1.');
 
+// Report-only is a tuning mode: the browser reports what a policy WOULD block
+// and enforces nothing. Left on, the app looks protected and is not — which is
+// exactly the failure that would go unnoticed, so it is called out here.
+if (process.env.CSP_REPORT_ONLY === '1') {
+  warn('Content-Security-Policy is in report-only mode',
+    'the policy is not enforced. Unset CSP_REPORT_ONLY once it is tuned.');
+} else {
+  ok('Content-Security-Policy enforced');
+}
+
+// HSTS is only sent when the app knows TLS is terminated in front of it. In
+// production without this, every response goes out without HSTS and a
+// first-visit downgrade stays possible.
+if (process.env.NODE_ENV === 'production' || process.env.TRUST_PROXY === '1') {
+  ok('HSTS sent', 'the app knows it is behind TLS');
+} else {
+  warn('HSTS not sent', 'set TRUST_PROXY=1 when a proxy or tunnel terminates HTTPS in front of this app');
+}
+
 // --- scheduled work -------------------------------------------------------
 // This is the check that exists because the failure is invisible.
 if (config.INPROCESS_CRON) {

@@ -67,6 +67,17 @@ function icon(name) {
     <a class="nav-link <%= active === 'audit' ? 'active' : '' %>" href="/audit">
       <span class="nav-icon"><%- icon('audit') %></span> Technical audit
     </a>
+    <%
+    /* Keyword research sits with the audit, not in the AI SEO section.
+       It was built as part of the AI suite because it uses the model for the
+       prompt half, but that is an implementation detail — the person using it
+       is doing keyword research at the start of an engagement, alongside the
+       audit, and looked for it under "Analyse" every time. The route is
+       unchanged (/ai-seo/research) so existing links and bookmarks still work. */
+    %>
+    <a class="nav-link <%= active === 'research' ? 'active' : '' %>" href="/ai-seo/research">
+      <span class="nav-icon"><%- icon('research') %></span> Keyword research
+    </a>
     <a class="nav-link <%= active === 'pagespeed' ? 'active' : '' %>" href="/pagespeed">
       <span class="nav-icon"><%- icon('speed') %></span> PageSpeed
     </a>
@@ -94,9 +105,6 @@ function icon(name) {
   <div class="nav-group">
     <a class="nav-link <%= active === 'aiseo' ? 'active' : '' %>" href="/ai-seo">
       <span class="nav-icon"><%- icon('ai') %></span> Overview
-    </a>
-    <a class="nav-link" href="/ai-seo/research">
-      <span class="nav-icon"><%- icon('research') %></span> Keyword &amp; prompt research
     </a>
     <a class="nav-link" href="/ai-seo/optimizer">
       <span class="nav-icon"><%- icon('optimizer') %></span> On-page score
@@ -130,6 +138,9 @@ function icon(name) {
     </a>
     <a class="nav-link" href="/ai-seo/freshness">
       <span class="nav-icon"><%- icon('freshness') %></span> Freshness &amp; intent drift
+    </a>
+    <a class="nav-link" href="/ai-seo/answer-citations">
+      <span class="nav-icon"><%- icon('reputation') %></span> Answer citations
     </a>
     <a class="nav-link" href="/ai-seo/ai-referrals">
       <span class="nav-icon"><%- icon('board') %></span> AI referral traffic

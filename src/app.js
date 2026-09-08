@@ -14,8 +14,17 @@ const backup = require('./lib/backup');
 const toolRunner = require('./lib/toolRunner');
 const notify = require('./lib/notify');
 
+const securityHeaders = require('./lib/securityHeaders');
+const csrf = require('./lib/csrf');
+
 const app = express();
 const PORT = config.PORT;
+
+// A tunnel or reverse proxy terminates TLS, so Express must be told to read
+// X-Forwarded-Proto — otherwise `secure` cookies are never sent and nobody can
+// stay signed in. It also decides whether HSTS is safe to send.
+const BEHIND_PROXY = process.env.TRUST_PROXY === '1' || process.env.NODE_ENV === 'production';
+if (BEHIND_PROXY) app.set('trust proxy', 1);
 
 // Cache-busting stamp for the stylesheet. Browsers cache /css/style.css hard,
 // so a CSS change could sit on disk while the tab kept rendering the previous
@@ -23,16 +32,52 @@ const PORT = config.PORT;
 // file's modification time, so the URL changes exactly when the file does.
 // In production it is read once at boot; in development it is re-read per
 // request so an edit shows up on the next refresh without a restart.
-const CSS_PATH = path.join(__dirname, '..', 'public', 'css', 'style.css');
-function cssVersion() {
-  try { return String(Math.floor(require('fs').statSync(CSS_PATH).mtimeMs)); }
-  catch { return '0'; }
+// Both the stylesheet and the client scripts are cache-busted, and by the same
+// stamp: the loader in /js/chart-assets.js is now as likely to change as the
+// CSS, and a stamp derived from style.css alone would leave a stale copy of it
+// in every browser until the next unrelated CSS edit.
+const ASSET_PATHS = [
+  path.join(__dirname, '..', 'public', 'css', 'style.css'),
+  path.join(__dirname, '..', 'public', 'js', 'chart-assets.js'),
+  path.join(__dirname, '..', 'public', 'js', 'country-codes.js'),
+];
+function assetVersion() {
+  const fs = require('fs');
+  let newest = 0;
+  for (const p of ASSET_PATHS) {
+    try {
+      const m = Math.floor(fs.statSync(p).mtimeMs);
+      if (m > newest) newest = m;
+    } catch { /* a missing file just does not contribute */ }
+  }
+  return String(newest);
 }
-const BOOT_CSS_VERSION = cssVersion();
+const BOOT_ASSET_VERSION = assetVersion();
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'views'));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Set before anything else answers, so the static handler's responses carry
+// them too — a header middleware mounted after express.static would not apply
+// to /css/style.css or /js/chart-assets.js at all.
+app.use(securityHeaders({ behindProxy: BEHIND_PROXY }));
+
+// Every reference to these files carries ?v=<mtime>, so the bytes at a given
+// URL never change and a year-long immutable cache is safe. Without maxAge the
+// browser revalidated the stylesheet and the chart loader on every navigation
+// — a round trip in front of first paint on each page, which is exactly the
+// kind of thing that puts LCP over budget on a slow connection.
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  maxAge: '365d',
+  immutable: true,
+  // A directory listing or an index.html is never wanted here; public/ holds
+  // privacy.html and terms.html, which are linked explicitly.
+  index: false,
+  setHeaders(res, filePath) {
+    // The two standalone legal pages are not versioned, so they must not be
+    // pinned for a year.
+    if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'public, max-age=3600');
+  },
+}));
 app.use(express.urlencoded({ extended: true, limit: '5mb' })); // keyword pastes can be large
 app.use(express.json({ limit: '5mb' }));
 
@@ -46,11 +91,6 @@ app.use(express.json({ limit: '5mb' }));
 // The store writes to the connection db.js already owns rather than opening its
 // own — see lib/sessionStore.js for why connect-sqlite3 was replaced.
 const SqliteSessionStore = require('./lib/sessionStore');
-const BEHIND_PROXY = process.env.TRUST_PROXY === '1' || process.env.NODE_ENV === 'production';
-// A tunnel or reverse proxy terminates TLS, so Express must be told to read
-// X-Forwarded-Proto — otherwise `secure` cookies are never sent and nobody can
-// stay signed in.
-if (BEHIND_PROXY) app.set('trust proxy', 1);
 
 app.use(session({
   store: new SqliteSessionStore(db),
@@ -115,7 +155,7 @@ app.use((req, res, next) => {
   };
   res.locals.fmtDate = (s) => (s ? String(s).slice(0, 10) : '—');
   res.locals.fmtDateTime = (s) => (s ? String(s).slice(0, 16).replace('T', ' ') : '—');
-  res.locals.assetVersion = process.env.NODE_ENV === 'production' ? BOOT_CSS_VERSION : cssVersion();
+  res.locals.assetVersion = process.env.NODE_ENV === 'production' ? BOOT_ASSET_VERSION : assetVersion();
   res.locals.severityMeta = notify.severityMeta;
   // Run status → an actual badge class. Several views used the raw status as
   // the class name, so anything other than "completed" rendered as an
@@ -144,6 +184,10 @@ app.use((req, res, next) => {
   res.locals.path = req.path;
   next();
 });
+
+// Makes `csrfField` available to every template. Verification is mounted
+// further down, after the cron route.
+app.use(csrf.expose);
 
 function requireAuth(req, res, next) {
   if (!res.locals.currentUser) {
@@ -180,15 +224,23 @@ app.set('requireAdmin', requireAdmin);
 // Brands are needed by the sidebar's brand switcher on every authed page.
 app.use((req, res, next) => {
   if (res.locals.currentUser) {
+    // Scoped to req.dataUserId — the team's data owner — not to the signed-in
+    // member's own id. A team shares the owner's workspace (see lib/team.js),
+    // and all ~130 data queries in the routes already resolve through
+    // dataUserId. This middleware used currentUser.id, so every member who was
+    // not the owner got an empty brand switcher and three zeroed counters
+    // sitting next to page bodies full of the team's real data — the sidebar
+    // disagreeing with the page it framed.
+    const dataUserId = req.dataUserId;
     res.locals.navBrands = db.prepare('SELECT id, name FROM brands WHERE user_id=? AND active=1 ORDER BY name')
-      .all(res.locals.currentUser.id);
+      .all(dataUserId);
     res.locals.navCounts = {
       openTasks: db.prepare("SELECT COUNT(*) n FROM tasks WHERE user_id=? AND status IN ('backlog','in_progress','awaiting_approval','blocked')")
-        .get(res.locals.currentUser.id).n,
+        .get(dataUserId).n,
       needsApproval: db.prepare("SELECT COUNT(*) n FROM tasks WHERE user_id=? AND requires_approval=1 AND approved_at IS NULL AND status NOT IN ('done','dismissed')")
-        .get(res.locals.currentUser.id).n,
+        .get(dataUserId).n,
       openAlerts: db.prepare('SELECT COUNT(*) n FROM alert_events WHERE user_id=? AND acknowledged_at IS NULL')
-        .get(res.locals.currentUser.id).n,
+        .get(dataUserId).n,
     };
   } else {
     res.locals.navBrands = [];
@@ -211,6 +263,12 @@ app.get('/', (req, res) => res.redirect(res.locals.currentUser ? '/dashboard' : 
 // Mounted ahead of the authenticated routes: cron carries a shared secret, not
 // a session, and must not be redirected to the login page.
 app.use('/internal/cron', require('./routes/cron'));
+
+// Everything below authenticates by session, so from here on a state-changing
+// request must carry the session's CSRF token. Mounted after the cron route
+// deliberately: cron authenticates with a shared secret and has no session to
+// hold a token. See lib/csrf.js.
+app.use(csrf.verify);
 
 // A cheap liveness URL. Hostinger's uptime monitor (or any external pinger)
 // hitting this every few minutes also has the side effect of keeping Passenger
@@ -247,12 +305,51 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('[error]', err);
-  res.status(500).render('error', {
-    title: 'Error', active: null,
-    message: err.message || 'Something went wrong.',
-    stack: process.env.NODE_ENV === 'production' ? null : err.stack,
-  });
+  // A short reference is logged with the stack and shown to the user, so a
+  // report of "I got an error" can be tied to one line in the log without the
+  // page having to show the error itself.
+  const ref = Math.random().toString(36).slice(2, 8).toUpperCase();
+  const isProd = process.env.NODE_ENV === 'production';
+  console.error(`[error] ref=${ref} ${req.method} ${req.originalUrl}`, err);
+
+  // Raw err.message used to be rendered in production. The messages here come
+  // from SQLite, googleapis and nodemailer, and carry absolute paths, SQL, and
+  // in the worst case a fragment of a request that contained a credential —
+  // none of which belongs on a page that an unapproved account can reach.
+  const message = isProd
+    ? `Something went wrong on our side. Quote reference ${ref} if you report this.`
+    : (err.message || 'Something went wrong.');
+
+  // If the failure happened before the view-globals middleware ran (a session
+  // store error, say), these locals are missing and error.ejs would itself
+  // throw on `currentUser` — turning a handled 500 into an unhandled one with
+  // no page at all.
+  if (res.locals.currentUser === undefined) res.locals.currentUser = null;
+  if (!res.locals.perms) {
+    res.locals.perms = { isAdmin: false, canAssign: false, canWrite: false, canManageTeam: false };
+  }
+  if (res.locals.team === undefined) res.locals.team = null;
+  if (res.locals.pendingMembers === undefined) res.locals.pendingMembers = 0;
+  if (!res.locals.navBrands) res.locals.navBrands = [];
+  if (!res.locals.navCounts) res.locals.navCounts = { openTasks: 0, needsApproval: 0, openAlerts: 0 };
+
+  // Headers may already be sent if the failure happened mid-stream (an xlsx
+  // export, a long report). Nothing can be rendered over a partial response;
+  // ending it is the only honest option.
+  if (res.headersSent) return req.socket.destroy();
+
+  try {
+    return res.status(500).render('error', {
+      title: 'Error', active: null,
+      message,
+      stack: isProd ? null : err.stack,
+    });
+  } catch (renderErr) {
+    // The error page itself failed. Plain text beats a blank response.
+    console.error(`[error] ref=${ref} error page failed to render`, renderErr);
+    return res.status(500).type('text/plain').send(`Something went wrong (ref ${ref}).
+`);
+  }
 });
 
 const server = app.listen(PORT, () => {

@@ -29,7 +29,6 @@ const _uid = `bc${Math.random().toString(36).slice(2, 9)}`;
           return Math.round(v).toLocaleString('en-US');
         }
         function render() {
-          if (!window.ApexCharts) { setTimeout(render, 60); return; }
           // Headroom past the longest bar so its value label always lands on
           // the plot's empty space instead of overlapping the fill or being
           // clipped at the chart edge.
@@ -62,7 +61,9 @@ const _uid = `bc${Math.random().toString(36).slice(2, 9)}`;
             tooltip: { theme: 'light', y: { formatter: fmtV } },
           }).render();
         }
-        render();
+        window.ChartAssets.need('apex').then(render).catch(function () {
+          window.ChartAssets.unavailable('#<%= _uid %>', 'This chart');
+        });
       })();
     </script>
   <% } %>

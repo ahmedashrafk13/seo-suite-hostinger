@@ -30,7 +30,7 @@
   <div class="card">
     <div class="card-head"><h3>Find links for a URL</h3></div>
     <div class="card-body">
-      <form method="POST" action="/ai-seo/link-opportunities/run">
+      <form method="POST" action="/ai-seo/link-opportunities/run"><%- csrfField %>
         <% if (brand) { %><input type="hidden" name="brand_id" value="<%= brand.id %>"><% } %>
         <div class="field">
           <label for="url">Target URL <span class="muted">(the page that needs links pointing at it)</span></label>

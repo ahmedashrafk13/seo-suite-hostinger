@@ -31,7 +31,7 @@ function gaugeDash(score) {
     <% } %>
   </div>
 
-  <form method="POST" action="/pagespeed/run" class="psi-form" id="psi-form">
+  <form method="POST" action="/pagespeed/run" class="psi-form" id="psi-form"><%- csrfField %>
     <label for="psi-url" class="sr-only">URL to analyse</label>
     <input type="text" id="psi-url" name="url" value="<%= url %>" placeholder="Enter a web page URL" required>
     <% if (brands.length) { %>
@@ -336,7 +336,7 @@ function gaugeDash(score) {
       <span class="spacer" style="flex:1"></span>
       <% if (row) { %>
         <form method="POST" action="/pagespeed/<%= row.id %>/delete"
-              onsubmit="return confirm('Delete this report?')">
+              onsubmit="return confirm('Delete this report?')"><%- csrfField %>
           <button class="btn danger-ghost sm" type="submit">Delete report</button>
         </form>
       <% } %>

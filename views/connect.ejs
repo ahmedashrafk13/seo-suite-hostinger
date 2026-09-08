@@ -49,7 +49,7 @@
         </div>
       </div>
       <div class="btn-row" style="margin-top:14px">
-        <form method="POST" action="/connect/disconnect">
+        <form method="POST" action="/connect/disconnect"><%- csrfField %>
           <button class="btn danger" type="submit">Disconnect Google account</button>
         </form>
       </div>
@@ -157,7 +157,7 @@
               The only check that proves the chain end to end. Runs one keyword idea request and reports
               Google&rsquo;s own answer.
             </div>
-            <form method="POST" action="/connect/ads-test" style="margin-top:8px">
+            <form method="POST" action="/connect/ads-test" style="margin-top:8px"><%- csrfField %>
               <button class="btn sm" type="submit"
                 <%= (ads.devToken && ads.selection.customerId) ? '' : 'disabled' %>>
                 Test Keyword Planner
@@ -189,7 +189,7 @@
           have to run a campaign, but an account with no billing history often returns no volumes), then reload this page.
         </p>
       <% } else { %>
-        <form method="POST" action="/connect/ads-account">
+        <form method="POST" action="/connect/ads-account"><%- csrfField %>
           <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Use this account for keyword volumes</label>
           <div class="btn-row" style="align-items:center;gap:8px">
             <select name="ads_account" style="min-width:340px">

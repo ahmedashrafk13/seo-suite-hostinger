@@ -216,7 +216,7 @@
     <div class="card">
       <div class="card-head"><h3>Run a sync</h3></div>
       <div class="card-body">
-        <form method="POST" action="/brands/<%= brand.id %>/sync">
+        <form method="POST" action="/brands/<%= brand.id %>/sync"><%- csrfField %>
           <div class="field">
             <label for="days">History to pull</label>
             <select id="days" name="days">
@@ -241,7 +241,7 @@
     <div class="card">
       <div class="card-head"><h3>Brand settings</h3></div>
       <div class="card-body">
-        <form method="POST" action="/brands/<%= brand.id %>/update">
+        <form method="POST" action="/brands/<%= brand.id %>/update"><%- csrfField %>
           <div class="field">
             <label for="b_name">Name</label>
             <input type="text" id="b_name" name="name" value="<%= brand.name %>" required>
@@ -284,7 +284,7 @@
         <span class="sub">One-time setup the Content Brief Agent reuses for every brief — free, and never asked again unless you change it here.</span>
       </div>
       <div class="card-body">
-        <form method="POST" action="/brands/<%= brand.id %>/content-settings">
+        <form method="POST" action="/brands/<%= brand.id %>/content-settings"><%- csrfField %>
           <div class="field">
             <label for="b_vertical">Business vertical</label>
             <select id="b_vertical" name="vertical">
@@ -370,17 +370,17 @@
               <% } %>
             </div>
           </div>
-          <form method="POST" action="/brands/<%= brand.id %>/crawl-access/test" class="inline-form">
+          <form method="POST" action="/brands/<%= brand.id %>/crawl-access/test" class="inline-form"><%- csrfField %>
             <button type="submit" class="btn secondary sm">Test access</button>
           </form>
-          <form method="POST" action="/brands/<%= brand.id %>/crawl-access" class="inline-form">
+          <form method="POST" action="/brands/<%= brand.id %>/crawl-access" class="inline-form"><%- csrfField %>
             <input type="hidden" name="clear" value="on">
             <button type="submit" class="btn ghost sm">Remove credentials</button>
           </form>
           <div class="section-divider"></div>
         <% } %>
 
-        <form method="POST" action="/brands/<%= brand.id %>/crawl-access">
+        <form method="POST" action="/brands/<%= brand.id %>/crawl-access"><%- csrfField %>
           <div class="field">
             <label for="ca_basic_user">HTTP basic auth — username</label>
             <input type="text" id="ca_basic_user" name="auth_basic_user" autocomplete="off"
@@ -460,7 +460,7 @@
           alert history, tasks and reports. This cannot be undone.
         </p>
         <form method="POST" action="/brands/<%= brand.id %>/delete"
-              onsubmit="return confirm('Delete <%= brand.name %> and all of its data? This cannot be undone.')">
+              onsubmit="return confirm('Delete <%= brand.name %> and all of its data? This cannot be undone.')"><%- csrfField %>
           <button type="submit" class="btn danger-ghost block">Delete <%= brand.name %></button>
         </form>
       </div>
@@ -513,7 +513,7 @@
           <p style="font-size:12px;color:var(--danger,#b42318);margin:6px 0 0"><%= v.error %></p>
         <% } %>
 
-        <form method="POST" action="/brands/<%= brand.id %>/data-sources" style="margin-top:10px">
+        <form method="POST" action="/brands/<%= brand.id %>/data-sources" style="margin-top:10px"><%- csrfField %>
           <input type="hidden" name="vendor" value="<%= v.key %>">
           <div class="grid cols-2" style="gap:10px">
             <% v.fields.forEach(function(f){ %>

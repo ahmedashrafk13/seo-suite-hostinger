@@ -30,6 +30,8 @@ const FEATURES = [
     blurb: 'Which review platforms have a profile for this brand and which do not, chosen by vertical and weighted by what a missing profile actually costs. Establishes existence without reading a single review.' },
   { slug: 'freshness', kind: 'freshness', name: 'Freshness & intent drift',
     blurb: 'Finds pages losing ground faster than the site, and pages whose topic is unchanged while the question being asked of it has moved.' },
+  { slug: 'answer-citations', kind: 'prompt_citations', name: 'Answer citations for assistant questions',
+    blurb: 'The answer side of keyword research: for each question people put to an assistant, who is in the retrieval pool it would draw a citation from — and which questions a named competitor can be quoted on while this site cannot. Reports eligibility, never a citation rate: no keyless endpoint reports what an assistant actually cited.' },
   { slug: 'ai-referrals', kind: 'ai_referrals', name: 'AI referral traffic (measured)',
     blurb: 'The only report here that measures what AI visibility delivered rather than whether it is possible: sessions from ChatGPT, Perplexity, Copilot, Gemini and Claude, read from GA4, broken down by assistant and by the pages they send people to. States plainly what it cannot see — AI Overview clicks and citations nobody clicked.' },
   { slug: 'monitoring', kind: 'tracking', name: 'SEO tracking board',
@@ -179,7 +181,7 @@ const brandQuery = brand ? ('?brand=' + brand.id) : '';
             <td class="muted"><%= f.run_kind %></td>
             <td><%= f.title %></td>
             <td class="truncate" style="max-width:220px"><%= f.affected_url ? shortUrl(f.affected_url) : '—' %></td>
-            <td><a class="btn ghost xs" href="/ai-seo/<%= ({ onpage: 'optimizer', competitive: 'competitors', tracking: 'monitoring', site_readiness: 'site-readiness', link_opportunities: 'link-opportunities', review_platforms: 'review-platforms', ai_referrals: 'ai-referrals' }[f.run_kind]) || f.run_kind %>/<%= f.run_id %>">View</a></td>
+            <td><a class="btn ghost xs" href="/ai-seo/<%= ({ onpage: 'optimizer', competitive: 'competitors', tracking: 'monitoring', site_readiness: 'site-readiness', link_opportunities: 'link-opportunities', review_platforms: 'review-platforms', ai_referrals: 'ai-referrals', prompt_citations: 'answer-citations' }[f.run_kind]) || f.run_kind %>/<%= f.run_id %>">View</a></td>
           </tr>
         <% }) %>
         </tbody>

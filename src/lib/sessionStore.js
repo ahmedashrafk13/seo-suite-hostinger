@@ -15,6 +15,9 @@
 // The contract is express-session's: get/set/destroy are required, and
 // touch/length/clear/all are optional but implemented because `rolling: true`
 // calls touch on every request.
+//
+// TOUCH IS THROTTLED — see the comment on touch() for why that matters here
+// more than it would with a normal database.
 const { Store } = require('express-session');
 
 const DAY = 86400000;
@@ -25,6 +28,9 @@ class SqliteSessionStore extends Store {
     this.db = db;
     this.table = options.table || 'sessions';
     this.ttl = options.ttl || 7 * DAY;
+    // How stale a stored expiry is allowed to get before touch() writes.
+    this.touchInterval = options.touchInterval == null ? 10 * 60 * 1000 : options.touchInterval;
+    this._lastTouch = new Map();
 
     // expires is stored as epoch milliseconds rather than a datetime string so
     // expiry comparisons are plain integer maths and need no SQLite date
@@ -85,16 +91,39 @@ class SqliteSessionStore extends Store {
 
   set(sid, sess, cb) {
     try {
-      this._set.run(sid, this._expiry(sess), JSON.stringify(sess));
+      const expires = this._expiry(sess);
+      this._set.run(sid, expires, JSON.stringify(sess));
+      // A real write just happened, so the throttle clock restarts from here.
+      this._lastTouch.set(sid, expires);
       return cb(null);
     } catch (err) {
       return cb(err);
     }
   }
 
+  // WHY THIS DOES NOT WRITE EVERY TIME
+  // `rolling: true` calls touch on every authenticated request, and this store
+  // writes to the same single-writer SQLite connection the whole application
+  // shares. Unthrottled, every page view, every poll from an audit progress
+  // page (one every four seconds) and every 30-second realtime refresh on an
+  // open dashboard became an UPDATE competing with the crawler and the AI SEO
+  // runner for the one writer. Nothing about that write is urgent: it extends
+  // an expiry that is a week out.
+  //
+  // So the expiry on disk is allowed to lag by up to touchInterval. The cost is
+  // that a session's real lifetime can be up to ten minutes shorter than its
+  // cookie claims, against a seven-day window — unmeasurable. The saving is
+  // roughly two orders of magnitude fewer session writes on an active day.
   touch(sid, sess, cb) {
     try {
-      this._touch.run(this._expiry(sess), sid);
+      const expires = this._expiry(sess);
+      const last = this._lastTouch.get(sid);
+      if (last != null && expires - last < this.touchInterval) return cb(null);
+      this._touch.run(expires, sid);
+      this._lastTouch.set(sid, expires);
+      // Bounded: without this the map grows by one entry per session id ever
+      // seen, and the process is long-lived on a real server.
+      if (this._lastTouch.size > 5000) this._lastTouch.clear();
       return cb(null);
     } catch (err) {
       return cb(err);
@@ -104,6 +133,9 @@ class SqliteSessionStore extends Store {
   destroy(sid, cb) {
     try {
       this._destroy.run(sid);
+      // Otherwise a regenerated or logged-out id keeps a stale entry, and a
+      // recycled id would inherit its throttle state.
+      this._lastTouch.delete(sid);
       return cb(null);
     } catch (err) {
       return cb(err);
@@ -133,6 +165,7 @@ class SqliteSessionStore extends Store {
   clear(cb) {
     try {
       this.db.exec(`DELETE FROM ${this.table}`);
+      this._lastTouch.clear();
       return cb ? cb(null) : undefined;
     } catch (err) {
       return cb ? cb(err) : undefined;
@@ -142,6 +175,9 @@ class SqliteSessionStore extends Store {
   reap() {
     try {
       const info = this._reap.run(Date.now());
+      // Entries for rows that just expired would otherwise suppress the first
+      // touch of a session id that came back into use.
+      if (info.changes) this._lastTouch.clear();
       return info.changes;
     } catch {
       return 0;
