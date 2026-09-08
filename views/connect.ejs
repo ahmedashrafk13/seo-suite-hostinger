@@ -15,6 +15,18 @@
     </div>
   </div>
 <% } %>
+<% if (ads.needsReconnect && ads.devToken && !ads.selection.shared) { %>
+  <div class="notice warn">
+    <span class="notice-icon">&#9888;</span>
+    <div class="notice-body">
+      <strong>Reconnect needed for Keyword Planner.</strong>
+      This Google account was connected before Keyword Planner access was added, and Google does not
+      grant a new permission to an existing connection. Search Console and GA4 keep working as they are —
+      only keyword volumes are affected.
+      <a href="/auth/google">Reconnect Google account</a> to grant it.
+    </div>
+  </div>
+<% } %>
 <% errors.forEach(function(e){ %>
   <div class="notice warn">
     <span class="notice-icon">&#9888;</span>
@@ -46,6 +58,168 @@
         Not connected. Connecting pulls live Search Console and GA4 data into audits, linking runs, alerts and reports.
       </p>
       <a class="btn" href="/auth/google">Connect Google account</a>
+    <% } %>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h3>Google Ads &mdash; Keyword Planner</h3>
+    <% if (ads.selection.customerId) { %>
+      <span class="badge good"><%= ads.selection.shared ? 'live \u00b7 shared account' : 'live \u00b7 this workspace' %></span>
+    <% } else { %>
+      <span class="badge">not active</span>
+    <% } %>
+  </div>
+  <div class="card-body">
+    <p style="font-size:13px;color:var(--text-2);margin:0 0 14px">
+      Keyword Planner has no API of its own &mdash; its numbers come from the Google Ads API. Four things
+      have to be true, and each is shown separately below so a missing one is never mistaken for a bug.
+      When all four hold, Google&rsquo;s own monthly search volumes become the top source for keyword
+      research, ahead of every fallback.
+    </p>
+
+    <table class="data compact" style="margin-bottom:14px">
+      <tbody>
+        <tr>
+          <td style="width:30px">
+            <% if (ads.devToken) { %><span class="badge good">&#10003;</span><% } else { %><span class="badge critical">&#10007;</span><% } %>
+          </td>
+          <td><strong>Developer token</strong>
+            <div style="font-size:12px;color:var(--text-2)">
+              <% if (ads.devToken) { %>
+                Set in <code>GOOGLE_ADS_DEVELOPER_TOKEN</code>. If calls return no volumes, the token is
+                probably still on <em>test</em> access. Basic access is what fixes that, but Google declines it
+                for tools that only do keyword research &mdash; use DataForSEO instead for the same figures.
+              <% } else { %>
+                Not set, and <strong>not the recommended route</strong>: Google declines Ads API developer
+                tokens for tools that only perform keyword research, which is all this suite asks of it.
+                Set <code>DATAFORSEO_LOGIN</code> and <code>DATAFORSEO_PASSWORD</code> instead &mdash; the same
+                Google figures, plus keyword difficulty, with no token application. This card stays useful only
+                if you already hold an approved token.
+              <% } %>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <% if (ads.scopeGranted) { %><span class="badge good">&#10003;</span><% } else { %><span class="badge critical">&#10007;</span><% } %>
+          </td>
+          <td><strong>Ads permission on the Google connection</strong>
+            <div style="font-size:12px;color:var(--text-2)">
+              <% if (ads.scopeGranted) { %>
+                Granted. Only read calls are ever made: list your accounts, and ask for keyword ideas.
+              <% } else if (ads.selection.shared) { %>
+                Not needed for this workspace &mdash; the shared account&rsquo;s own authorisation is used.
+              <% } else if (!connection) { %>
+                Connect a Google account above first.
+              <% } else { %>
+                Missing &mdash; <a href="/auth/google">reconnect</a>. Google&rsquo;s consent screen will ask to
+                &ldquo;manage your Google Ads campaigns&rdquo; because that is the only scope the Ads API offers;
+                this app never writes to your account.
+              <% } %>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <% if (ads.selection && ads.selection.customerId) { %><span class="badge good">&#10003;</span><% } else { %><span class="badge critical">&#10007;</span><% } %>
+          </td>
+          <td><strong>Google Ads account</strong>
+            <div style="font-size:12px;color:var(--text-2)">
+              <% if (ads.selection.shared) { %>
+                Using the shared account <span class="mono"><%= ads.selection.customerId %></span><%= ads.selection.name ? ' \u2014 ' + ads.selection.name : '' %>,
+                authorised by <%= ads.selection.ownerEmail || 'the account that connected Google for this deployment' %>.
+                <strong>Nothing to set up here</strong> &mdash; keyword volumes already work for this workspace.
+                <% if (ads.selection.staleOwnSelection) { %>
+                  <br><strong>Note:</strong> this workspace has its own account
+                  (<span class="mono"><%= ads.selection.staleOwnSelection %></span>) selected, but it is
+                  <em>not</em> being used &mdash; its Google connection no longer carries Ads access.
+                  <a href="/auth/google">Reconnect Google</a> to switch back to it.
+                <% } %>
+                <% if (ads.canPick) { %>
+                  You can override it with your own Google Ads account below.
+                <% } %>
+              <% } else if (ads.selection.customerId) { %>
+                <span class="mono"><%= ads.selection.customerId %></span><%= ads.selection.name ? ' \u2014 ' + ads.selection.name : '' %>
+                &mdash; this workspace&rsquo;s own account, billed to it.
+                <% if (ads.selection.loginCustomerId) { %>
+                  (through manager <span class="mono"><%= ads.selection.loginCustomerId %></span>)
+                <% } %>
+              <% } else { %>
+                <%= ads.selection.reason || 'Not chosen. Pick one below.' %>
+              <% } %>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><span class="badge">?</span></td>
+          <td><strong>A real call returns volumes</strong>
+            <div style="font-size:12px;color:var(--text-2)">
+              The only check that proves the chain end to end. Runs one keyword idea request and reports
+              Google&rsquo;s own answer.
+            </div>
+            <form method="POST" action="/connect/ads-test" style="margin-top:8px">
+              <button class="btn sm" type="submit"
+                <%= (ads.devToken && ads.selection.customerId) ? '' : 'disabled' %>>
+                Test Keyword Planner
+              </button>
+            </form>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <% if (ads.listError) { %>
+      <div class="notice warn" style="margin:0 0 14px">
+        <span class="notice-icon">&#9888;</span>
+        <div class="notice-body">
+          Could not list your Google Ads accounts &mdash; <%= ads.listError %>
+          <div style="font-size:12px;margin-top:6px">
+            This is Google&rsquo;s own message, shown verbatim. Using Google Ads API
+            <code><%= ads.apiVersion %></code>; if the message mentions the version, set
+            <code>GOOGLE_ADS_API_VERSION</code> to a supported one.
+          </div>
+        </div>
+      </div>
+    <% } %>
+
+    <% if (ads.canPick && ads.accounts) { %>
+      <% if (!ads.accounts.length) { %>
+        <p style="font-size:13px;color:var(--text-2);margin:0">
+          This Google login cannot reach any Google Ads account. Create one at ads.google.com (you do not
+          have to run a campaign, but an account with no billing history often returns no volumes), then reload this page.
+        </p>
+      <% } else { %>
+        <form method="POST" action="/connect/ads-account">
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Use this account for keyword volumes</label>
+          <div class="btn-row" style="align-items:center;gap:8px">
+            <select name="ads_account" style="min-width:340px">
+              <option value="">&mdash; none (fall back to the next source) &mdash;</option>
+              <% ads.accounts.forEach(function(a){ %>
+                <% var val = a.id; %>
+                <option value="<%= val %>"
+                  <%= (ads.selection && ads.selection.customerId === a.id && !ads.selection.loginCustomerId) ? 'selected' : '' %>>
+                  <%= a.name || 'Unnamed account' %> &middot; <%= a.id %><%= a.manager ? ' (manager \u2014 cannot serve ideas itself)' : '' %><%= a.currency ? ' \u00b7 ' + a.currency : '' %>
+                </option>
+              <% }) %>
+            </select>
+            <button class="btn" type="submit">Save account</button>
+          </div>
+          <p style="font-size:12px;color:var(--text-2);margin:8px 0 0">
+            Pick a real advertising account, not a manager (MCC) account &mdash; a manager account cannot
+            serve keyword ideas on its own behalf. If your account sits under a manager and the direct
+            choice is refused, set <code>GOOGLE_ADS_CUSTOMER_ID</code> and the manager id in
+            <code>.env</code> instead.
+          </p>
+        </form>
+      <% } %>
+    <% } else if (ads.selection.shared) { %>
+      <p style="font-size:13px;color:var(--text-2);margin:0">
+        This workspace does not need its own Google Ads account &mdash; keyword volumes come from the
+        shared account above. Connect Google and grant Ads access only if you want volumes billed to
+        your own Google Ads account instead.
+      </p>
     <% } %>
   </div>
 </div>

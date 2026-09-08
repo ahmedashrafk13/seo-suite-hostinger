@@ -105,6 +105,7 @@
             <span>Create tasks from failing checks automatically</span>
           </label>
         </div>
+        <%- include('partials/crawl-access', { authByBrand: authByBrand }) %>
         <button class="btn" type="submit" <%= tool.exists ? '' : 'disabled' %>>Start audit</button>
       </form>
       </div>

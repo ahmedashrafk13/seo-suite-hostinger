@@ -37,6 +37,7 @@ const {
 } = require('./cannibalization');
 const { recommend } = require('./recommend');
 const { writeXlsx, buildDocx } = require('./report');
+const { takeAuthArgs, authHeaderNames, bindAuthSite } = require('../lib/http');
 
 const TOTAL_STEPS = 8;
 function step(n, msg) {
@@ -168,11 +169,19 @@ function loadGscCsv(csvPath, pages, origin, host, notes) {
 
 async function main() {
   const t0 = Date.now();
-  const { args, overrides } = parseArgs(process.argv.slice(2));
+  // Crawl credentials are pulled out first and installed on the HTTP layer, so
+  // every request this crawl makes carries them. See tools/node/lib/http.js
+  // and src/lib/crawlAuth.js.
+  const auth = takeAuthArgs(process.argv.slice(2));
+  const { args, overrides } = parseArgs(auth.argv);
   if (!args.url) {
     process.stderr.write('Usage: node tools/node/linking/main.js <url> [--max-pages N] [--out DIR]\n');
     process.exit(2);
   }
+
+  // Credentials are scoped to the site being crawled, so the broken-link
+  // checks cannot carry them to a third party.
+  bindAuthSite(args.url);
 
   // Must run before any tokenizing/anchor work happens: it repopulates the
   // stopword/generic-anchor word lists for this run's language.

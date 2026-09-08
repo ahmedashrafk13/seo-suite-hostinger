@@ -26,6 +26,7 @@ const {
 const { analyze, siteHealth, groupFindings } = require('./analyze');
 const { fetchPage, isThin, thinCause } = require('./page');
 const { normalizeUrl, canonUrl, sameSite, hostKey } = require('../lib/urls');
+const { takeAuthArgs, authHeaderNames, bindAuthSite } = require('../lib/http');
 
 function parseArgs(argv) {
   const args = {
@@ -76,13 +77,20 @@ function progress(msg) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  // Crawl credentials are pulled out first and installed on the HTTP layer, so
+  // every request the audit makes — pages, robots.txt, sitemaps, link checks —
+  // carries them. See tools/node/lib/http.js and src/lib/crawlAuth.js.
+  const auth = takeAuthArgs(process.argv.slice(2));
+  const args = parseArgs(auth.argv);
   if (!args.url) {
     process.stderr.write('Usage: node tools/node/audit/main.js <url> [--max-pages N] [--json]\n');
     process.exit(2);
   }
 
   const startUrl = normalizeUrl(args.url);
+  // Credentials are scoped to the site being audited, so the external-link
+  // checks below cannot carry them to a third party.
+  bindAuthSite(startUrl);
   const quiet = args.json;
 
   // Rendering requires a headless browser that shared hosting cannot provide.
@@ -197,6 +205,9 @@ async function main() {
   const result = {
     site: startUrl,
     site_health: score,
+    // Named, never valued: a report is shared more widely than the settings
+    // page, and a session cookie printed into a deliverable is a leaked session.
+    crawl_auth: authHeaderNames(),
     pages_crawled: pages.size,
     pages_ok: stats.pages_ok,
     links_checked: stats.links_checked,

@@ -25,6 +25,8 @@
 // 'error' status on the run row and a log line, never an unhandled rejection.
 const db = require('../../db');
 const store = require('./store');
+const fetcher = require('./fetcher');
+const crawlAuth = require('../crawlAuth');
 
 // runId -> { kind, brandId, startedMs, label }
 // In-memory only, and deliberately so: it answers "is this still running in
@@ -77,8 +79,18 @@ function launch({
 
   // Not awaited: that is the point. Errors are handled inside so nothing
   // escapes as an unhandled rejection.
+  // Crawl credentials for the brand, if it has any, made available to every
+  // fetch this analysis makes — see fetcher.runWithAuth for the two rules that
+  // keep that safe (scoped to the brand's own site; the AI-crawler checks opt
+  // out). Held in async context rather than a module global because two
+  // analyses run at once and they may belong to different brands.
+  const runAuth = brand ? crawlAuth.forBrand(brand.id) : null;
+  const withAuth = (fn) => (runAuth && brand && brand.site_url
+    ? fetcher.runWithAuth({ headers: crawlAuth.toHeaders(runAuth), site: brand.site_url }, fn)
+    : fn());
+
   Promise.resolve()
-    .then(() => engine.run({ ...args, userId, brand, adoptRunId: row.id }))
+    .then(() => withAuth(() => engine.run({ ...args, userId, brand, adoptRunId: row.id })))
     .then(() => {
       // The engine has already written the completed row through store.finish.
       // Turn its findings into tasks right away — the same call the "Create

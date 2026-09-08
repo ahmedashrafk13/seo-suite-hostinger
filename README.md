@@ -46,6 +46,227 @@ approval before a task touching them can be marked done (`src/lib/tasks.js`).
   `src/lib/toolRunner.js`. This app does not reimplement their crawling logic
   — it drives them, parses their output, and turns findings into tasks and
   alerts.
+### Crawling a site that needs a login
+
+Both crawlers request pages as an anonymous visitor, which is wrong for a
+members-only site, a client portal, or a staging build behind HTTP basic auth.
+Credentials are set per brand under **Crawl access** on the brand page (or typed
+into either start form for a one-off run) and are carried by every request the
+crawl makes — pages, `robots.txt`, sitemaps, link checks, asset checks — in all
+four crawler implementations, Python and Node port alike. Three transports:
+
+| Wall | What to supply |
+|---|---|
+| HTTP basic auth (staging sites) | username + password |
+| A login form | a session cookie copied from a logged-in browser |
+| A CDN/WAF rule answering 403 | whatever header the edge rules expect |
+
+**Every run now probes the seed URL before spawning a crawler**
+(`src/lib/crawlAuth.js`). This exists because of the failure mode that is worse
+than a failed crawl: a site that 302s to `/login` serves that login page with
+HTTP **200**, so the crawler used to follow its two or three links, finish
+successfully, and report a health score for the login form. That is a login wall
+wearing a success code — the same trap this repo already documents for
+`old.reddit.com/search` — and nothing on screen distinguished it from a real
+audit of a small site.
+
+So a walled site now **fails before the crawl starts**, naming what was seen,
+where the seed URL ended up, which credentials were sent, and how to fix it. One
+request replaces a ten-minute crawl that returns nothing, and it catches the
+failure that actually recurs: a saved cookie that has since expired. Session
+cookies do expire, which is why the brand page has a **Test access** button and
+stores the result of the last test — an expired credential is visible there
+rather than discovered by a crawl that reads one page.
+
+**A public site crawls exactly as it did before**, including one that has
+accounts. A restaurant site with `/signup` and `/login` for order tracking is
+still a public site: the pages a diner needs are served to anyone, so the check
+passes and the signup and login pages are crawled like any other page. Having a
+login is not being behind one.
+
+That constraint shapes the whole feature, because a guard that stops a public
+crawl on a bad guess costs more than the wall it catches. A run is stopped
+**only** on evidence that cannot mean anything else:
+
+- **401** — the server explicitly demanded credentials.
+- **A redirect to a page that identifies itself as the sign-in page.**
+- **A sign-in page served at the seed URL with a 200** — and only when four
+  signals agree: a password field, under 150 words of visible text, a title or
+  URL that says sign-in, *and* fewer than three links onward into the site.
+
+That last condition is the one doing the real work, because it answers what the
+guard is actually predicting — *would a crawl started here get anywhere?* A true
+login wall is a dead end. A restaurant's login page carries the site's whole
+header nav, so a crawl seeded there reaches the menu, the hours and the contact
+page and produces a perfectly good audit. It is therefore never treated as a
+wall, whatever its title says.
+
+Everything else the probe can notice is a guess, and is recorded as a note while
+the crawl proceeds untouched:
+
+| Seen | Before | Now |
+|---|---|---|
+| 401, or a redirect to a sign-in page | crawled the login page, scored it | **run stopped**, with the reason and the fix |
+| A dead-end sign-in page at the seed URL | same | **run stopped** (four signals must agree) |
+| A public site with a signup/login page | crawled fine | **identical** |
+| 403 from a WAF or bot rule | crawl ran | crawl runs, note added |
+| 4xx/5xx, or a timed-out seed | crawl ran | crawl runs, note added |
+| A sparse homepage with a "Client login" box | crawl ran | crawl runs, note added |
+| Anything else public | crawl ran | **identical** |
+
+The only cost to a public site is one extra HTTP request before a crawl that is
+about to make hundreds. `verify_crawl_access.js` tests this directly against the
+shapes a naive login detector gets wrong: a restaurant site with signup, order
+tracking and a gated account area; a sparse homepage with a client login box; a
+page whose copy contains "restricted access"; a one-line holding page; an
+ordinary http→https redirect chain; and a redirect to
+`/accounts-payable-services` (which a substring match on "account" would block).
+
+Two further escapes from the guard:
+
+- **"Scan anyway"** proceeds for the case the probe cannot distinguish — a gated
+  homepage with a public section below it. The finding is kept as a note on the
+  run rather than discarded.
+- **Sitemap coverage** is checked after a crawl finishes and reported as a
+  *note*, never a failure: a crawl that read 12 of 400 sitemap URLs is probably
+  hitting a gated section, but a `--max-pages` cap legitimately produces the
+  same ratio, so this cannot be a hard gate without crying wolf on every capped
+  crawl.
+
+Credentials travel to the crawlers in the **environment**, not on the command
+line. On Linux `/proc/<pid>/cmdline` is world-readable, so on shared hosting a
+`--cookie` argument hands a client's live session to every other tenant for the
+length of the crawl; `environ` on the same process is owner-only. The
+`--cookie` / `--header` flags still exist for running a crawler by hand, and an
+explicit flag beats the inherited environment. A malformed credential variable
+degrades to an anonymous crawl rather than failing one.
+
+**Credentials are bound to one site and go nowhere else.** They are attached
+per request and re-evaluated on every redirect hop, so an external link check,
+a competitor crawl, a CDN subdomain or a hop that leaves the site all get
+nothing. This is not theoretical tidiness: the first version merged them into
+every request, and since the audit checks every external link a page points at,
+a fixture recorded a client's live session cookie arriving at a partner domain.
+The scope key is host-plus-port, deliberately stricter than the crawler's own
+host grouping, because two services on one host are two different systems.
+
+**The AI SEO analyses authenticate too.** They fetch from 87 call sites across
+seventeen files, so the credentials live in async context for the length of a
+run (`fetcher.runWithAuth`) rather than being threaded through each call —
+AsyncLocalStorage rather than a module global, because two analyses run at once
+and may belong to different brands. Two rules make that safe, and both matter
+more than the feature: the credentials are scoped to the brand's own site, since
+these analyses deliberately fetch competitors, Reddit, Hacker News and news
+sites; and **the AI-crawler checks opt out** (`noAuth`), because their whole
+question is what an *unauthenticated* agent can read, and answering it with a
+logged-in session would report that GPTBot can read a members-only page.
+
+**A wall that only exists in the browser is caught by rendering.** When a page
+answers 200 but looks like a shell — under 150 visible words, or a declared
+meta refresh — and a renderer is available, `tools/render_probe.py` loads it in
+Chromium and the verdict is taken again. `app.slack.com/client` is the reference
+case and the reason this exists:
+
+```
+static probe   200, 146 words, 18 nav links, no form, no redirect   looks fine
+rendered       -> app.slack.com/workspace-signin                    a login wall
+```
+
+A page with real copy is never rendered, so an ordinary audit pays nothing for
+it (measured: 2.1s versus 11.4s). A page that renders to nothing is reported
+without stopping the run. Two things about the browser path were bugs first and
+are worth not re-learning: a `Cookie` must go in the **cookie jar**, because
+Chromium ignores one set through route interception and the crawl then renders
+login pages while reporting that credentials were sent; and credentials must be
+attached by routing rather than `extra_http_headers`, which a context applies to
+every font, analytics beacon and vendor script the page pulls in.
+
+**Sign-in paths cover 114 segments across 40-odd languages** — Latin,
+Cyrillic, Greek, Arabic, Hebrew, Devanagari, Bengali, Tamil, Sinhala, Thai, Lao,
+Khmer, Burmese, Georgian, Armenian, Ethiopic, and CJK. Matched as whole path
+segments after percent-decoding: Node's `URL` renders `/登录` as
+`/%E7%99%BB%E5%BD%95`, so without decoding the entire non-Latin half of the list
+would be dead code that looked complete.
+
+Credentials are stored in the clear in `data/app.db`, alongside the Google
+refresh tokens already there — so the existing rule stands: that file is
+gitignored and must not be copied off the host. Credential **values** are never
+written to a run log, a report, or the audit JSON; only the names of the headers
+used, because a report is shared more widely than a settings page.
+
+Editing them is a merge, not a replace. The form cannot show a stored cookie or
+password back to the user, so a blank field means "leave it alone" and removal
+is an explicit checkbox — a plain replace silently destroyed the working cookie
+of anyone who edited only their basic-auth username, and nothing on screen
+connected that to the refused crawl that followed.
+
+```bash
+DB_PATH=tmp/verify-crawl-access.db node verify_crawl_access.js           # 162 checks
+DB_PATH=tmp/verify-crawl-access.db node verify_crawl_access.js --live    # 175, adds live sites
+```
+
+It starts a local server per scenario and runs both crawlers, in both
+implementations, against them. The scenario list is the point: the access check
+fails silently in both directions — a missed wall reads as a healthy small site,
+and a public page mistaken for a wall stops a crawl that used to work — so both
+directions are tested explicitly.
+
+**Walls it must catch:** a cookie login wall that answers 200, HTTP basic auth,
+a sign-in page served at the seed URL, an expired session cookie, and a
+Chinese-language login wall.
+
+**Sites it must never block**, each of which crawled before and each of which
+breaks a naive login detector: a restaurant with signup, order tracking and a
+gated account area; a sparse homepage with a "Client login" box; an age gate; a
+cookie-consent interstitial; a locale redirect; a news paywall with a subscribe
+form; a JavaScript SPA shell; a 403 bot challenge; 429 and 503; a soft 404; an
+empty 200; JSON or a PDF at the root; a redirect loop; a four-hop redirect
+chain; a site answering HEAD differently from GET; gzip and latin-1 responses; a
+page with no title or h1; and a site with an untrusted TLS certificate — which
+must stay auditable, since a bad certificate is a finding the audit exists to
+report.
+
+**The path matcher** is table-tested over 45 Latin paths and 16 non-Latin ones,
+in both directions. Two things in it are load-bearing and both were bugs first:
+
+- *The segment boundary.* Without it `/sso` matched `/ssortment-of-cheeses`,
+  `/login` matched `/logins-explained`, `/signin` matched `/signing-a-lease` and
+  `/authenticate` matched `/authenticated-users-guide` — so a restaurant with an
+  assortment page could have had its crawl stopped.
+- *Percent-decoding before matching.* Node's `URL` renders `/登录` as
+  `/%E7%99%BB%E5%BD%95`, so the non-Latin half of the list — Chinese, Japanese,
+  Korean, Cyrillic, Arabic, Hebrew, Thai, Greek, Hindi, alongside French,
+  German, Spanish, Portuguese, Italian, Dutch, Nordic, Polish, Turkish and
+  Indonesian — was dead code until `pathForMatch()` decoded the path. An
+  English-only matcher fails silently on exactly the sites least likely to be
+  double-checked by an English-speaking operator.
+
+**Rendered crawls are covered too.** The Playwright path is a separate HTTP
+client — a browser context, not the requests session — so credentials have to
+reach it independently. The fixture serves an empty shell whose content, title
+and links are written by JavaScript and gates it on a cookie, so the test can
+only pass if both the cookie and the rendering arrived. The controls matter as
+much as the test: the same site without credentials still reaches only the login
+page, and without rendering it reports as a JavaScript shell whose score is
+capped.
+
+**`--live` adds the real web**, because fixtures prove the logic and only live
+sites prove the thresholds. Five public sites must pass (including one with a
+consent wall, one deliberately sparse government site, and one whose homepage
+carries a login link); five genuinely gated applications must be caught. It then
+runs the full audit against the live brand site in **both** implementations and
+asserts they agree on the health score, the page count and the exact set of
+failing checks — the credential work touched the HTTP layer of both, and a
+regression there would surface as a subtly different report rather than as an
+error.
+
+The live run is honest about one gap it cannot close: an app that answers 200
+with a JavaScript shell and redirects in the browser (`app.slack.com` does
+exactly this) is invisible to any server-side probe, so it is **not** caught.
+What stops that being dangerous is the audit's own behaviour — a JS shell earns
+a content warning and a capped health score, never a healthy one, which is
+asserted rather than assumed.
+
 - **The AI SEO suite** (`src/lib/aiseo/`, routes in `src/routes/aiseo.js`,
   views in `views/aiseo/`) — nine analyses plus a twenty-check tracking board.
   Unlike the two crawlers above these run **in this process**, because they

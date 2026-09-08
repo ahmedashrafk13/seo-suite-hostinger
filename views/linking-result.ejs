@@ -43,6 +43,21 @@ function fmtCell(row, col) {
       <div class="card-body">
         <p style="margin:0 0 6px"><span class="badge <%= statusBadge(run.status) %>"><%= run.status %></span></p>
 
+        <%#
+          How this crawl reached the site. Shown on every completed run, not
+          only the problem cases: "crawled anonymously" and "crawled with
+          credentials" are different facts about a report, and six weeks later
+          nobody remembers which one it was.
+        -%>
+        <% if (run.access_note) { %>
+          <div class="notice"><span class="notice-icon"><%= run.auth_used ? '&#128273;' : '&#8505;' %></span>
+            <div class="notice-body">
+              <strong>Crawl access:</strong>
+              <%= run.auth_used ? 'crawled with stored credentials.' : 'crawled anonymously.' %>
+              <%= run.access_note %>
+            </div>
+          </div>
+        <% } %>
         <% if (run.status === 'error' && run.error) { %>
           <div class="notice error"><span class="notice-icon">&#9888;</span><div class="notice-body"><%= run.error %></div></div>
         <% } %>

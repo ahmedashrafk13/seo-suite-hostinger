@@ -83,7 +83,11 @@ function looksLikeChallenge(body, status) {
 async function probeAgents(url, { agents = AI_AGENTS, baselineDoc = null, baselineBytes = 0 } = {}) {
   const probeable = agents.filter((a) => a.ua);
   const results = await mapLimit(probeable, 3, async (agent) => {
-    const res = await fetchPage(url, { ua: agent.ua, timeout: 20000 });
+    // noAuth: the entire question here is what an UNauthenticated agent can
+    // read. Answering it with the run's session cookie would report that
+    // GPTBot can read a page only a logged-in member can see — a green light
+    // meaning the opposite of what it says. See fetcher.runWithAuth.
+    const res = await fetchPage(url, { ua: agent.ua, timeout: 20000, noAuth: true });
     const challenge = looksLikeChallenge(res.body, res.status);
     let contentRatio = null;
     let textRatio = null;
@@ -142,7 +146,9 @@ async function probeAgents(url, { agents = AI_AGENTS, baselineDoc = null, baseli
 const CONTROL_UA = 'Mozilla/5.0 (compatible; ReadinessControl/1.0; +https://example.invalid/control)';
 
 async function probeControls(url) {
-  const res = await fetchPage(url, { ua: CONTROL_UA, timeout: 20000 });
+  // Unauthenticated for the same reason as the agent probes: the control has
+  // to be measured on the same terms as what it is controlling for.
+  const res = await fetchPage(url, { ua: CONTROL_UA, timeout: 20000, noAuth: true });
   const challenge = looksLikeChallenge(res.body, res.status);
   return {
     ua: CONTROL_UA,
@@ -177,7 +183,10 @@ async function run({
     try { origin = new URL(target).origin; } catch { /* keep */ }
 
     // --- baseline fetch, as a browser -----------------------------------
-    const baseline = await fetchPage(target, { timeout: 25000 });
+    // The baseline every agent is compared against, so it must be fetched on
+    // the same unauthenticated terms — a logged-in baseline would make every
+    // agent look like it was served a stripped page.
+    const baseline = await fetchPage(target, { timeout: 25000, noAuth: true });
     const doc = baseline.ok && baseline.body ? parseDocument(baseline.url, baseline.body) : null;
 
     // --- robots.txt, per agent -----------------------------------------

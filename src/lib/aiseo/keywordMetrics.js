@@ -44,20 +44,24 @@ const markets = require('./markets');
 const serpLite = require('./serpLite');
 const difficultyCache = require('./difficultyCache');
 const { fetchPage, mapLimit, sleep } = require('./fetcher');
+const dataCredentials = require('../dataCredentials');
 
 // -------------------------------------------------------------- DataForSEO
 
 const DFS_BASE = 'https://api.dataforseo.com/v3';
 
-function dfsAuthHeader() {
-  const login = process.env.DATAFORSEO_LOGIN;
-  const password = process.env.DATAFORSEO_PASSWORD;
+// `cred` is the resolved per-brand credential (see lib/dataCredentials.js).
+// Falling back to the agency's .env keys keeps every existing call working and
+// is the documented behaviour when a brand has none of its own.
+function dfsAuthHeader(cred) {
+  const login = (cred && cred.login) || process.env.DATAFORSEO_LOGIN;
+  const password = (cred && cred.password) || process.env.DATAFORSEO_PASSWORD;
   if (!login || !password) return null;
   return `Basic ${Buffer.from(`${login}:${password}`).toString('base64')}`;
 }
 
-async function dfsPost(path, payload) {
-  const auth = dfsAuthHeader();
+async function dfsPost(path, payload, cred) {
+  const auth = dfsAuthHeader(cred);
   if (!auth) throw new Error('DataForSEO credentials are not configured');
   const res = await fetchPage(`${DFS_BASE}${path}`, {
     timeout: 45000,
@@ -74,7 +78,7 @@ async function dfsPost(path, payload) {
 }
 
 // Volume, CPC and competition for up to 700 keywords in one call.
-async function dfsVolume(keywords, market) {
+async function dfsVolume(keywords, market, cred) {
   const m = markets.resolve(market);
   const parsed = await dfsPost('/keywords_data/google_ads/search_volume/live', [{
     keywords: keywords.slice(0, 700),
@@ -83,7 +87,7 @@ async function dfsVolume(keywords, market) {
     // Google Ads reports the 12-month average by default, which is what every
     // "monthly search volume" figure in the industry means.
     search_partners: false,
-  }]);
+  }], cred);
   const out = new Map();
   (parsed.tasks || []).forEach((t) => {
     (t.result || []).forEach((r) => {
@@ -102,13 +106,13 @@ async function dfsVolume(keywords, market) {
   return out;
 }
 
-async function dfsDifficulty(keywords, market) {
+async function dfsDifficulty(keywords, market, cred) {
   const m = markets.resolve(market);
   const parsed = await dfsPost('/dataforseo_labs/google/bulk_keyword_difficulty/live', [{
     keywords: keywords.slice(0, 1000),
     location_code: m.dfsLocation,
     language_code: m.dfsLanguage,
-  }]);
+  }], cred);
   const out = new Map();
   (parsed.tasks || []).forEach((t) => {
     (t.result || []).forEach((r) => {
@@ -128,8 +132,8 @@ async function dfsDifficulty(keywords, market) {
 
 // Semrush's phrase_this endpoint returns one semicolon-delimited row per
 // keyword. `Nq` is volume, `Kd` is difficulty, `Co` is Ads competition.
-async function semrushMetrics(keywords, market) {
-  const key = process.env.SEMRUSH_API_KEY;
+async function semrushMetrics(keywords, market, cred) {
+  const key = (cred && cred.key) || process.env.SEMRUSH_API_KEY;
   if (!key) throw new Error('SEMRUSH_API_KEY is not set');
   const m = markets.resolve(market);
   const db = m.semrush || 'us';
@@ -182,44 +186,66 @@ async function semrushMetrics(keywords, market) {
 // Google Ads Keyword Planner, on the OAuth principal this app already holds.
 //
 // This is the highest rung deliberately: it is Google's own volume, for the
-// exact country asked for, and it costs nothing beyond a developer token. It
-// needs GOOGLE_ADS_DEVELOPER_TOKEN and GOOGLE_ADS_CUSTOMER_ID (a manager
-// account id, digits only) in addition to the Google connection.
-async function googleAdsVolume(keywords, market, { userId }) {
-  const devToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-  const customerId = String(process.env.GOOGLE_ADS_CUSTOMER_ID || '').replace(/[^0-9]/g, '');
-  if (!devToken) throw new Error('GOOGLE_ADS_DEVELOPER_TOKEN is not set');
-  if (!customerId) throw new Error('GOOGLE_ADS_CUSTOMER_ID is not set');
+// exact country asked for, and it costs nothing beyond a developer token.
+//
+// Three things must be in place, and lib/google.js owns all three so that a
+// failure names WHICH one is missing rather than returning a bare 401:
+//   - the `adwords` OAuth scope on the team's Google connection
+//   - GOOGLE_ADS_DEVELOPER_TOKEN (the app's, applied for once)
+//   - a Google Ads account chosen by the team on /connect
+//
+// Language constants. Google Ads takes a languageConstants id, not a language
+// code, and the previous version of this function hardcoded English for every
+// market via a no-op ternary - so a German or Japanese run asked Google for
+// English volumes and got numbers that looked plausible and were wrong. Only
+// ids that are actually verified belong in this table; anything unmapped
+// falls back to English AND says so in the basis, because a silently wrong
+// language is the failure mode this table exists to prevent.
+const ADS_LANGUAGE_IDS = {
+  en: 1000, de: 1001, fr: 1002, es: 1003, it: 1004, ja: 1005,
+  da: 1009, nl: 1010, fi: 1011, ko: 1012, no: 1013, pt: 1014, sv: 1015,
+  zh: 1017, ar: 1019, cs: 1021, el: 1022, hi: 1023, hu: 1024, id: 1025,
+  he: 1027, pl: 1030, ru: 1031, ro: 1032, sk: 1033, uk: 1036, tr: 1037,
+  vi: 1040, th: 1044,
+};
 
+function adsLanguageConstant(languageCode) {
+  const id = ADS_LANGUAGE_IDS[String(languageCode || '').toLowerCase()];
+  return { id: id || ADS_LANGUAGE_IDS.en, exact: Boolean(id) };
+}
+
+async function googleAdsVolume(keywords, market, { userId }) {
   const google = require('../google');
-  const token = await google.getValidAccessToken(userId);
-  if (!token) throw new Error('no Google connection for this user');
+
+  // Which Ads account, and whose OAuth token. In the shared agency model the
+  // principal is NOT the team running the research — it is the agency
+  // connection that holds the Ads scope — so the resolved userId must be used
+  // for the request, not the one passed in.
+  const principal = google.resolveAdsPrincipal(userId);
+  if (!principal.ok) throw new Error(principal.reason);
 
   const m = markets.resolve(market);
+  const lang = adsLanguageConstant(m.dfsLanguage);
   const body = {
     keywordSeed: { keywords: keywords.slice(0, 20) },
     // Google Ads wants geoTargetConstants, whose numeric ids are the same
     // criteria ids the markets table already carries for DataForSEO.
     geoTargetConstants: m.worldwide ? [] : [`geoTargetConstants/${m.dfsLocation}`],
-    language: `languageConstants/${m.dfsLanguage === 'en' ? '1000' : '1000'}`,
+    language: `languageConstants/${lang.id}`,
     keywordPlanNetwork: 'GOOGLE_SEARCH',
   };
-  const res = await fetchPage(
-    `https://googleads.googleapis.com/v18/customers/${customerId}:generateKeywordIdeas`,
-    {
-      timeout: 45000,
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'developer-token': devToken,
-        'login-customer-id': customerId,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    },
-  );
-  if (!res.ok || !res.body) throw new Error(res.error || `HTTP ${res.status}: ${String(res.body || '').slice(0, 200)}`);
-  const parsed = JSON.parse(res.body);
+
+  const parsed = await google.adsRequest(principal.userId, `/customers/${principal.customerId}:generateKeywordIdeas`, {
+    body,
+    loginCustomerId: principal.loginCustomerId,
+  });
+
+  // The basis records the language actually asked for, so a market whose
+  // language is unmapped is readable as such on the page instead of passing
+  // for a native-language volume.
+  let basis = principal.mode === 'shared' ? 'google-ads (shared account)' : 'google-ads';
+  if (!lang.exact) basis += ` (language fell back to English; ${m.dfsLanguage} is unmapped)`;
+
   const out = new Map();
   (parsed.results || []).forEach((r) => {
     const kw = String(r.text || '').toLowerCase();
@@ -229,9 +255,154 @@ async function googleAdsVolume(keywords, market, { userId }) {
       volume: ms.avgMonthlySearches == null ? null : Number(ms.avgMonthlySearches),
       competition: ms.competitionIndex == null ? null : Number(ms.competitionIndex),
       cpc: ms.highTopOfPageBidMicros ? Math.round((Number(ms.highTopOfPageBidMicros) / 1e6) * 100) / 100 : null,
-      basis: 'google-ads',
+      // Google returns the last 12 months per idea. It was being discarded,
+      // which is a waste: the merge layer already carries a `monthly` field
+      // and the trend is the most useful thing Keyword Planner gives that the
+      // keyless sources cannot.
+      monthly: Array.isArray(ms.monthlySearchVolumes) && ms.monthlySearchVolumes.length
+        ? ms.monthlySearchVolumes.map((v) => ({
+          year: Number(v.year),
+          month: v.month || null,
+          volume: v.monthlySearches == null ? null : Number(v.monthlySearches),
+        }))
+        : null,
+      basis,
     });
   });
+  return out;
+}
+
+
+// ------------------------------------------------------- Bing Webmaster Tools
+
+// THE FREE MEASURED-VOLUME RUNG.
+//
+// Bing Webmaster Tools exposes keyword volume through an official, free,
+// key-authenticated API. That makes it the only source in this file that
+// reports a real search count without a paid subscription, which matters a
+// great deal here: Google refused an Ads API developer token for this tool
+// (keyword-research-only tools are barred by policy), and DataForSEO and
+// Semrush both cost money.
+//
+// WHAT IT IS NOT. These are BING's numbers, not Google's. Bing's share of
+// search is a fraction of Google's and varies by country and device, so the
+// absolute figures are much smaller than a Keyword Planner number for the same
+// term. This adapter therefore labels every value `bing-webmaster` and the
+// basis note says so in words. It deliberately does NOT multiply by an
+// assumed Google/Bing ratio: a scaled number would read exactly like a Google
+// volume while being a guess built on a guess, which is the one thing the rest
+// of this module refuses to do. What Bing gives honestly is RELATIVE demand —
+// which of two keywords is bigger, and roughly by how much — and that is what
+// keyword prioritisation actually needs.
+//
+// ONE KEYWORD PER REQUEST. Unlike DataForSEO (700 per call) GetKeywordStats
+// takes a single `q`, so a 200-keyword run is 200 requests. Hence the cap and
+// the small concurrency: this is paced to stay well inside Bing's quota rather
+// than to finish fastest.
+const BING_WMT_BASE = 'https://ssl.bing.com/webmaster/api.svc/json';
+const BING_MAX_KEYWORDS = 120;
+const BING_CONCURRENCY = 4;
+
+// Bing serialises dates as /Date(1712345678000)/ or /Date(1712345678000+0000)/.
+function bingDate(v) {
+  const m = /\/Date\((-?\d+)/.exec(String(v || ''));
+  if (!m) return null;
+  const d = new Date(Number(m[1]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// Pull a usable count out of one KeywordStats entry.
+//
+// The field actually populated has varied across Bing's own docs and versions
+// (Impressions on some responses, Broad/Exact/Phrase match counts on others),
+// so this reads whichever is present in a stated order instead of assuming
+// one. If none is present the entry is skipped rather than counted as zero —
+// a missing field is not a keyword nobody searches for.
+function bingCount(entry) {
+  for (const f of ['Impressions', 'Broad', 'Phrase', 'Exact']) {
+    const v = entry[f];
+    if (v != null && Number.isFinite(Number(v))) return Number(v);
+  }
+  return null;
+}
+
+async function bingVolume(keywords, market, cred) {
+  const key = (cred && cred.key) || process.env.BING_WEBMASTER_API_KEY;
+  if (!key) throw new Error('BING_WEBMASTER_API_KEY is not set');
+
+  const m = markets.resolve(market);
+  const list = keywords.slice(0, BING_MAX_KEYWORDS);
+  const out = new Map();
+  // Raw bodies from the first couple of failures, so a shape change in Bing's
+  // response is diagnosable from the page instead of looking like "no data".
+  const unparsed = [];
+
+  const results = await mapLimit(list, BING_CONCURRENCY, async (kw) => {
+    const params = new URLSearchParams({ apikey: key, q: kw });
+    if (!m.worldwide && m.gl) {
+      params.set('country', m.gl);
+      params.set('language', `${m.dfsLanguage || 'en'}-${String(m.gl).toUpperCase()}`);
+    }
+    const res = await fetchPage(`${BING_WMT_BASE}/GetKeywordStats?${params.toString()}`, {
+      timeout: 25000,
+      headers: { Accept: 'application/json' },
+    });
+    // Parse BEFORE checking the status code. Bing puts its only useful
+    // diagnostic in the body — an invalid key is HTTP 400 with
+    // {"ErrorCode":3,"Message":"ERROR!!! InvalidApiKey"} — so bailing out on
+    // !res.ok first would replace "your key is wrong" with a bare "HTTP 400".
+    let parsed = null;
+    if (res.body) {
+      try { parsed = JSON.parse(res.body); } catch (e) { parsed = null; }
+    }
+    if (parsed && parsed.ErrorCode) {
+      throw new Error(`Bing error ${parsed.ErrorCode}: ${String(parsed.Message || 'unknown').replace(/^ERROR!+\s*/, '')}`);
+    }
+    if (!res.ok) throw new Error(res.error || `HTTP ${res.status}`);
+    if (!res.body) throw new Error('empty response');
+    if (!parsed) throw new Error(`unparseable JSON: ${String(res.body).slice(0, 160)}`);
+    const rows = Array.isArray(parsed && parsed.d) ? parsed.d
+      : Array.isArray(parsed) ? parsed : null;
+    if (!rows) {
+      if (unparsed.length < 2) unparsed.push(String(res.body).slice(0, 200));
+      return null;
+    }
+
+    // The response is a time series. Build the monthly array the merge layer
+    // already understands, and take the mean as the headline figure — the
+    // same convention every "monthly search volume" in this file uses.
+    const monthly = [];
+    rows.forEach((r) => {
+      const c = bingCount(r);
+      if (c == null) return;
+      const d = bingDate(r.Date || r.Time);
+      monthly.push({
+        year: d ? d.getUTCFullYear() : null,
+        month: d ? d.getUTCMonth() + 1 : null,
+        volume: c,
+      });
+    });
+    if (!monthly.length) return null;
+    const mean = Math.round(monthly.reduce((a, x) => a + x.volume, 0) / monthly.length);
+
+    out.set(String(kw).toLowerCase(), {
+      volume: mean,
+      monthly: monthly.length > 1 ? monthly.slice(-12) : null,
+      basis: 'bing-webmaster',
+    });
+    return true;
+  });
+
+  // mapLimit reports a thrown worker as { __error }. If EVERY keyword failed
+  // the credential or the endpoint is broken, and that must surface as an
+  // error rather than as a silently empty result that drops to the next rung
+  // with no explanation.
+  const failures = results.filter((r) => r && r.__error);
+  if (!out.size) {
+    const first = failures[0] && failures[0].__error && failures[0].__error.message;
+    throw new Error(first
+      || (unparsed.length ? `unexpected response shape: ${unparsed[0]}` : 'no keyword stats returned'));
+  }
   return out;
 }
 
@@ -535,6 +706,20 @@ async function enrich(keywords, {
   const sources = new Set();
   const m = markets.resolve(market);
 
+  // WHOSE SUBSCRIPTION PAYS FOR THIS RUN.
+  //
+  // Resolved once per run rather than per rung: each lookup decrypts a stored
+  // credential, and doing that inside a retry loop would decrypt the same row
+  // repeatedly. `source` is carried into the provenance so a report can say
+  // whether a number came from the client's own account or the agency's.
+  const creds = dataCredentials.resolveAll({ brandId });
+  Object.values(creds).forEach((c) => {
+    // A credential that exists but cannot be decrypted is a real problem for
+    // the person reading the report, so it is surfaced rather than logged.
+    if (c && c.error) errors.push(c.error);
+  });
+  const credSources = {};
+
   const mergeInto = (map, fields) => {
     map.forEach((v, k) => {
       const cur = out.get(k) || { keyword: k };
@@ -557,15 +742,36 @@ async function enrich(keywords, {
         available: () => providers.has('google-ads') && userId,
         fetch: () => googleAdsVolume(list, market, { userId }),
       },
+      // Availability is now the RESOLVED credential, not the global env var:
+      // a brand with its own DataForSEO account must reach this rung even when
+      // the agency has no key of its own, and providers.has() only ever knew
+      // about .env.
       {
         key: 'dataforseo',
-        available: () => providers.has('dataforseo'),
-        fetch: () => dfsVolume(list, market),
+        available: () => Boolean(creds.dataforseo && creds.dataforseo.values),
+        fetch: () => {
+          credSources.dataforseo = creds.dataforseo.source;
+          return dfsVolume(list, market, creds.dataforseo.values);
+        },
       },
       {
         key: 'semrush',
-        available: () => providers.has('semrush'),
-        fetch: () => semrushMetrics(list, market),
+        available: () => Boolean(creds.semrush && creds.semrush.values),
+        fetch: () => {
+          credSources.semrush = creds.semrush.source;
+          return semrushMetrics(list, market, creds.semrush.values);
+        },
+      },
+      // Last measured rung, and the only free one. Below the paid sources
+      // because it reports Bing's demand rather than Google's, above the
+      // keyless fallback because it is still a real search count.
+      {
+        key: 'bing-webmaster',
+        available: () => Boolean(creds.bing && creds.bing.values),
+        fetch: () => {
+          credSources.bing = creds.bing.source;
+          return bingVolume(list, market, creds.bing.values);
+        },
       },
     ];
     let gotVolume = false;
@@ -626,7 +832,7 @@ async function enrich(keywords, {
     const needsKd = list.filter((k) => out.get(k).difficulty == null);
     if (needsKd.length && providers.has('dataforseo')) {
       try {
-        const map = await dfsDifficulty(needsKd, market);
+        const map = await dfsDifficulty(needsKd, market, creds.dataforseo && creds.dataforseo.values);
         const hits = [...map.values()].filter((v) => v.difficulty != null).length;
         mergeInto(map, ['difficulty']);
         attempted.push({ rung: 'dataforseo-kd', outcome: `${hits} keyword${hits === 1 ? '' : 's'} with measured difficulty` });
@@ -746,6 +952,9 @@ async function enrich(keywords, {
     values: out,
     market: { code: m.code, name: m.name },
     sources: [...sources],
+    // 'brand' = the client's own subscription paid for this; 'agency' = yours;
+    // 'brand+agency' = a brand credential completed from the agency's keys.
+    credentialSources: credSources,
     attempted,
     errors,
     difficultyCoverage,
@@ -753,14 +962,23 @@ async function enrich(keywords, {
       ? "Keyword difficulty is the vendor's measured KD."
       : `Keyword difficulty is a proxy computed from a sample of a non-Google result page, not a vendor KD. ${scored} of ${list.length} keywords are scored so far; the rest are queued for the background scorer and will fill in on the next run.`,
     // Stated once, here, so every view can render the same sentence.
-    volumeBasisNote: sources.has('google-ads') || sources.has('dataforseo') || sources.has('semrush')
-      ? 'Search volume is measured, from the source named on each row.'
-      : 'No measured search volume is available: this deployment holds no Keyword Planner, DataForSEO or Semrush credential. Search Console impressions (a measurement of this site) and Google Trends relative interest (the shape of demand in the chosen country, 0-100, not a count) are shown instead, in their own columns.',
+    volumeBasisNote: (() => {
+      if (sources.has('google-ads') || sources.has('dataforseo') || sources.has('semrush')) {
+        return 'Search volume is measured against Google, from the source named on each row.';
+      }
+      if (sources.has('bing-webmaster')) {
+        return 'Search volume is measured, but against BING, not Google — from Bing Webmaster Tools. '
+          + 'Bing carries a fraction of Google\'s search traffic, so treat these as relative demand '
+          + '(which keyword is bigger, and roughly by how much) rather than as the absolute monthly '
+          + 'Google figure a Keyword Planner number would give. No multiplier has been applied.';
+      }
+      return 'No measured search volume is available: this deployment holds no Bing Webmaster, DataForSEO or Semrush credential. Search Console impressions (a measurement of this site) and Google Trends relative interest (the shape of demand in the chosen country, 0-100, not a count) are shown instead, in their own columns.';
+    })(),
   };
 }
 
 module.exports = {
   enrich, difficultyFromSerp, trendsInterest, trendsBatch, trendsCookieHeader,
-  dfsVolume, dfsDifficulty, semrushMetrics, googleAdsVolume,
+  dfsVolume, dfsDifficulty, semrushMetrics, googleAdsVolume, bingVolume,
   HIGH_AUTHORITY, UGC_FORUM,
 };

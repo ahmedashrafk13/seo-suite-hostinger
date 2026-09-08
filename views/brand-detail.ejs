@@ -347,6 +347,112 @@
     </div>
 
     <div class="card">
+      <div class="card-head"><h3>Crawl access</h3></div>
+      <div class="card-body">
+        <p style="font-size:12.5px;color:var(--text-2);margin-top:0">
+          Credentials the technical audit and internal-linking crawlers present to this site.
+          Only needed if the site will not serve its pages to an anonymous visitor — a
+          members-only site, a client portal, or a staging build behind HTTP basic auth.
+          Stored here so scheduled crawls authenticate the same way a manual one does.
+        </p>
+
+        <% if (crawlAccess) { %>
+          <div class="notice <%= crawlAccess.verifyStatus === 'ok' ? 'success' : (crawlAccess.verifyStatus === 'blocked' ? 'warn' : '') %>">
+            <span class="notice-icon"><%= crawlAccess.verifyStatus === 'ok' ? '&#10003;' : (crawlAccess.verifyStatus === 'blocked' ? '&#9888;' : '&#128273;') %></span>
+            <div class="notice-body">
+              <strong>Stored:</strong> <%= crawlAccess.describe %><br>
+              <span class="muted">Saved <%= crawlAccess.updatedAt %>.</span>
+              <% if (crawlAccess.verifiedAt) { %>
+                <br><strong><%= crawlAccess.verifyStatus === 'ok' ? 'Last test passed' : 'Last test FAILED' %></strong>
+                (<%= crawlAccess.verifiedAt %>): <%= crawlAccess.verifyNote %>
+              <% } else { %>
+                <br><span class="muted">Not tested yet — run the test below before relying on a scheduled crawl.</span>
+              <% } %>
+            </div>
+          </div>
+          <form method="POST" action="/brands/<%= brand.id %>/crawl-access/test" class="inline-form">
+            <button type="submit" class="btn secondary sm">Test access</button>
+          </form>
+          <form method="POST" action="/brands/<%= brand.id %>/crawl-access" class="inline-form">
+            <input type="hidden" name="clear" value="on">
+            <button type="submit" class="btn ghost sm">Remove credentials</button>
+          </form>
+          <div class="section-divider"></div>
+        <% } %>
+
+        <form method="POST" action="/brands/<%= brand.id %>/crawl-access">
+          <div class="field">
+            <label for="ca_basic_user">HTTP basic auth — username</label>
+            <input type="text" id="ca_basic_user" name="auth_basic_user" autocomplete="off"
+                   value="<%= crawlAccess ? crawlAccess.basicUser : '' %>" placeholder="staging">
+          </div>
+          <div class="field">
+            <label for="ca_basic_pass">HTTP basic auth — password</label>
+            <input type="password" id="ca_basic_pass" name="auth_basic_pass" autocomplete="off"
+                   placeholder="<%= crawlAccess && crawlAccess.hasBasic ? 'a password is stored — leave empty to keep it' : '' %>">
+          </div>
+          <div class="field">
+            <label for="ca_cookie">Session cookie</label>
+            <input type="text" id="ca_cookie" name="auth_cookie" autocomplete="off"
+                   placeholder="<%= crawlAccess && crawlAccess.hasCookie ? 'a cookie is stored — leave empty to keep it' : 'sessionid=abc123; csrftoken=def456' %>">
+            <div class="hint">
+              Log into the site in your browser, then DevTools → Application → Cookies and copy
+              the cookie for this domain. These expire, which is why the test button exists.
+            </div>
+          </div>
+          <div class="field">
+            <label for="ca_headers">Extra request headers</label>
+            <%# The textarea starts EMPTY, always. It used to be prefilled with
+                "X-Token: (stored — retype to replace)" as its VALUE, so saving
+                the form untouched stored that sentence as the header's value.
+                What is stored is shown as text beside it instead. %>
+            <textarea id="ca_headers" name="auth_headers" rows="3"
+                      placeholder="Authorization: Bearer eyJ..."></textarea>
+            <div class="hint">
+              One <code>Name: value</code> per line.
+              <% if (crawlAccess && crawlAccess.headerNames.length) { %>
+                Currently stored: <strong><%= crawlAccess.headerNames.join(', ') %></strong>.
+                Leave this box empty to keep them; typing here replaces the whole set.
+              <% } %>
+            </div>
+          </div>
+          <% if (crawlAccess) { %>
+            <%# Blank fields mean "leave alone", so removing a credential has to
+                be an explicit action rather than an empty box. %>
+            <div class="checkbox-row">
+              <% if (crawlAccess.hasCookie) { %>
+                <label class="check" for="remove_cookie">
+                  <input type="checkbox" id="remove_cookie" name="remove_cookie">
+                  <span>Remove the stored cookie</span>
+                </label>
+              <% } %>
+              <% if (crawlAccess.hasBasic) { %>
+                <label class="check" for="remove_basic">
+                  <input type="checkbox" id="remove_basic" name="remove_basic">
+                  <span>Remove the stored basic auth</span>
+                </label>
+              <% } %>
+              <% if (crawlAccess.headerNames.length) { %>
+                <label class="check" for="remove_headers">
+                  <input type="checkbox" id="remove_headers" name="remove_headers">
+                  <span>Remove the stored headers</span>
+                </label>
+              <% } %>
+            </div>
+          <% } %>
+          <div class="lock-note">
+            <span>&#9888;</span>
+            <div>
+              Stored in the clear in this app's database, alongside the Google refresh tokens
+              already there. Use a low-privilege account where the site offers one.
+            </div>
+          </div>
+          <button type="submit" class="btn secondary block" style="margin-top:10px">Save crawl credentials</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-head"><h3 style="color:var(--critical)">Delete brand</h3></div>
       <div class="card-body">
         <p style="font-size:12.5px;color:var(--text-2)">
@@ -359,6 +465,82 @@
         </form>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h3>Data sources for this client</h3>
+  </div>
+  <div class="card-body">
+    <p style="font-size:13px;color:var(--text-2);margin:0 0 14px">
+      Search volume, keyword difficulty and backlink data come from vendors who charge for API access.
+      Enter <strong>this client&rsquo;s own</strong> credentials here and their runs bill against their
+      subscription instead of yours. Leave a vendor blank to use the agency default from
+      <code>.env</code>. Values are encrypted before they are stored and are never shown again.
+    </p>
+
+    <% if (!credentialSecretSet) { %>
+      <div class="notice warn" style="margin:0 0 14px">
+        <span class="notice-icon">&#9888;</span>
+        <div class="notice-body">
+          <strong>Encryption key not set.</strong> Per-client credentials cannot be stored until
+          <code>CREDENTIAL_SECRET</code> is set in <code>.env</code> &mdash; saving is refused rather than
+          written in plain text. Generate one with:
+          <code>node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"</code>
+        </div>
+      </div>
+    <% } %>
+
+    <% dataSources.forEach(function(v){ %>
+      <div style="border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <strong style="font-size:14px"><%= v.label %></strong>
+          <span>
+            <% if (!v.configured) { %>
+              <span class="badge">not configured</span>
+            <% } else if (v.source === 'brand') { %>
+              <span class="badge good">this client&rsquo;s own account</span>
+            <% } else if (v.source === 'brand+agency') { %>
+              <span class="badge accent">part client, part agency</span>
+            <% } else { %>
+              <span class="badge neutral">agency default</span>
+            <% } %>
+          </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-2);margin:6px 0 0"><%= v.help %></p>
+        <% if (v.error) { %>
+          <p style="font-size:12px;color:var(--danger,#b42318);margin:6px 0 0"><%= v.error %></p>
+        <% } %>
+
+        <form method="POST" action="/brands/<%= brand.id %>/data-sources" style="margin-top:10px">
+          <input type="hidden" name="vendor" value="<%= v.key %>">
+          <div class="grid cols-2" style="gap:10px">
+            <% v.fields.forEach(function(f){ %>
+              <label style="display:block">
+                <span style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">
+                  <%= f.label %>
+                  <% if (v.brandFields.indexOf(f.name) !== -1) { %>
+                    <span class="badge good" style="font-weight:500">set</span>
+                  <% } %>
+                </span>
+                <input
+                  type="<%= f.secret ? 'password' : 'text' %>"
+                  name="<%= f.name %>"
+                  autocomplete="off"
+                  style="width:100%"
+                  placeholder="<%= v.brandFields.indexOf(f.name) !== -1 ? 'stored — retype to replace, blank to clear' : ('blank = use agency ' + f.env) %>">
+              </label>
+            <% }) %>
+          </div>
+          <div class="btn-row" style="margin-top:10px">
+            <button class="btn sm" type="submit" <%= credentialSecretSet ? '' : 'disabled' %>>
+              Save <%= v.label %>
+            </button>
+          </div>
+        </form>
+      </div>
+    <% }) %>
   </div>
 </div>
 

@@ -86,7 +86,7 @@ Then add whichever of these you use:
 | `BASE_URL` | Absolute links in reports and the OAuth callback (see section 4) |
 | `AZURE_OPENAI_*` | The AI-written parts: prompt research, schema drafting, rewrites |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | Alert emails |
-| `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_CUSTOMER_ID` | Measured keyword search volume |
+| `GOOGLE_ADS_*` | Measured keyword search volume — see section 4b |
 | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` | Live Google SERPs and real keyword difficulty |
 
 The app refuses to start in production with the default session secret, so the
@@ -119,6 +119,37 @@ https://your-app.fly.dev/api/auth/google/callback
 
 A mismatch produces `redirect_uri_mismatch` at sign-in and nothing in the app's
 own logs.
+
+## 4b. Google Ads / Keyword Planner
+
+Two things about this integration surprise people on a first deploy.
+
+**Your local `.env` is not deployed.** `.dockerignore` excludes it, deliberately
+— secrets do not belong in an image layer. Every `GOOGLE_ADS_*` value has to be
+set again as a Fly secret:
+
+```bash
+fly secrets set GOOGLE_ADS_DEVELOPER_TOKEN="..." GOOGLE_ADS_OWNER_EMAIL="you@youragency.com" GOOGLE_ADS_CUSTOMER_ID="778-054-8005" --app seo-suite-hostinger
+```
+
+Add `GOOGLE_ADS_LOGIN_CUSTOMER_ID` only if that account sits under a manager,
+and `GOOGLE_ADS_API_VERSION` only when the default in `src/lib/google.js` has
+sunset.
+
+**The Google connection itself does not deploy either.** It is an OAuth refresh
+token in the database, and the database is the Fly volume — a different one
+from your laptop's. Connecting Google locally grants nothing here. After the
+first deploy you must sign in on the Fly URL and press **Connect Google
+account** again, as the address in `GOOGLE_ADS_OWNER_EMAIL`; until you do,
+`/connect` reports that no connection in this deployment carries Ads access.
+
+The same applies to the `adwords` scope on the consent screen in Google Cloud.
+That is project-level rather than per-deployment, so it is shared with your
+local setup — but if you added the scope while the consent screen was in
+Testing mode, `ahmed.ashraf@canvasdigital.org` must be listed as a test user,
+and reaching a publicly-signed-up client needs the app published and verified
+for that scope. Running the shared-account model (Model A in `.env.example`) avoids that
+entirely, because only you ever grant the scope.
 
 ## 5. Deploy
 

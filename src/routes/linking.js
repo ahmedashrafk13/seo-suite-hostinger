@@ -4,6 +4,7 @@ const express = require('express');
 const path = require('path');
 const db = require('../db');
 const toolRunner = require('../lib/toolRunner');
+const crawlAuth = require('../lib/crawlAuth');
 const csvStore = require('../lib/csvStore');
 const tasksLib = require('../lib/tasks');
 const A = require('../lib/analytics');
@@ -40,11 +41,17 @@ router.get('/', (req, res, next) => {
       hasGsc: Boolean(A.latestGscDate(b.id)),
     }));
 
+    // So the form can say which brands already have crawl credentials rather
+    // than asking for them again on every run.
+    const authByBrand = Object.fromEntries(brands
+      .map((b) => [b.id, crawlAuth.statusForBrand(b.id)])
+      .filter(([, v]) => v));
+
     res.render('linking', {
       title: 'Internal linking',
       active: 'linking',
       pageTitle: 'Internal linking agent',
-      runs, brands,
+      runs, brands, authByBrand,
       tool: toolRunner.toolAvailability().linking,
       flash: req.query.msg || null,
       flashError: req.query.error || null,
@@ -66,6 +73,14 @@ router.post('/start', (req, res, next) => {
     if (!siteUrl) return res.redirect('/linking?error=' + encodeURIComponent('Enter a website URL or pick a brand.'));
     if (!/^https?:\/\//i.test(siteUrl)) siteUrl = `https://${siteUrl}`;
 
+    const { auth, rejected } = crawlAuth.fromForm(req.body);
+    if (rejected.length) {
+      return res.redirect('/linking?error=' + encodeURIComponent(
+        `Could not read the extra headers: ${rejected.map((r) => `"${r.line}" (${r.why})`).join('; ')}`
+      ));
+    }
+    if (auth && brandId && req.body.save_auth === 'on') crawlAuth.save(brandId, auth);
+
     const runId = toolRunner.startLinking({
       userId,
       brandId,
@@ -74,6 +89,8 @@ router.post('/start', (req, res, next) => {
       useGsc: req.body.use_gsc === 'on',
       render: req.body.render === 'on',
       createTasks: req.body.create_tasks !== 'off',
+      auth,
+      force: req.body.force_scan === 'on',
     });
 
     res.redirect(`/linking/${runId}`);

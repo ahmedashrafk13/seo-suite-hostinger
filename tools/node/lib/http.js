@@ -33,6 +33,116 @@ const BROWSER_HEADERS = {
   'Upgrade-Insecure-Requests': '1',
 };
 
+// ------------------------------------------------------------ credentials
+//
+// Headers the crawl must send on every request to be served anything at all:
+// a session cookie for a members-only site, HTTP basic auth for a staging
+// build, or whatever header a CDN's rules expect. Set once from the command
+// line (--cookie / --header) before the crawl starts.
+//
+// Module-level rather than threaded through every call site because there are
+// dozens of them across both ports (pages, robots.txt, sitemaps, link checks,
+// asset checks, host variants) and a credential that reaches only some of them
+// is worse than none: the crawl half-works and the report is a mix of real
+// pages and login pages. One place means every request carries it.
+let AUTH_HEADERS = {};
+
+// The site the credentials belong to. They are attached ONLY to requests for
+// this site, and to nothing else.
+//
+// WHY, and this was a real leak: the audit checks every external link a page
+// points at, and crawls follow cross-origin redirects. With the headers merged
+// into every request unconditionally, a client's live session cookie was sent
+// to every third-party domain the site links to — proven with a fixture that
+// recorded `cookie=sess=SECRET` arriving at a partner domain. Handing a
+// client's session to strangers is a worse outcome than any crawl gap, so an
+// UNBOUND credential set is now attached to nothing at all: fail safe, not
+// fail open.
+let AUTH_SITE = '';
+
+// The credential scope key — deliberately NOT hostKey().
+//
+// hostKey() is the crawler's site-grouping key and drops the port, because for
+// grouping pages a port is noise. For credentials it is not: two services on
+// one host are two different systems, and the first version of this leaked a
+// cookie between them (caught by a fixture running the client site and a
+// "partner" site on 127.0.0.1 under different ports — hostKey saw one site).
+// A credential scope must be at least as strict as the browser's, so the port
+// is kept. `www.` is still folded away, because a login cookie genuinely has
+// to work across www and non-www and the audit probes both host variants.
+function authSiteKey(url) {
+  try {
+    const u = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`);
+    const host = u.hostname.toLowerCase().replace(/^www\./, '');
+    const port = u.port || (u.protocol === 'https:' ? '443' : '80');
+    return `${host}:${port}`;
+  } catch {
+    return '';
+  }
+}
+
+function setAuthHeaders(headers, site = '') {
+  AUTH_HEADERS = {};
+  Object.entries(headers || {}).forEach(([k, v]) => {
+    if (k && v != null && !/[\r\n]/.test(String(v))) AUTH_HEADERS[k] = String(v);
+  });
+  if (site) AUTH_SITE = authSiteKey(site);
+  return AUTH_HEADERS;
+}
+
+// Called by each port once it knows its seed URL.
+function bindAuthSite(url) {
+  AUTH_SITE = authSiteKey(url);
+  return AUTH_SITE;
+}
+
+// Credentials for this URL, or null. A CDN, a partner, an analytics domain or
+// any cross-origin redirect target gets null.
+function authFor(url) {
+  if (!AUTH_SITE || !Object.keys(AUTH_HEADERS).length) return null;
+  return authSiteKey(url) === AUTH_SITE ? AUTH_HEADERS : null;
+}
+
+function authHeaderNames() {
+  return Object.keys(AUTH_HEADERS);
+}
+
+// Parses the shared `--cookie` / `--header` flags out of an argv array, so both
+// ports get identical behaviour from one implementation. Returns the argv with
+// those flags removed, leaving each port's own parser untouched.
+function takeAuthArgs(argv) {
+  const rest = [];
+  // The environment is the transport the app itself uses: on shared hosting
+  // /proc/<pid>/cmdline is world-readable and environ is not, so a session
+  // cookie does not belong in argv. Flags still win, because an explicit
+  // argument should always beat an inherited one.
+  const headers = {};
+  try {
+    const fromEnv = JSON.parse(process.env.CRAWL_AUTH_HEADERS || '{}');
+    Object.entries(fromEnv).forEach(([k, v]) => {
+      if (k && typeof v === 'string' && !/[\r\n]/.test(v)) headers[k] = v;
+    });
+  } catch { /* a malformed value must never stop a crawl */ }
+  let cookie = null;
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a === '--cookie') {
+      cookie = String(argv[i + 1] || '');
+      i += 1;
+    } else if (a === '--header' || a === '-H') {
+      const raw = String(argv[i + 1] || '');
+      i += 1;
+      const idx = raw.indexOf(':');
+      if (idx > 0) headers[raw.slice(0, idx).trim()] = raw.slice(idx + 1).trim();
+    } else {
+      rest.push(a);
+    }
+  }
+  if (cookie) headers.Cookie = cookie;
+  setAuthHeaders(headers);
+  return { argv: rest, headers: AUTH_HEADERS };
+}
+
 // Connections are pooled and kept alive. Without this every request pays a
 // fresh TCP + TLS handshake, which on a 200-page crawl is the dominant cost.
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 32 });
@@ -63,8 +173,23 @@ function classify(err) {
 // (DataForSEO, Google Ads). It is written before req.end() and its length is
 // declared, because both of those endpoints reject a chunked request without a
 // Content-Length. A GET with no body behaves exactly as it did before.
+// Per-call credentials, scoped the same way the module-level ones are.
+//
+// This exists for the app (as opposed to the standalone crawlers), which is
+// long-lived and runs two analyses at once: module-level credentials would let
+// one brand's cookie be sent to another brand's site. Passing them per call and
+// evaluating the scope against EACH hop's URL keeps a cross-origin redirect
+// from carrying them off-site, which is the vector a caller cannot guard
+// against on its own — fetchUrl follows redirects internally.
+function scopedAuthFor(url, scopedAuth) {
+  if (!scopedAuth || !scopedAuth.headers || !scopedAuth.site) return null;
+  if (!Object.keys(scopedAuth.headers).length) return null;
+  return authSiteKey(url) === authSiteKey(scopedAuth.site) ? scopedAuth.headers : null;
+}
+
 function requestOnce(url, {
   method = 'GET', timeout = 20000, headers = {}, maxBytes = DEFAULT_MAX_BYTES, body = null,
+  scopedAuth = null,
 }) {
   return new Promise((resolve, reject) => {
     let target;
@@ -90,6 +215,14 @@ function requestOnce(url, {
         method,
         headers: {
           ...BROWSER_HEADERS,
+          // Credentials sit between the defaults and the per-call headers: a
+          // call that deliberately sets a header (the AI-crawler checks send
+          // their own User-Agent) still wins, but nothing has to remember to
+          // pass the session cookie.
+          // Attached per-URL, and only for the site they belong to — see
+          // authFor(). Never to an external link or a cross-origin redirect.
+          ...(authFor(target.href) || {}),
+          ...(scopedAuthFor(target.href, scopedAuth) || {}),
           ...headers,
           host: target.host,
           ...(body != null
@@ -232,4 +365,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 module.exports = {
   UA, BROWSER_HEADERS, HttpError,
   fetchUrl, requestOnce, decodeBody, mapLimit, sleep, classify,
+  setAuthHeaders, authHeaderNames, takeAuthArgs, bindAuthSite, authFor,
+  authSiteKey, scopedAuthFor,
 };

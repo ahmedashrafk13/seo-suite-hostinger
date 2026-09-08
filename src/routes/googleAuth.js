@@ -53,4 +53,50 @@ router.post('/connect/disconnect', (req, res) => {
   res.redirect('/connect?msg=' + encodeURIComponent('Google account disconnected for the whole team.'));
 });
 
+// ------------------------------------------------ Google Ads / Keyword Planner
+
+// Choose which Google Ads account this team's keyword volumes are billed
+// against. The list comes from listAccessibleCustomers, so the admin picks
+// from accounts the connected login can actually reach rather than typing a
+// ten-digit id and finding out it was wrong three screens later.
+//
+// The value posted is "<customerId>" or "<customerId>:<loginCustomerId>" — the
+// second form is used when the account is reached through a manager (MCC),
+// which needs the manager id in the login-customer-id header.
+router.post('/connect/ads-account', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const raw = String(req.body.ads_account || '').trim();
+  if (!raw) {
+    google.clearAdsSelection(req.dataUserId);
+    return res.redirect('/connect?msg=' + encodeURIComponent('Google Ads account cleared. Keyword volumes will fall back to the next available source.'));
+  }
+  const [customerId, loginCustomerId] = raw.split(':');
+  const name = String(req.body.ads_account_name || '').trim() || null;
+  try {
+    google.saveAdsSelection(req.dataUserId, { customerId, loginCustomerId, name });
+    res.redirect('/connect?msg=' + encodeURIComponent('Google Ads account saved. Use "Test Keyword Planner" to confirm it returns volumes.'));
+  } catch (err) {
+    res.redirect('/connect?error=' + encodeURIComponent(err.message));
+  }
+});
+
+// Run one real generateKeywordIdeas call and report exactly what came back.
+//
+// This exists because every way this integration fails looks identical from
+// the outside: a missing scope, a test-access developer token, an Ads account
+// with no billing and a sunset API version all end with "no keyword volumes".
+// The probe names which one it is.
+router.post('/connect/ads-test', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const verdict = await google.probeKeywordPlanner(req.dataUserId);
+    const q = verdict.ok
+      ? 'msg=' + encodeURIComponent('Keyword Planner: ' + verdict.message)
+      : 'error=' + encodeURIComponent('Keyword Planner not working (' + verdict.stage + '): ' + verdict.message);
+    res.redirect('/connect?' + q);
+  } catch (err) {
+    res.redirect('/connect?error=' + encodeURIComponent('Keyword Planner test failed: ' + err.message));
+  }
+});
+
 module.exports = router;

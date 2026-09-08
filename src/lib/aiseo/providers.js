@@ -167,16 +167,67 @@ const PROVIDERS = [
     key: 'google-ads',
     label: 'Google Ads Keyword Planner',
     kind: 'keyword-tool',
-    // The best volume source available and the cheapest: it reuses the Google
-    // OAuth connection this app already holds, so the only thing missing is a
-    // developer token (free, applied for in the Ads UI) and the manager
-    // account id to bill the API call against.
-    envKeys: ['GOOGLE_ADS_DEVELOPER_TOKEN', 'GOOGLE_ADS_CUSTOMER_ID'],
-    detect: () => Boolean(process.env.GOOGLE_ADS_DEVELOPER_TOKEN
-      && process.env.GOOGLE_ADS_CUSTOMER_ID
-      && process.env.GOOGLE_CLIENT_ID),
+    // NOT the recommended path, despite being technically the best data.
+    //
+    // Google REJECTED a Basic access application for this tool on 2026-09-07: "Tools that offer only keyword research are not allowed by the Google Ads API Policy." The Ads API requires campaign-management functionality (Required Minimum Functionality); a read-only keyword-volume consumer does not qualify, however accurately it is described. The code below still works and is kept for a future in which this suite manages campaigns, or for an account that already holds an approved token - but DO NOT send an operator to apply for one as the recommended path.
+    //
+    // DataForSEO resells the identical Google Ads figures under its own
+    // licence, accepts 700 keywords per call against this API's 20, and adds
+    // keyword difficulty. It is the rung to configure instead.
+    envKeys: ['GOOGLE_ADS_DEVELOPER_TOKEN'],
+    // Availability is NOT a pure env check. The developer token is the app's
+    // and lives in .env, but the Ads ACCOUNT is chosen per team on /connect,
+    // and the OAuth connection must carry the `adwords` scope — a connection
+    // authorised before that scope was added can never answer an Ads call.
+    // So this asks the database whether any team is actually set up, and env
+    // GOOGLE_ADS_CUSTOMER_ID remains a fallback for a single-tenant install.
+    //
+    // has() is synchronous and per-deployment, so this answers "can anyone
+    // here use Keyword Planner"; the per-user check that decides an individual
+    // run is google.getAdsSelection(userId) in keywordMetrics.js.
+    detect: () => {
+      if (!process.env.GOOGLE_ADS_DEVELOPER_TOKEN || !process.env.GOOGLE_CLIENT_ID) return false;
+      try {
+        // A shared agency account counts only when some connection actually
+        // holds the Ads scope to authorise with. GOOGLE_ADS_CUSTOMER_ID alone
+        // used to be treated as sufficient, which over-claimed: the id names
+        // an account but grants nothing, so the feature would advertise itself
+        // as live and then fail on every call.
+        if (process.env.GOOGLE_ADS_CUSTOMER_ID) {
+          const google = require('../google');
+          return Boolean(google.findAdsOwnerConnection());
+        }
+      } catch (e) {
+        return false;
+      }
+      try {
+        // Required lazily: the registry is imported from places that must not
+        // pull in the database, and a missing table must degrade to "not
+        // available" rather than throwing during a page render.
+        const db = require('../../db');
+        const row = db.prepare(`SELECT 1 FROM google_connections
+          WHERE ads_customer_id IS NOT NULL AND ads_customer_id <> ''
+            AND scope LIKE '%auth/adwords%' LIMIT 1`).get();
+        return Boolean(row);
+      } catch (e) {
+        return false;
+      }
+    },
     provides: ['keyword-volume', 'keyword-cpc', 'keyword-competition', 'country-volume'],
-    note: 'Set GOOGLE_ADS_DEVELOPER_TOKEN and GOOGLE_ADS_CUSTOMER_ID (and keep Google connected) to show the monthly search volumes Google itself reports, per country.',
+    note: 'Requires an approved Google Ads developer token. Google rejects applications from tools that only do keyword research, so DataForSEO is the practical route to the same figures - see DATAFORSEO_LOGIN below. This adapter works if you already hold an approved token.',
+  },
+  {
+    key: 'bing-webmaster',
+    label: 'Bing Webmaster Tools',
+    kind: 'keyword-tool',
+    // The only FREE source of a measured search count in this registry, and
+    // therefore the practical answer to Google refusing an Ads API token for
+    // this tool. An API key is free from bing.com/webmasters (Settings > API
+    // access). What it reports is Bing demand, not Google demand — every view
+    // that shows it says so.
+    envKeys: ['BING_WEBMASTER_API_KEY'],
+    provides: ['keyword-volume', 'country-volume'],
+    note: 'Set BING_WEBMASTER_API_KEY (free, from bing.com/webmasters > Settings > API access) for measured search volume without a paid subscription. The figures are Bing\'s, not Google\'s, and are labelled as such wherever they appear.',
   },
   {
     key: 'semrush',

@@ -18,6 +18,7 @@ const csvStore = require('./csvStore');
 const tasksLib = require('./tasks');
 const google = require('./google');
 const pythonEnv = require('./pythonEnv');
+const crawlAuth = require('./crawlAuth');
 const A = require('./analytics');
 
 const WEBTECHSTACK_DIR = path.dirname(config.WEBTECHSTACK_DETECTOR_PATH);
@@ -26,6 +27,9 @@ const INTERNAL_LINKING_DIR = path.dirname(config.INTERNAL_LINK_AGENT_PATH);
 // Live handles, purely so a running job can be cancelled. All durable state
 // lives in SQLite.
 const running = new Map();
+
+// A literal newline, for the run-log lines below.
+const NL = String.fromCharCode(10);
 
 // Which implementation of each crawler will actually run.
 //
@@ -172,14 +176,19 @@ function makeLogger(table, runId) {
 // and write the same output (JSON on stdout for the audit, the same set of
 // files in --out for the linking agent), so the caller does not branch: only
 // the interpreter and the script path change.
-function spawnTool(choice, args, cwd, { onData, onDone, tool = 'audit' }) {
+function spawnTool(choice, args, cwd, { onData, onDone, tool = 'audit', env = null }) {
+  // Credentials arrive here as environment entries rather than arguments,
+  // because on shared hosting /proc/<pid>/cmdline is world-readable and
+  // environ is not. See crawlAuth.toEnv().
+  const childEnv = env && Object.keys(env).length ? { ...process.env, ...env } : undefined;
   if (choice.runtime === 'node') {
     let child;
     try {
       // process.execPath rather than "node": under Passenger the app may be
       // started by a Node binary that is not the one on PATH, and mixing the
       // two would run the port under a different version than the app itself.
-      child = spawn(process.execPath, [choice.script, ...args], { cwd, windowsHide: true });
+      child = spawn(process.execPath, [choice.script, ...args],
+        { cwd, windowsHide: true, ...(childEnv ? { env: childEnv } : {}) });
     } catch (err) {
       onDone(err, { code: -1 });
       return null;
@@ -199,10 +208,10 @@ function spawnTool(choice, args, cwd, { onData, onDone, tool = 'audit' }) {
     });
     return child;
   }
-  return spawnPython(choice.script, args, cwd, { onData, onDone, tool });
+  return spawnPython(choice.script, args, cwd, { onData, onDone, tool, env: childEnv });
 }
 
-function spawnPython(script, args, cwd, { onData, onDone, tool = 'audit' }) {
+function spawnPython(script, args, cwd, { onData, onDone, tool = 'audit', env: childEnv = null }) {
   const env = pythonEnv.resolve(tool);
   if (!env.ok) {
     const err = new Error(
@@ -217,7 +226,8 @@ function spawnPython(script, args, cwd, { onData, onDone, tool = 'audit' }) {
   const tryBin = (bin, binArgs) => {
     let child;
     try {
-      child = spawn(bin, [...binArgs, '-u', script, ...args], { cwd, windowsHide: true });
+      child = spawn(bin, [...binArgs, '-u', script, ...args],
+        { cwd, windowsHide: true, ...(childEnv ? { env: childEnv } : {}) });
     } catch (err) {
       onDone(err, { code: -1 });
       return null;
@@ -250,10 +260,118 @@ function fail(table, runId, message) {
 }
 
 // ==========================================================================
+// Pre-flight access check
+// ==========================================================================
+//
+// Both crawlers used to be started blind. On a site that will not serve its
+// pages anonymously that produced the worst available outcome: a crawl of the
+// login page, finishing successfully, scored as if it were the site.
+//
+// So every run now probes the seed URL first — one request, about a second —
+// and only spawns the crawler if the site will actually serve its content. A
+// run stopped here costs nothing and says exactly what it saw; a run allowed
+// through records how it got in, so a report months later still states whether
+// it was crawled anonymously or with credentials.
+//
+// `force` exists for the legitimate case the probe cannot distinguish: a site
+// whose homepage is gated while a public section below it is not. It proceeds
+// and keeps the finding as a note on the run rather than discarding it.
+async function preflight({ table, runId, url, brandId, auth, force }) {
+  const resolved = auth || crawlAuth.forBrand(brandId);
+  // The run is now spawned a beat after the row is created rather than in the
+  // same tick, which opens a window that did not exist before: a user can hit
+  // Cancel while the access check is still in flight. Without this check the
+  // crawl would start anyway and run to completion on a row marked cancelled.
+  const stillWanted = () => {
+    const row = db.prepare(`SELECT status FROM ${table} WHERE id=?`).get(runId);
+    return !row || row.status === 'running';
+  };
+  if (!stillWanted()) return { auth: resolved, blocked: true, cancelled: true };
+  let probe;
+  try {
+    probe = await crawlAuth.probe(url, resolved);
+  } catch (err) {
+    // A probe that itself fails must not block a crawl — that would turn one
+    // flaky request into "this site cannot be audited".
+    if (!stillWanted()) return { auth: resolved, blocked: true, cancelled: true };
+    return { auth: resolved, blocked: false, note: `Access check could not run (${err.message}); the crawl was started anyway.` };
+  }
+
+  if (!stillWanted()) return { auth: resolved, blocked: true, cancelled: true };
+
+  if (brandId && !crawlAuth.isEmpty(resolved)) {
+    try { crawlAuth.recordVerification(brandId, probe); } catch { /* not worth failing a run over */ }
+  }
+
+  if (probe.ok) {
+    return { auth: resolved, blocked: false, note: probe.summary, probe };
+  }
+
+  const remedy = crawlAuth.remedyFor(probe.wall);
+
+  // Not proof of an auth wall — a 403 bot rule, a timed-out request, a bad seed
+  // URL, a sparse homepage with a login box in the header. These describe real
+  // public sites that crawled fine before, so the observation is recorded and
+  // the crawl runs exactly as it used to. Only crawlAuth.BLOCKING_WALLS stop a
+  // run.
+  if (!probe.blocking) {
+    return {
+      auth: resolved,
+      blocked: false,
+      note: `${probe.summary} ${remedy}`,
+      probe,
+    };
+  }
+
+  if (force) {
+    return {
+      auth: resolved,
+      blocked: false,
+      note: `Access check FAILED and was overridden: ${probe.summary} ${remedy} `
+        + 'Pages below the seed URL may have been crawled, but anything behind the wall was not.',
+      probe,
+    };
+  }
+
+  const seen = probe.reasons.map((r) => `  - ${r}`).join('\n');
+  fail(table, runId,
+    [
+      'Crawl stopped before it started: this site will not serve its pages to the crawler.',
+      '',
+      probe.summary,
+      '',
+      'What was seen:',
+      seen,
+      '',
+      `Seed URL:  ${probe.requestedUrl}`,
+      `Ended at:  ${probe.finalUrl} (HTTP ${probe.status})`,
+      `Credentials sent: ${probe.authDescribed}`,
+      '',
+      'How to fix it:',
+      `  ${remedy}`,
+      '',
+      '',
+    ].join('\n')
+    + 'The crawl was not run, because a crawl of a login page produces a health '
+    + 'score for the login page — which is indistinguishable on screen from a '
+    + 'score for the site. Tick "Scan anyway" to override if a public section '
+    + 'sits below this URL.');
+  return { auth: resolved, blocked: true, probe };
+}
+
+// ==========================================================================
 // Technical SEO audit
 // ==========================================================================
 
-function startAudit({ userId, brandId = null, domain, maxPages = 100, render = 'auto', createTasks = true }) {
+// `auth` and `force` are the authenticated-crawl inputs (see lib/crawlAuth.js).
+// Passing no `auth` falls back to the brand's stored credentials, which is what
+// makes this safe to call from anywhere: any caller that does not think about
+// credentials still authenticates, rather than silently crawling a login page
+// and reporting it as the site.
+function startAudit({
+  userId, brandId = null, domain, maxPages = 100, render = 'auto', createTasks = true,
+  auth = null, force = false,
+}) {
   const avail = toolAvailability().audit;
   const insert = db.prepare(
     'INSERT INTO audit_runs (user_id, brand_id, domain, max_pages, status) VALUES (?,?,?,?,?)'
@@ -267,6 +385,20 @@ function startAudit({ userId, brandId = null, domain, maxPages = 100, render = '
     return runId;
   }
 
+  // The access check is one HTTP request and must not hold the caller: the
+  // route returns the run id immediately and the result page polls, exactly as
+  // it did before. If the check blocks the run, the row is already marked
+  // failed with the explanation by the time the first poll arrives.
+  preflight({ table: 'audit_runs', runId, url: domain, brandId, auth, force })
+    .then((pf) => {
+      if (pf.blocked) return;
+      launchAudit(pf);
+    })
+    .catch((err) => fail('audit_runs', runId, `Access check failed unexpectedly: ${err.message}`));
+
+  return runId;
+
+  function launchAudit(pf) {
   fs.mkdirSync(config.REPORTS_DIR, { recursive: true });
 
   // NOTE on --json vs --doc: main.py writes its Word document only in the
@@ -283,9 +415,14 @@ function startAudit({ userId, brandId = null, domain, maxPages = 100, render = '
     '--render', render,
   ];
 
+  db.prepare('UPDATE audit_runs SET auth_used=?, access_note=? WHERE id=?')
+    .run(crawlAuth.isEmpty(pf.auth) ? 0 : 1, pf.note || null, runId);
+
   const log = makeLogger('audit_runs', runId);
+  log.write(`Crawl access: ${crawlAuth.describe(pf.auth)}\n${pf.note || ''}\n`);
   const child = spawnTool(avail.choice, args, avail.dir, {
     tool: 'audit',
+    env: crawlAuth.toEnv(pf.auth),
     onData: (chunk) => log.write(chunk),
     onDone: (err, { code }) => {
       running.delete(`audit:${runId}`);
@@ -311,6 +448,13 @@ function startAudit({ userId, brandId = null, domain, maxPages = 100, render = '
         finished_at=datetime('now') WHERE id=?`)
         .run(JSON.stringify(parsed), runId);
 
+      // The second half of the guard. Getting past the seed does not prove the
+      // whole site was readable — a public homepage can sit in front of a gated
+      // application. Comparing the crawl against the sitemap catches that, and
+      // is recorded as a note rather than a failure because a capped crawl
+      // legitimately reads fewer pages than the sitemap lists.
+      noteCoverage('audit_runs', runId, domain, parsed.pages_crawled, maxPages, pf.auth, pf.note);
+
       if (createTasks) {
         try {
           const run = db.prepare('SELECT * FROM audit_runs WHERE id=?').get(runId);
@@ -327,7 +471,22 @@ function startAudit({ userId, brandId = null, domain, maxPages = 100, render = '
     db.prepare('UPDATE audit_runs SET pid=? WHERE id=?').run(child.pid, runId);
     running.set(`audit:${runId}`, child);
   }
-  return runId;
+  } // launchAudit
+}
+
+// Appends the sitemap-coverage finding to a finished run's access note.
+//
+// Failures are swallowed on purpose: this is an advisory note, and a sitemap
+// that 404s or times out must not mark a completed crawl as broken.
+function noteCoverage(table, runId, siteUrl, pagesCrawled, maxPages, auth, existingNote) {
+  if (!pagesCrawled) return;
+  crawlAuth.coverage(siteUrl, pagesCrawled, { maxPages, auth })
+    .then((cov) => {
+      if (!cov || !cov.note) return;
+      const note = [existingNote, cov.note].filter(Boolean).join(' ');
+      db.prepare(`UPDATE ${table} SET access_note=? WHERE id=?`).run(note.slice(0, 2000), runId);
+    })
+    .catch(() => { /* advisory only */ });
 }
 
 // Finds the JSON object in mixed stdout. Scans for the last '{' that opens a
@@ -411,7 +570,7 @@ function writeGscCsv(brand, runId) {
 
 function startLinking({
   userId, brandId = null, siteUrl, maxPages = 200, useGsc = false,
-  render = false, createTasks = true,
+  render = false, createTasks = true, auth = null, force = false,
 }) {
   const avail = toolAvailability().linking;
   const insert = db.prepare(
@@ -426,6 +585,19 @@ function startLinking({
     return runId;
   }
 
+  // Same access check as the audit, and for a sharper reason: a linking report
+  // built from one login page recommends nothing, reports every real page as an
+  // orphan, and looks like a site with no internal links at all.
+  preflight({ table: 'linking_runs', runId, url: siteUrl, brandId, auth, force })
+    .then((pf) => {
+      if (pf.blocked) return;
+      launchLinking(pf);
+    })
+    .catch((err) => fail('linking_runs', runId, `Access check failed unexpectedly: ${err.message}`));
+
+  return runId;
+
+  function launchLinking(pf) {
   // Write output inside this app so runs are self-contained and downloadable,
   // instead of scattered through the sibling tool's own reports/ folder.
   const hostSafe = siteUrl.replace(/^https?:\/\//, '').replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -434,6 +606,9 @@ function startLinking({
 
   const args = [siteUrl, '--max-pages', String(maxPages), '--out', outDir];
   if (render) args.push('--render');
+
+  db.prepare('UPDATE linking_runs SET auth_used=?, access_note=? WHERE id=?')
+    .run(crawlAuth.isEmpty(pf.auth) ? 0 : 1, pf.note || null, runId);
 
   // Passes the brand's configured language down to the Python tool so its
   // anchor-generation/keyword-extraction word lists (and the Accept-Language
@@ -460,10 +635,12 @@ function startLinking({
   }
 
   const log = makeLogger('linking_runs', runId);
+  log.write(`Crawl access: ${crawlAuth.describe(pf.auth)}` + NL + `${pf.note || ''}` + NL);
   if (csvPath) log.write(`Blending Search Console page data from ${csvPath}\n`);
 
   const child = spawnTool(avail.choice, args, avail.dir, {
     tool: 'linking',
+    env: crawlAuth.toEnv(pf.auth),
     onData: (chunk) => log.write(chunk),
     onDone: (err, { code }) => {
       running.delete(`linking:${runId}`);
@@ -505,6 +682,10 @@ function startLinking({
         finished_at=datetime('now') WHERE id=?`)
         .run(outDir, JSON.stringify(result), inv.docx, runId);
 
+      noteCoverage('linking_runs', runId, siteUrl,
+        (summary && (summary.pages_crawled || summary.pages)) || null,
+        maxPages, pf.auth, pf.note);
+
       if (createTasks) {
         try {
           const run = db.prepare('SELECT * FROM linking_runs WHERE id=?').get(runId);
@@ -521,7 +702,7 @@ function startLinking({
     db.prepare('UPDATE linking_runs SET pid=? WHERE id=?').run(child.pid, runId);
     running.set(`linking:${runId}`, child);
   }
-  return runId;
+  } // launchLinking
 }
 
 // ==========================================================================

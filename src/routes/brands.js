@@ -1,10 +1,12 @@
 // Brand management: the unit every other feature is keyed to.
 const express = require('express');
+const dataCredentials = require('../lib/dataCredentials');
 const db = require('../db');
 const google = require('../lib/google');
 const sync = require('../lib/sync');
 const alertEngine = require('../lib/alertEngine');
 const catalog = require('../lib/alertCatalog');
+const crawlAuth = require('../lib/crawlAuth');
 const propertyMatch = require('../lib/propertyMatch');
 
 const router = express.Router();
@@ -316,6 +318,42 @@ router.post('/:id/content-settings', (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// PER-CLIENT DATA VENDOR CREDENTIALS
+//
+// Agency admins only. A member who could read these could lift a client's paid
+// Semrush subscription, which is a different class of secret from the brand
+// settings beside it — so this is gated harder than the rest of the page.
+//
+// The form posts one vendor at a time. A blank field clears that field and the
+// brand falls back to the agency's .env key, which is what the form promises.
+router.post('/:id/data-sources', (req, res, next) => {
+  try {
+    const brand = db.prepare('SELECT * FROM brands WHERE id=? AND user_id=?')
+      .get(req.params.id, req.dataUserId);
+    if (!brand) return res.redirect('/brands');
+    if (!res.locals.perms || !res.locals.perms.isAdmin) {
+      return res.redirect(`/brands/${brand.id}?error=`
+        + encodeURIComponent('Only a team admin can change data vendor credentials.'));
+    }
+    const vendorKey = String(req.body.vendor || '');
+    const vendor = dataCredentials.VENDORS.find((v) => v.key === vendorKey);
+    if (!vendor) {
+      return res.redirect(`/brands/${brand.id}?error=` + encodeURIComponent('Unknown data vendor.'));
+    }
+    const values = {};
+    vendor.fields.forEach((f) => { values[f.name] = req.body[f.name]; });
+    const result = dataCredentials.save(brand.id, req.dataUserId, vendorKey, values);
+    const msg = result.cleared
+      ? `${vendor.label} credentials cleared for ${brand.name}. It will use the agency default if one is set.`
+      : `${vendor.label} credentials saved for ${brand.name}. Its runs now bill against this account.`;
+    res.redirect(`/brands/${brand.id}?msg=` + encodeURIComponent(msg));
+  } catch (err) {
+    // The most likely failure is CREDENTIAL_SECRET being unset, whose message
+    // explains itself and tells the operator how to generate one.
+    res.redirect(`/brands/${req.params.id}?error=` + encodeURIComponent(err.message));
+  }
+});
+
 router.post('/:id/sync', async (req, res, next) => {
   try {
     const userId = req.dataUserId;
@@ -342,6 +380,87 @@ router.post('/:id/delete', (req, res) => {
 });
 
 // Brand detail: data coverage, sync history, and everything attached to it.
+// ------------------------------------------------------------ crawl access
+//
+// Credentials the audit and internal-linking crawlers present to a site that
+// will not serve its pages anonymously. Stored per brand so a scheduled crawl
+// authenticates the same way a manual one does — see lib/crawlAuth.js for why
+// crawling a login wall anonymously is worse than not crawling at all.
+router.post('/:id/crawl-access', (req, res, next) => {
+  try {
+    const userId = req.dataUserId;
+    const brand = db.prepare('SELECT * FROM brands WHERE id=? AND user_id=?').get(req.params.id, userId);
+    if (!brand) return res.redirect('/brands?error=' + encodeURIComponent('Brand not found.'));
+
+    if (req.body.clear === 'on') {
+      crawlAuth.clear(brand.id);
+      return res.redirect(`/brands/${brand.id}?msg=` + encodeURIComponent(
+        'Crawl credentials removed. Crawls of this brand will run anonymously.'
+      ));
+    }
+
+    const { auth, rejected } = crawlAuth.fromForm(req.body);
+    if (rejected.length) {
+      return res.redirect(`/brands/${brand.id}?error=` + encodeURIComponent(
+        `Could not read the extra headers: ${rejected.map((r) => `"${r.line}" (${r.why})`).join('; ')}`
+      ));
+    }
+    // Blank fields mean "leave that credential alone", because the form cannot
+    // show a stored cookie or password back to the user and a plain replace
+    // silently destroyed the ones they did not retype. Removal is explicit,
+    // via the per-credential checkboxes.
+    const remove = [];
+    if (req.body.remove_cookie === 'on') remove.push('cookie');
+    if (req.body.remove_basic === 'on') remove.push('basic');
+    if (req.body.remove_headers === 'on') remove.push('headers');
+
+    const existing = crawlAuth.forBrand(brand.id);
+    const merged = crawlAuth.merge(existing, auth, remove);
+
+    if (crawlAuth.isEmpty(merged)) {
+      // Either nothing was ever stored and nothing was typed, or every stored
+      // credential was just removed. The second is a legitimate action.
+      if (existing) {
+        crawlAuth.clear(brand.id);
+        return res.redirect(`/brands/${brand.id}?msg=` + encodeURIComponent(
+          'Crawl credentials removed. Crawls of this brand will run anonymously.'
+        ));
+      }
+      return res.redirect(`/brands/${brand.id}?error=` + encodeURIComponent(
+        'Nothing to save — enter a cookie, a basic-auth username, or at least one header.'
+      ));
+    }
+    crawlAuth.save(brand.id, merged);
+    res.redirect(`/brands/${brand.id}?msg=` + encodeURIComponent(
+      `Saved: ${crawlAuth.describe(merged)}. Run "Test access" to confirm it gets past the login.`
+    ));
+  } catch (err) { next(err); }
+});
+
+// Tests the stored credentials against the live site. This is the whole point
+// of storing the verification result: a session cookie that has expired looks
+// identical to one that works until something actually requests a page with it,
+// and discovering that through a ten-minute crawl that returns one page is how
+// the team loses an afternoon.
+router.post('/:id/crawl-access/test', async (req, res, next) => {
+  try {
+    const userId = req.dataUserId;
+    const brand = db.prepare('SELECT * FROM brands WHERE id=? AND user_id=?').get(req.params.id, userId);
+    if (!brand) return res.redirect('/brands?error=' + encodeURIComponent('Brand not found.'));
+
+    const auth = crawlAuth.forBrand(brand.id);
+    const probe = await crawlAuth.probe(brand.site_url, auth);
+    if (auth) crawlAuth.recordVerification(brand.id, probe);
+
+    if (probe.ok) {
+      return res.redirect(`/brands/${brand.id}?msg=` + encodeURIComponent(probe.summary));
+    }
+    res.redirect(`/brands/${brand.id}?error=` + encodeURIComponent(
+      `${probe.summary} ${crawlAuth.remedyFor(probe.wall)}`
+    ));
+  } catch (err) { next(err); }
+});
+
 router.get('/:id', (req, res, next) => {
   try {
     const userId = req.dataUserId;
@@ -389,6 +508,11 @@ router.get('/:id', (req, res, next) => {
       active: 'brands',
       pageTitle: brand.name,
       brand,
+      crawlAccess: crawlAuth.statusForBrand(brand.id),
+      // Per-client data-vendor credentials. `status()` never returns a secret
+      // value — only whether each vendor is configured and from where.
+      dataSources: dataCredentials.status(brand.id),
+      credentialSecretSet: dataCredentials.secretConfigured(),
       coverage: sync.dataCoverage(brand.id),
       caps: catalog.brandCapabilities(brand),
       syncRuns,

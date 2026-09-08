@@ -103,6 +103,7 @@ import asyncio
 import csv
 import gzip
 import json
+import os
 import math
 import re
 import sys
@@ -1458,14 +1459,67 @@ class Renderer:
         self.cfg = cfg
         self._pw = None
         self._browser = None
+        self._ctx = None
 
     async def __aenter__(self) -> "Renderer":
         self._pw = await async_playwright().start()
         self._browser = await self._pw.chromium.launch()
+        # Credentials go on a CONTEXT, not on bare pages. The browser is a
+        # second HTTP client and knows nothing about the httpx client's
+        # headers, so without this a --render run on a gated site rendered the
+        # login page for every URL while the access check had already passed —
+        # the original bug wearing a different hat.
+        #
+        # They are attached by ROUTING rather than extra_http_headers, because
+        # a context applies those to every request it makes — fonts, analytics
+        # beacons, any third-party script the page embeds — which would post a
+        # client's session cookie to every vendor on the page.
+        self._ctx = await self._browser.new_context(
+            ignore_https_errors=not self.cfg.get("verify_tls", False),
+        )
+        auth_headers = dict(self.cfg.get("auth_headers") or {})
+        auth_site = self.cfg.get("auth_site") or ""
+        if auth_headers and auth_site:
+            site_key = auth_site_key(auth_site)
+            # A Cookie goes in the COOKIE JAR, not in an intercepted header:
+            # Chromium ignores a Cookie header set through route interception,
+            # so routing it rendered login pages while reporting success.
+            cookie_header = None
+            other_headers = {}
+            for _name, _value in auth_headers.items():
+                if _name.lower() == "cookie":
+                    cookie_header = _value
+                else:
+                    other_headers[_name] = _value
+
+            if cookie_header:
+                jar = []
+                for pair in cookie_header.split(";"):
+                    if "=" not in pair:
+                        continue
+                    cname, _, cvalue = pair.partition("=")
+                    cname, cvalue = cname.strip(), cvalue.strip()
+                    if cname:
+                        jar.append({"name": cname, "value": cvalue, "url": auth_site})
+                if jar:
+                    await self._ctx.add_cookies(jar)
+
+            if other_headers:
+                async def _scoped_route(route, request):
+                    if auth_site_key(request.url) == site_key:
+                        merged = dict(request.headers)
+                        merged.update(other_headers)
+                        await route.continue_(headers=merged)
+                    else:
+                        await route.continue_()
+
+                await self._ctx.route("**/*", _scoped_route)
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
         try:
+            if getattr(self, "_ctx", None) is not None:
+                await self._ctx.close()
             if self._browser is not None:
                 await self._browser.close()
         finally:
@@ -1473,7 +1527,7 @@ class Renderer:
                 await self._pw.stop()
 
     async def render(self, url: str) -> str | None:
-        page = await self._browser.new_page()
+        page = await self._ctx.new_page()
         try:
             await page.goto(url, wait_until="domcontentloaded",
                             timeout=self.cfg["render_timeout"] * 1000)
@@ -3726,16 +3780,116 @@ def prompt_for_int(label: str, default: int, low: int, high: int) -> int:
         return default
 
 
+def auth_site_key(url):
+    """The credential scope key: host (www folded) plus port.
+
+    Stricter than this file's own host grouping, which drops the port: two
+    services on one host are two different systems, and a credential scope
+    must be at least as strict as a browser's.
+    """
+    try:
+        parts = urlparse(str(url) if "://" in str(url) else "https://" + str(url))
+    except Exception:
+        return ""
+    host = (parts.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    return "%s:%s" % (host, port)
+
+
+def scoped_auth_hook(auth_headers, site):
+    """An httpx request hook that keeps credentials on their own site.
+
+    WHY A HOOK AND NOT client(headers=...)
+    Client-level headers go out with every request the client makes, and
+    follow_redirects means one of those can be a hop to another domain. A
+    client's live session cookie following a redirect off-site is a credential
+    handed to a stranger. The audit crawler had exactly this bug and a fixture
+    caught it arriving at a partner domain.
+
+    The hook runs per request INCLUDING each redirect hop, so it can strip as
+    well as add — which is the half that matters.
+    """
+    site_key = auth_site_key(site)
+    names = list(auth_headers or {})
+
+    async def _hook(request):
+        if not names:
+            return
+        if auth_site_key(str(request.url)) == site_key:
+            for name, value in auth_headers.items():
+                request.headers[name] = value
+        else:
+            for name in names:
+                request.headers.pop(name, None)
+
+    return _hook
+
+
+CR = chr(13)
+LF = chr(10)
+
+
+def parse_auth_headers(cookie, header_args):
+    """Turns --cookie/--header into one header dict.
+
+    Header names the client sets itself are refused rather than silently
+    dropped: a caller who thinks they have overridden Host and has not would
+    otherwise debug the wrong thing.
+    """
+    blocked = {"host", "content-length", "connection", "transfer-encoding",
+               "keep-alive", "upgrade", "te", "trailer", "proxy-authorization"}
+    # The environment is the transport the app itself uses: on shared hosting
+    # /proc/<pid>/cmdline is world-readable and environ is not, so a session
+    # cookie does not belong in argv. Flags still win, because an explicit
+    # argument should always beat an inherited one.
+    headers = {}
+    try:
+        for k, v in (json.loads(os.environ.get("CRAWL_AUTH_HEADERS") or "{}")).items():
+            if k and isinstance(v, str) and CR not in v and LF not in v:
+                headers[k] = v
+    except Exception:
+        pass  # a malformed value must never stop a crawl
+    for raw in (header_args or []):
+        if ":" not in raw:
+            sys.stderr.write("  ignoring --header %r: no 'Name: value' separator\n" % raw)
+            continue
+        name, _, value = raw.partition(":")
+        name, value = name.strip(), value.strip()
+        if not name or name.lower() in blocked:
+            sys.stderr.write("  ignoring --header %r: set by the client itself\n" % name)
+            continue
+        if "\r" in value or "\n" in value:
+            sys.stderr.write("  ignoring --header %r: value contains a line break\n" % name)
+            continue
+        headers[name] = value
+    if cookie:
+        headers["Cookie"] = cookie.strip().replace("\r", " ").replace("\n", " ")
+    return headers
+
+
 async def run(root_input: str, cfg: dict, outdir: Path) -> dict:
     t0 = time.time()
     TOTAL = 8
 
     crawler = Crawler(root_input, cfg)
     headers = dict(BROWSER_HEADERS, **{"User-Agent": cfg.get("user_agent", USER_AGENT)})
+    # Crawl credentials, applied to the CLIENT so every request in the run
+    # carries them: robots.txt, the sitemaps, the origin probe and every page.
+    # A site that will not serve its pages anonymously otherwise yields a
+    # one-page crawl and an internal-link report about a login form.
     limits = httpx.Limits(max_connections=cfg["concurrency"] + 4,
                           max_keepalive_connections=cfg["concurrency"])
+    # Credentials are attached by a per-request hook rather than being set on
+    # the client, so they reach every request for THIS site and nothing else —
+    # including no redirect hop that leaves it. See scoped_auth_hook().
+    _auth_headers = dict(cfg.get("auth_headers") or {})
+    _hooks = ({"request": [scoped_auth_hook(_auth_headers, crawler.root)]}
+              if _auth_headers else {})
     async with httpx.AsyncClient(headers=headers, follow_redirects=True,
                                  timeout=cfg["request_timeout"], limits=limits,
+                                 event_hooks=_hooks,
                                  verify=cfg.get("verify_tls", False)) as client:
         step(1, TOTAL, f"Discovering site structure for {crawler.root}")
         await crawler.establish_origin(client)
@@ -4272,6 +4426,12 @@ def main() -> None:
                          "Takes precedence over --include.")
     ap.add_argument("--user-agent", default=USER_AGENT,
                     help="Override the request User-Agent.")
+    ap.add_argument("--cookie", default=None, metavar="STR",
+                    help="Cookie header sent on every request, e.g. "
+                         "\"sessionid=abc; csrftoken=def\". Needed for a site "
+                         "that will not serve its pages anonymously.")
+    ap.add_argument("--header", action="append", default=None, metavar="H",
+                    help="Extra request header as \"Name: value\". Repeatable.")
     ap.add_argument("--verify-tls", action="store_true",
                     help="Enforce TLS certificate validation (off by default so "
                          "sites with misconfigured certificates can still be audited).")
@@ -4357,6 +4517,10 @@ def main() -> None:
         include=args.include or [],
         exclude=args.exclude or [],
         user_agent=args.user_agent,
+        auth_headers=parse_auth_headers(args.cookie, args.header),
+        # The site the credentials belong to, so both the httpx hook and the
+        # browser routing can scope them to it.
+        auth_site=target_url,
         verify_tls=args.verify_tls,
         respect_robots=not args.ignore_robots,
         render=args.render,

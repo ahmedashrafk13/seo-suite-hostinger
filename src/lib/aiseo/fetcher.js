@@ -22,12 +22,63 @@
 const cheerio = require('cheerio');
 const tls = require('tls');
 const { URL } = require('url');
+const { AsyncLocalStorage } = require('async_hooks');
 const {
-  fetchUrl, requestOnce, decodeBody, mapLimit, sleep, UA,
+  fetchUrl, requestOnce, decodeBody, mapLimit, sleep, UA, authSiteKey,
 } = require('../../../tools/node/lib/http');
 const {
   normalizeUrl, hostKey, sameSite, canonUrl, joinUrl, isCrawlableHtml, truncate,
 } = require('../../../tools/node/lib/urls');
+
+
+// ==========================================================================
+// Crawl credentials for the AI SEO analyses
+// ==========================================================================
+//
+// The nine analyses fetch through this module from 87 call sites across
+// seventeen files, so threading a credential argument through each one would
+// be both enormous and fragile — one missed call site produces a report that
+// mixes real pages with login pages, which is the failure this is meant to
+// remove.
+//
+// So the credentials live in async context for the duration of a run.
+// AsyncLocalStorage rather than a module-level variable because two analyses
+// run concurrently (runner.js MAX_CONCURRENT): a module global would let one
+// brand's session cookie be sent to another brand's site.
+//
+// TWO RULES MAKE THIS SAFE, and both matter more than the feature:
+//
+//   1. SCOPED TO THE BRAND'S OWN SITE. These analyses deliberately fetch
+//      third parties — competitor domains, Reddit, Hacker News, Google and
+//      Bing News, review platforms. Sending a client's session cookie to a
+//      competitor's server would be handing over a live credential, so the
+//      scope is checked against every hop of every request.
+//   2. THE AI-CRAWLER CHECKS OPT OUT (`noAuth`). Their whole question is
+//      "can an unauthenticated agent read this page?" — answering it with a
+//      logged-in session would report that GPTBot can read a page only a
+//      member can see. A green light that means the opposite of what it says
+//      is the worst possible output for that check.
+const authContext = new AsyncLocalStorage();
+
+// Runs `fn` with credentials available to every fetch inside it, including
+// everything it awaits. `site` is the brand's own URL — the only host the
+// credentials will ever be sent to.
+function runWithAuth({ headers, site }, fn) {
+  const usable = headers && Object.keys(headers).length && site;
+  if (!usable) return fn();
+  return authContext.run({ headers, site, siteKey: authSiteKey(site) }, fn);
+}
+
+function currentAuth() {
+  return authContext.getStore() || null;
+}
+
+// What the run is sending, for a provenance line. Names only, never values.
+function authDescription() {
+  const a = currentAuth();
+  if (!a) return null;
+  return { site: a.site, headers: Object.keys(a.headers) };
+}
 
 // The user agents AI engines and search engines actually crawl with, as
 // published by each operator. Used two ways: matched against robots.txt, and
@@ -79,6 +130,9 @@ const RETRIEVAL_AGENTS = AI_AGENTS.filter((a) => a.purpose === 'retrieval');
 async function fetchPage(url, {
   ua = UA, timeout = 20000, method = 'GET', headers: extraHeaders = null, body = null,
   maxBytes = null,
+  // Opt out of the run's credentials. Used by the AI-crawler access checks,
+  // whose question is precisely what an UNauthenticated agent can read.
+  noAuth = false,
 } = {}) {
   const started = Date.now();
   const out = {
@@ -101,9 +155,13 @@ async function fetchPage(url, {
     // wrapper is what exposes the chain. TTFB is taken from a separate
     // headers-only probe below where a check needs it, because attributing
     // total elapsed time to TTFB would be wrong.
+    const auth = noAuth ? null : currentAuth();
     const res = await fetchUrl(url, {
       timeout,
       headers: { 'User-Agent': ua, ...(extraHeaders || {}) },
+      // Evaluated per redirect hop against the brand's own site, so a redirect
+      // that leaves it drops the credentials rather than carrying them.
+      ...(auth ? { scopedAuth: { headers: auth.headers, site: auth.site } } : {}),
       method,
       ...(body != null ? { body } : {}),
       ...(maxBytes ? { maxBytes } : {}),
@@ -541,10 +599,10 @@ function robotsAllows(robots, agentToken, path) {
   return { allowed: best.allowed, rule: best.rule, matchedAgent, group };
 }
 
-async function fetchRobots(siteUrl) {
+async function fetchRobots(siteUrl, { headers = null } = {}) {
   let origin;
   try { origin = new URL(normalizeUrl(siteUrl)).origin; } catch { return { ok: false, error: 'unparseable site URL' }; }
-  const res = await fetchPage(`${origin}/robots.txt`, { timeout: 12000 });
+  const res = await fetchPage(`${origin}/robots.txt`, { timeout: 12000, headers });
   if (res.error) return { ok: false, error: res.error, url: `${origin}/robots.txt` };
   if (res.status === 404) return { ok: true, present: false, status: 404, url: `${origin}/robots.txt`, parsed: parseRobots('') };
   return {
@@ -579,7 +637,10 @@ async function fetchLlmsTxt(siteUrl) {
 // Sitemap URLs, following index files one level deep. Capped, because a large
 // news site's sitemap index expands to millions of URLs and nothing here needs
 // more than a representative sample.
-async function fetchSitemapUrls(siteUrl, { limit = 2000, robots = null } = {}) {
+// `headers` is passed through so a site whose sitemap sits behind the same
+// login as its pages can still be read with crawl credentials (see
+// lib/crawlAuth.js). Anonymous callers pass nothing and behave as before.
+async function fetchSitemapUrls(siteUrl, { limit = 2000, robots = null, headers = null } = {}) {
   let origin;
   try { origin = new URL(normalizeUrl(siteUrl)).origin; } catch { return { urls: [], sources: [] }; }
 
@@ -594,7 +655,7 @@ async function fetchSitemapUrls(siteUrl, { limit = 2000, robots = null } = {}) {
   const readOne = async (sitemapUrl, depth) => {
     if (urls.length >= limit || seen.has(sitemapUrl) || depth > 1) return;
     seen.add(sitemapUrl);
-    const res = await fetchPage(sitemapUrl, { timeout: 20000 });
+    const res = await fetchPage(sitemapUrl, { timeout: 20000, headers });
     if (!res.ok || !res.body) {
       sources.push({ url: sitemapUrl, ok: false, status: res.status, error: res.error });
       return;
@@ -699,6 +760,7 @@ async function crawlSite(startUrl, {
 
 module.exports = {
   AI_AGENTS, RETRIEVAL_AGENTS, UA,
+  runWithAuth, currentAuth, authDescription,
   fetchPage, measureTtfb, inspectCertificate,
   load, visibleText, parseDocument, extractBreadcrumbs,
   parseRobots, robotsAllows, fetchRobots, fetchLlmsTxt, fetchSitemapUrls,

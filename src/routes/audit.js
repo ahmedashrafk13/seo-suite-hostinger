@@ -5,6 +5,7 @@ const db = require('../db');
 const toolRunner = require('../lib/toolRunner');
 const pythonEnv = require('../lib/pythonEnv');
 const csvStore = require('../lib/csvStore');
+const crawlAuth = require('../lib/crawlAuth');
 const tasksLib = require('../lib/tasks');
 const { buildWorkbook, sendWorkbook } = require('../lib/xlsxExport');
 
@@ -42,6 +43,11 @@ router.get('/', (req, res, next) => {
       runs,
       brands: brandsFor(userId),
       tool: toolRunner.toolAvailability().audit,
+      // So the form can say which brands already have crawl credentials rather
+      // than asking for them again on every run.
+      authByBrand: Object.fromEntries(brandsFor(userId)
+        .map((b) => [b.id, crawlAuth.statusForBrand(b.id)])
+        .filter(([, v]) => v)),
       python: toolRunner.toolAvailability().python,
       pythonStatus: pythonEnv.status().find((x) => x.tool === 'audit'),
       flash: req.query.msg || null,
@@ -83,6 +89,17 @@ router.post('/start', (req, res, next) => {
     if (!domain) return res.redirect('/audit?error=' + encodeURIComponent('Enter a website URL or pick a brand.'));
     if (!/^https?:\/\//i.test(domain)) domain = `https://${domain}`;
 
+    // Credentials typed into the form win over the brand's stored ones, so a
+    // one-off crawl of a staging build does not require editing the brand.
+    // Passing null lets toolRunner fall back to the stored set.
+    const { auth, rejected } = crawlAuth.fromForm(req.body);
+    if (rejected.length) {
+      return res.redirect('/audit?error=' + encodeURIComponent(
+        `Could not read the extra headers: ${rejected.map((r) => `"${r.line}" (${r.why})`).join('; ')}`
+      ));
+    }
+    if (auth && brandId && req.body.save_auth === 'on') crawlAuth.save(brandId, auth);
+
     const runId = toolRunner.startAudit({
       userId,
       brandId,
@@ -90,6 +107,8 @@ router.post('/start', (req, res, next) => {
       maxPages: Math.min(2000, Math.max(5, parseInt(req.body.max_pages, 10) || 100)),
       render: req.body.render || 'auto',
       createTasks: req.body.create_tasks !== 'off',
+      auth,
+      force: req.body.force_scan === 'on',
     });
 
     res.redirect(`/audit/${runId}`);

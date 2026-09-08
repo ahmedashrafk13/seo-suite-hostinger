@@ -487,6 +487,31 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value TEXT,
   PRIMARY KEY (user_id, key)
 );
+
+-- ------------------------------------------------------- crawl credentials
+-- Credentials the two crawlers present when a site will not serve its pages
+-- anonymously: a members-only site, a client portal, or a staging build behind
+-- HTTP basic auth. Without these the crawl reaches the login page and nothing
+-- else, which is the failure this table exists to remove.
+--
+-- Stored per brand, in the clear, in the same database that already holds
+-- Google OAuth refresh tokens — so the existing rule stands: data/app.db is
+-- gitignored and must never be copied off the host.
+--
+-- verify_* records the result of the last credential test, so an expired
+-- cookie is visible on the brand page rather than being discovered by a crawl
+-- that returns one page.
+CREATE TABLE IF NOT EXISTS crawl_auth (
+  brand_id INTEGER PRIMARY KEY REFERENCES brands(id) ON DELETE CASCADE,
+  cookie TEXT,
+  headers_json TEXT,
+  basic_user TEXT,
+  basic_pass TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  verified_at TEXT,
+  verify_status TEXT,
+  verify_note TEXT
+);
 `);
 
 // --- additive migrations for databases created by earlier versions --------
@@ -505,6 +530,14 @@ try {
   addColumn('linking_runs', 'log_tail', 'log_tail TEXT');
   addColumn('linking_runs', 'tasks_created', 'tasks_created INTEGER NOT NULL DEFAULT 0');
   addColumn('linking_runs', 'max_pages', 'max_pages INTEGER');
+  // Whether a run presented crawl credentials, and what the pre-flight access
+  // check found. Recorded per run rather than read from the brand at display
+  // time, because credentials change and a six-week-old report must still say
+  // how THAT crawl reached the site. See lib/crawlAuth.js.
+  addColumn('audit_runs', 'auth_used', 'auth_used INTEGER NOT NULL DEFAULT 0');
+  addColumn('audit_runs', 'access_note', 'access_note TEXT');
+  addColumn('linking_runs', 'auth_used', 'auth_used INTEGER NOT NULL DEFAULT 0');
+  addColumn('linking_runs', 'access_note', 'access_note TEXT');
   // One-time-per-brand inputs the Content Brief Agent cannot derive from any
   // synced data — what the brand actually sells, and how it wants to ask for
   // the sale. Set once in the brand's settings, reused by every brief after.
@@ -518,11 +551,35 @@ try {
   addColumn('brands', 'vertical', 'vertical TEXT');
   addColumn('brands', 'locale', 'locale TEXT');
   addColumn('brands', 'market', 'market TEXT');
+  // Google Ads / Keyword Planner, chosen per team on /connect rather than set
+  // globally in .env, because one deployment serves several teams and each has
+  // its own Ads account. ads_login_customer_id is the manager (MCC) account to
+  // authorise through, and stays NULL for an account owned directly.
+  addColumn('google_connections', 'ads_customer_id', 'ads_customer_id TEXT');
+  addColumn('google_connections', 'ads_login_customer_id', 'ads_login_customer_id TEXT');
+  addColumn('google_connections', 'ads_customer_name', 'ads_customer_name TEXT');
 } catch (e) {
   console.error('[db] migration warning:', e.message);
 }
 
 db.exec(`
+-- Per-client credentials for paid SEO data vendors, so a client's own
+-- subscription pays for that client's data and the agency's .env keys act only
+-- as a fallback. The payload column is AES-256-GCM ciphertext (see
+-- lib/dataCredentials.js) and is never readable without CREDENTIAL_SECRET:
+-- these are other people's paid credentials, and a copied database file must
+-- not be enough to use them.
+CREATE TABLE IF NOT EXISTS brand_data_credentials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  vendor TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT,
+  UNIQUE(brand_id, vendor)
+);
+
 CREATE TABLE IF NOT EXISTS content_briefs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -1,0 +1,89 @@
+<%#
+  Crawl credentials, shared by the audit and internal-linking start forms.
+
+  Collapsed by default: the overwhelming majority of crawls are of public sites
+  and need none of this. It opens by itself when the selected brand already has
+  credentials stored, so nobody re-types a cookie that is already saved.
+
+  Expects:
+    authByBrand  { [brandId]: { describe, verifyStatus, verifiedAt, ... } }
+-%>
+<details class="disclosure" id="crawl-access">
+  <summary>Crawl access — for a site that needs a login</summary>
+
+  <p class="hint" style="margin-top:0">
+    Both crawlers request pages as an anonymous visitor. If the site will not serve
+    its pages that way — a members-only site, a client portal, a staging build behind
+    HTTP basic auth — the crawl is stopped before it starts and told you why, rather
+    than crawling the login page and scoring that as the site. Fill in whichever of
+    these the site needs.
+  </p>
+
+  <% var authed = Object.keys(authByBrand || {}); %>
+  <% if (authed.length) { %>
+    <div class="notice">
+      <span class="notice-icon">&#128273;</span>
+      <div class="notice-body">
+        <strong>Saved credentials will be used automatically</strong> for
+        <%= authed.length %> brand<%= authed.length === 1 ? '' : 's' %>. Leave these
+        fields empty to use what is stored; anything typed here overrides it for this
+        run only. Manage and test stored credentials on the brand's page.
+      </div>
+    </div>
+  <% } %>
+
+  <div class="form-row">
+    <div class="field">
+      <label for="auth_basic_user">HTTP basic auth — username</label>
+      <input type="text" id="auth_basic_user" name="auth_basic_user" autocomplete="off"
+             placeholder="staging">
+      <p class="hint">The browser popup kind. Common on staging sites.</p>
+    </div>
+    <div class="field">
+      <label for="auth_basic_pass">HTTP basic auth — password</label>
+      <input type="password" id="auth_basic_pass" name="auth_basic_pass" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="auth_cookie">Session cookie</label>
+    <input type="text" id="auth_cookie" name="auth_cookie" autocomplete="off"
+           placeholder="sessionid=abc123; csrftoken=def456">
+    <p class="hint">
+      For a site with a login form. Log in as normal in your browser, open DevTools →
+      Application → Cookies, and copy the cookie for the site's domain. Session cookies
+      expire — if a crawl that used to work stops, this is why.
+    </p>
+  </div>
+
+  <div class="field">
+    <label for="auth_headers">Extra request headers</label>
+    <textarea id="auth_headers" name="auth_headers" rows="3"
+              placeholder="Authorization: Bearer eyJ...&#10;X-Bypass-Token: ..."></textarea>
+    <p class="hint">
+      One <code>Name: value</code> per line. Use this for a bearer token, or for whatever
+      header a CDN's bot rules expect in order to let the crawler through a 403.
+    </p>
+  </div>
+
+  <div class="checkbox-row">
+    <label class="check" for="save_auth">
+      <input type="checkbox" id="save_auth" name="save_auth">
+      <span>Save these against the selected brand, so scheduled crawls use them too</span>
+    </label>
+    <label class="check" for="force_scan">
+      <input type="checkbox" id="force_scan" name="force_scan">
+      <span>Scan anyway if the access check fails — for a site whose homepage is gated but
+        which has public pages below it</span>
+    </label>
+  </div>
+
+  <div class="lock-note">
+    <span>&#9888;</span>
+    <div>
+      Credentials are stored in this app's database in the clear, alongside the Google
+      refresh tokens already there. Use a low-privilege account where the site offers one,
+      and never a client's admin login.
+    </div>
+  </div>
+</details>

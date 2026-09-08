@@ -80,6 +80,7 @@ import sys
 import io
 import re
 import json
+import os
 import time
 import gzip
 import datetime
@@ -692,7 +693,112 @@ def _render_fetch(ctx, url, wait_ms, start_url):
     return page
 
 
-def render_crawl(start_url, max_pages, delay, wait_ms, log=True):
+def auth_site_key(url):
+    """The credential scope key: host (www folded) plus port.
+
+    Deliberately stricter than the crawler's own host grouping, which drops the
+    port. Two services on one host are two different systems, and a credential
+    scope must be at least as strict as a browser's.
+    """
+    try:
+        parts = urllib.parse.urlparse(
+            url if "://" in str(url) else "https://" + str(url))
+    except Exception:
+        return ""
+    host = (parts.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    return "%s:%s" % (host, port)
+
+
+class ScopedAuthSession(requests.Session):
+    """A session that attaches crawl credentials ONLY to the audited site.
+
+    WHY THIS IS A CLASS AND NOT session.headers.update()
+    The audit checks every external link a page points at, and follows
+    redirects. With credentials on session.headers they went out with all of
+    it, so a client's live session cookie was sent to every third-party domain
+    the site links to. A fixture recorded exactly that: `cookie=sess=SECRET`
+    arriving at a partner domain. Handing a client's session to strangers is a
+    worse outcome than any crawl gap.
+
+    So credentials are attached per request, and stripped again the moment a
+    redirect leaves the site (rebuild_auth is requests' documented hook for
+    that; it already strips Authorization across hosts and knows nothing about
+    a custom Cookie header).
+    """
+
+    def __init__(self, auth_headers=None, site=""):
+        super().__init__()
+        self._auth_headers = dict(auth_headers or {})
+        self._auth_site = auth_site_key(site) if site else ""
+
+    def _scoped(self, url):
+        if not self._auth_headers or not self._auth_site:
+            return {}
+        return self._auth_headers if auth_site_key(url) == self._auth_site else {}
+
+    def request(self, method, url, **kwargs):
+        scoped = self._scoped(url)
+        if scoped:
+            headers = dict(scoped)
+            headers.update(kwargs.pop("headers", None) or {})
+            kwargs["headers"] = headers
+        return super().request(method, url, **kwargs)
+
+    def rebuild_auth(self, prepared_request, response):
+        super().rebuild_auth(prepared_request, response)
+        if not self._auth_headers:
+            return
+        if auth_site_key(prepared_request.url) != self._auth_site:
+            for name in self._auth_headers:
+                prepared_request.headers.pop(name, None)
+
+
+CR = chr(13)
+LF = chr(10)
+
+
+def parse_auth_headers(cookie, header_args):
+    """Turns --cookie/--header into one header dict.
+
+    Header names the crawler sets itself are refused rather than silently
+    dropped: a caller who thinks they have overridden Host and has not would
+    otherwise debug the wrong thing.
+    """
+    blocked = {"host", "content-length", "connection", "transfer-encoding",
+               "keep-alive", "upgrade", "te", "trailer", "proxy-authorization"}
+    # The environment is the transport the app itself uses: on shared hosting
+    # /proc/<pid>/cmdline is world-readable and environ is not, so a session
+    # cookie does not belong in argv. Flags still win, because an explicit
+    # argument should always beat an inherited one.
+    headers = {}
+    try:
+        for k, v in (json.loads(os.environ.get("CRAWL_AUTH_HEADERS") or "{}")).items():
+            if k and isinstance(v, str) and CR not in v and LF not in v:
+                headers[k] = v
+    except Exception:
+        pass  # a malformed value must never stop a crawl
+    for raw in (header_args or []):
+        if ":" not in raw:
+            sys.stderr.write("  ignoring --header %r: no 'Name: value' separator\n" % raw)
+            continue
+        name, _, value = raw.partition(":")
+        name, value = name.strip(), value.strip()
+        if not name or name.lower() in blocked:
+            sys.stderr.write("  ignoring --header %r: set by the crawler itself\n" % name)
+            continue
+        if "\r" in value or "\n" in value:
+            sys.stderr.write("  ignoring --header %r: value contains a line break\n" % name)
+            continue
+        headers[name] = value
+    if cookie:
+        headers["Cookie"] = cookie.strip().replace("\r", " ").replace("\n", " ")
+    return headers
+
+
+def render_crawl(start_url, max_pages, delay, wait_ms, log=True, auth_headers=None):
     from playwright.sync_api import sync_playwright
     seed = canon_url(start_url)
     seen = {seed}
@@ -701,8 +807,55 @@ def render_crawl(start_url, max_pages, delay, wait_ms, log=True):
     frontier = deque([start_url])
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
+        # Without credentials the rendered crawl authenticates nothing while
+        # the plain crawl does, so --render on a gated site would quietly
+        # return login pages after the pre-flight check had passed.
+        #
+        # They are NOT set as extra_http_headers, because a browser context
+        # applies those to every request it makes — including fonts, analytics
+        # beacons and any third-party script the page loads. That would post a
+        # client's session cookie to every vendor the site embeds. Routing
+        # instead attaches them per request, to this site only.
         ctx = browser.new_context(user_agent=UA, ignore_https_errors=True,
                                   viewport={"width": 1366, "height": 900})
+        if auth_headers:
+            site_key = auth_site_key(start_url)
+            # A Cookie goes in the COOKIE JAR, not in an intercepted header.
+            # Chromium manages cookies itself and IGNORES a Cookie header set
+            # through route interception, so the first version of this scoping
+            # fix quietly rendered login pages while reporting that
+            # credentials had been sent. The jar is also origin-scoped by the
+            # browser, which is the behaviour wanted here anyway.
+            cookie_header = None
+            other_headers = {}
+            for _name, _value in auth_headers.items():
+                if _name.lower() == "cookie":
+                    cookie_header = _value
+                else:
+                    other_headers[_name] = _value
+
+            if cookie_header:
+                jar = []
+                for pair in cookie_header.split(";"):
+                    if "=" not in pair:
+                        continue
+                    cname, _, cvalue = pair.partition("=")
+                    cname, cvalue = cname.strip(), cvalue.strip()
+                    if cname:
+                        jar.append({"name": cname, "value": cvalue, "url": start_url})
+                if jar:
+                    ctx.add_cookies(jar)
+
+            if other_headers:
+                def _scoped_route(route, request):
+                    if auth_site_key(request.url) == site_key:
+                        merged = dict(request.headers)
+                        merged.update(other_headers)
+                        route.continue_(headers=merged)
+                    else:
+                        route.continue_()
+
+                ctx.route("**/*", _scoped_route)
         while frontier and len(pages) < max_pages:
             url = frontier.popleft()
             page = _render_fetch(ctx, url, wait_ms, start_url)
@@ -2579,6 +2732,10 @@ def build_json(start_url, pages, findings, score, stats):
         "external_checked": stats["external_checked"],
         "rendered": stats.get("rendered", False),
         "content_warning": stats.get("content_warning"),
+        # Named, never valued: a report is shared more widely than the settings
+        # page, and a session cookie printed into a deliverable is a leaked
+        # session. Matches the Node port's field exactly.
+        "crawl_auth": sorted(stats.get("crawl_auth") or []),
         "counts": {t: len(groups[t]) for t in ("error", "warning", "notice", "info", "passed")},
         "findings": [{k: v for k, v in f.items()} for f in findings],
     }, indent=2, ensure_ascii=False)
@@ -2619,6 +2776,16 @@ def main():
     ap.add_argument("--html", metavar="FILE",
                     help="(Optional) also write an HTML report to FILE")
     ap.add_argument("--json", action="store_true", help="Emit JSON to stdout")
+    # Crawl credentials. A site that will not serve its pages anonymously — a
+    # members-only site, a client portal, a staging build behind basic auth —
+    # otherwise yields a crawl of its login page and a health score computed
+    # over it. See src/lib/crawlAuth.js for the pre-flight check that decides
+    # whether these are needed and whether they still work.
+    ap.add_argument("--cookie", default=None, metavar="STR",
+                    help="Cookie header sent on every request, e.g. "
+                         "\"sessionid=abc; csrftoken=def\"")
+    ap.add_argument("--header", action="append", default=None, metavar="H",
+                    help="Extra request header as \"Name: value\". Repeatable.")
     args = ap.parse_args()
 
     if args.url:
@@ -2633,7 +2800,12 @@ def main():
     start_url = normalize_url(url_input)
     quiet = args.json
 
-    session = requests.Session()
+    # Credentials reach every request the audit makes for THIS site — pages,
+    # robots.txt, sitemaps, link checks, asset checks, host variants — because
+    # applying them to page fetches alone would produce a report mixing real
+    # pages with login pages. They reach nothing else: see ScopedAuthSession.
+    auth_headers = parse_auth_headers(args.cookie, args.header)
+    session = ScopedAuthSession(auth_headers, start_url)
     session.headers.update(BROWSER_HEADERS)
 
     have_pw = playwright_available()
@@ -2658,7 +2830,8 @@ def main():
             sys.stderr.write(f"  Rendering {start_url} with headless browser "
                              f"(max {args.max_pages} pages)...\n")
         pages, link_sources, raw_link_sources, crawl_complete = render_crawl(
-            start_url, args.max_pages, args.delay, args.render_wait, log=not quiet)
+            start_url, args.max_pages, args.delay, args.render_wait, log=not quiet,
+            auth_headers=auth_headers)
     else:
         if not quiet:
             sys.stderr.write(f"  Crawling {start_url} (max {args.max_pages} pages)...\n")
@@ -2727,6 +2900,7 @@ def main():
         "pages": len(pages),
         "pages_ok": sum(1 for p in pages.values() if p.ok),
         "crawl_complete": crawl_complete,
+        "crawl_auth": list(auth_headers.keys()),
         "generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
 
