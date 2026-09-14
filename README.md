@@ -115,7 +115,7 @@ the crawl proceeds untouched:
 | Anything else public | crawl ran | **identical** |
 
 The only cost to a public site is one extra HTTP request before a crawl that is
-about to make hundreds. `verify_crawl_access.js` tests this directly against the
+about to make hundreds. `scripts/verify_crawl_access.js` tests this directly against the
 shapes a naive login detector gets wrong: a restaurant site with signup, order
 tracking and a gated account area; a sparse homepage with a client login box; a
 page whose copy contains "restricted access"; a one-line holding page; an
@@ -201,8 +201,8 @@ of anyone who edited only their basic-auth username, and nothing on screen
 connected that to the refused crawl that followed.
 
 ```bash
-DB_PATH=tmp/verify-crawl-access.db node verify_crawl_access.js           # 162 checks
-DB_PATH=tmp/verify-crawl-access.db node verify_crawl_access.js --live    # 175, adds live sites
+DB_PATH=tmp/verify-crawl-access.db node scripts/verify_crawl_access.js           # 162 checks
+DB_PATH=tmp/verify-crawl-access.db node scripts/verify_crawl_access.js --live    # 175, adds live sites
 ```
 
 It starts a local server per scenario and runs both crawlers, in both
@@ -274,6 +274,35 @@ asserted rather than assumed.
   second process opening `data/app.db` while the app is running has corrupted
   it before. Long runs are detached through `src/lib/aiseo/runner.js` and
   polled, rather than held open in a request.
+
+## Running the checks
+
+The verification harnesses live in `scripts/`. Each one asserts against the
+real app and a real database and exits non-zero when a check fails, so they
+compose into one command:
+
+```bash
+npm test        # 18 harnesses, no network, ~2 minutes
+npm run test:net   # adds the live-crawl harness (slow: it fetches real sites)
+npm run test:all   # both
+```
+
+Run them with the server **stopped**. The WebAssembly SQLite driver is
+single-writer, and a second process opening `data/app.db` while the app is
+running has corrupted it before.
+
+`npm test` is the gate: it covers security scoping, every link and form on
+every page, all 52 rendered pages, the task/action flows, leads, clustering,
+briefs, the AI SEO analyses and the render budget. Two harnesses are
+deliberately left out of every suite, with the reason recorded at the top of
+`scripts/run-tests.js`:
+
+- `verify_team.js` still asserts that open signup creates a team, but signup
+  became invite-only. It needs to sign up through an invite to be trustworthy
+  again.
+- `verify_renderer.js` has two checks that assert against the live content of
+  a third-party page, so they fail when that page changes rather than when the
+  renderer breaks.
 
 ## Setup
 
@@ -463,11 +492,11 @@ no findings, which looks exactly like a healthy site.
 
 ```bash
 npm start                      # stop this before running the checks below
-node verify_aiseo.js           # 82 checks: text measurement, HTML parsing,
+node scripts/verify_aiseo.js           # 82 checks: text measurement, HTML parsing,
                                # robots matching, schema validation, scoring,
                                # the Reddit tier chain, provider honesty,
                                # the store, live network
-node verify_aiseo.js --full    # adds live crawling analyses (slower)
+node scripts/verify_aiseo.js --full    # adds live crawling analyses (slower)
 ```
 
 Run it with the server **stopped**: the WebAssembly SQLite driver is
@@ -577,7 +606,7 @@ company name, logo URL, accent colour, contact line and footer. The accent is
 the only themeable colour; the severity palette is not, because a warning that
 no longer reads as one is worse than an off-brand red.
 
-It carries **no lead's name, email or phone number**. `verify_leads.js` asserts
+It carries **no lead's name, email or phone number**. `scripts/verify_leads.js` asserts
 that against the rendered page rather than trusting the template — a shared URL
 is a URL that gets forwarded.
 
