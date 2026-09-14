@@ -2,7 +2,7 @@
 //
 // WHAT THIS REPLACES
 // head.ejs used to load ApexCharts (522 KB), jsVectorMap (33 KB), its world
-// map (102 KB) and the country-code table on EVERY page — around 660 KB of
+// map (102 KB) and the country-code table on EVERY page - around 660 KB of
 // JavaScript on all ~60 views, when only two of them draw a chart at all and
 // only one draws a map. The login page paid for it. So did every settings,
 // task, brand and audit page. That is the single largest thing standing
@@ -44,7 +44,7 @@
           sri: 'sha384-dUo4VnkPwa5iJ/udOYY1SRDya6+2CVXYRfing32kyXbeB6HePV/YmJ3EPPvYz/Sb'
         },
         // The world map registers itself against jsVectorMap, so it must load
-        // after it — hence a sequential chain rather than a parallel batch.
+        // after it - hence a sequential chain rather than a parallel batch.
         {
           url: 'https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js',
           sri: 'sha384-QCoiowLYPphJpiHouJIJOUCcg6AxqnLAAyEjkZnJ7RQCpC3YY1kEX0PaOant/8kx'
@@ -168,6 +168,104 @@
       + 'The figures are in the table below.';
     el.appendChild(box);
   }
+
+
+  /* ------------------------------------------------------------------ theme
+     Charts are drawn by a library that knows nothing about our CSS variables,
+     so every chart partial used to hard-code hex values from the old palette.
+     That breaks the moment there is a dark mode: light tooltips on a dark
+     card, axis labels at 2:1 contrast, and series colours from a palette the
+     rest of the app no longer uses.
+
+     ChartTheme resolves the real, current token values off the document at
+     draw time, so a chart is always drawn in whatever theme is actually
+     showing. Charts registered with onThemeChange() are redrawn when the
+     theme is switched. */
+
+  function cssVar(name, fallback) {
+    try {
+      var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return v || fallback;
+    } catch (e) { return fallback; }
+  }
+
+  function isDark() {
+    var attr = document.documentElement.getAttribute('data-theme');
+    if (attr === 'dark') return true;
+    if (attr === 'light') return false;
+    return Boolean(global.matchMedia && global.matchMedia('(prefers-color-scheme: dark)').matches);
+  }
+
+  var themeListeners = [];
+
+  function theme() {
+    return {
+      dark: isDark(),
+      mode: isDark() ? 'dark' : 'light',
+      text: cssVar('--text', '#191918'),
+      text2: cssVar('--text-2', '#545450'),
+      text3: cssVar('--text-3', '#71716b'),
+      muted: cssVar('--text-4', '#9a9a94'),
+      border: cssVar('--border', '#dededa'),
+      surface: cssVar('--surface', '#ffffff'),
+      surface2: cssVar('--surface-2', '#f7f7f6'),
+      surface3: cssVar('--surface-3', '#f0f0ee'),
+      font: cssVar('--font', 'system-ui, sans-serif'),
+      /* Categorical ramp, in the order a multi-series chart should consume it. */
+      series: [
+        cssVar('--viz-1', '#3f6f6a'), cssVar('--viz-2', '#a8672c'), cssVar('--viz-3', '#4a6491'),
+        cssVar('--viz-4', '#8a5a7d'), cssVar('--viz-5', '#6b7f3f'), cssVar('--viz-6', '#9c5145')
+      ],
+      severity: {
+        critical: cssVar('--critical', '#b4342e'), high: cssVar('--high', '#b5652a'),
+        medium: cssVar('--medium', '#97761d'), low: cssVar('--low', '#44618c'),
+        info: cssVar('--text-4', '#9a9a94'), good: cssVar('--good', '#3d7a5a')
+      }
+    };
+  }
+
+  /* Shared Apex defaults, so fourteen charts cannot drift apart. */
+  function apexBase() {
+    var t = theme();
+    return {
+      chart: { fontFamily: t.font, foreColor: t.text3, animations: { easing: 'easeinout', speed: 420 } },
+      grid: { borderColor: t.border, strokeDashArray: 3 },
+      tooltip: { theme: t.mode },
+      legend: { fontFamily: t.font, labels: { colors: t.text2 } },
+      dataLabels: { style: { fontFamily: t.font } },
+      theme: { mode: t.mode }
+    };
+  }
+
+  function onThemeChange(fn) {
+    themeListeners.push(fn);
+    return fn;
+  }
+
+  function notifyTheme() {
+    themeListeners.forEach(function (fn) { try { fn(theme()); } catch (e) {} });
+  }
+
+  /* Redraw when the user flips the theme, and when the OS flips it while the
+     app is set to "system". */
+  if (global.MutationObserver) {
+    new MutationObserver(function (recs) {
+      for (var i = 0; i < recs.length; i++) {
+        if (recs[i].attributeName === 'data-theme') { notifyTheme(); return; }
+      }
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+  if (global.matchMedia) {
+    var mq = global.matchMedia('(prefers-color-scheme: dark)');
+    var onMq = function () { if (!document.documentElement.getAttribute('data-theme')) notifyTheme(); };
+    if (mq.addEventListener) mq.addEventListener('change', onMq);
+    else if (mq.addListener) mq.addListener(onMq);
+  }
+
+  global.ChartTheme = {
+    get: theme, cssVar: cssVar, isDark: isDark,
+    apexBase: apexBase, onThemeChange: onThemeChange
+  };
 
   global.ChartAssets = { need: need, unavailable: unavailable };
 }(window));
