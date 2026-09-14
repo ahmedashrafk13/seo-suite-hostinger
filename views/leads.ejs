@@ -1,0 +1,379 @@
+<%
+/* Leads & attribution.
+   The page is ordered by the question it answers: how many enquiries, from
+   where, and from WHICH PAGES. The list of individual enquiries is last on
+   purpose - a list of contacts is a CRM, and this page exists to line those
+   contacts up against Search Console, not to replace one. */
+function deltaHtml(cur, prev, invert) {
+  const abs = (cur || 0) - (prev || 0);
+  if (!prev && !cur) return '<span class="delta flat"> - </span>';
+  const pct = prev ? (abs / prev) * 100 : 100;
+  const good = invert ? abs < 0 : abs > 0;
+  const cls = !abs ? 'flat' : (good ? 'up' : 'down');
+  const arrow = !abs ? '' : (abs > 0 ? '▲' : '▼');
+  return `<span class="delta ${cls}">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
+}
+const CHANNEL_LABEL = {
+  organic: 'Organic search', paid: 'Paid', referral: 'Referral', direct: 'Direct',
+  email: 'Email', social: 'Social', ai: 'AI assistants', other: 'Other', unknown: 'Unknown',
+};
+%>
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<%- include('partials/pagehead', {
+      heading: "Leads",
+      lede: "The only numbers here that do not come from Google, which is what makes them worth showing a client next to the ones that do."
+    }) %>
+
+
+<% if (flash) { %><div class="notice good"><div class="notice-body"><%= flash %></div></div><% } %>
+<% if (flashError) { %><div class="notice warn"><div class="notice-body"><%= flashError %></div></div><% } %>
+
+<% if (!brands.length) { %>
+  <div class="card"><div class="card-body">
+    <div class="empty-state">
+      <h3>No brands yet</h3>
+      <p>Leads are recorded against a brand. <a href="/brands">Add one</a> first.</p>
+    </div>
+  </div></div>
+<% } else { %>
+
+<form method="GET" action="/leads" class="toolbar">
+  <label for="brand" class="sr-only">Brand</label>
+  <select id="brand" name="brand" onchange="this.form.submit()">
+    <% brands.forEach(function(b){ %>
+      <option value="<%= b.id %>" <%= brand && b.id === brand.id ? 'selected' : '' %>><%= b.name %></option>
+    <% }) %>
+  </select>
+  <label for="days" class="sr-only">Window</label>
+  <select id="days" name="days" onchange="this.form.submit()">
+    <% [7, 28, 90, 180, 365].forEach(function(dv){ %>
+      <option value="<%= dv %>" <%= win.days === dv ? 'selected' : '' %>>Last <%= dv %> days</option>
+    <% }) %>
+  </select>
+  <div class="spacer"></div>
+  <% if (brand) { %>
+    <a class="btn secondary sm" href="/leads/export?brand=<%= brand.id %>&days=<%= win.days %>">Excel export</a>
+  <% } %>
+</form>
+
+<% if (newKey) { %>
+  <div class="card">
+    <div class="card-head">
+      <h2>Your new ingest key</h2>
+      <span class="sub">This is the only time it is shown. It is stored hashed, so it cannot be recovered - only replaced.</span>
+    </div>
+    <div class="card-body">
+      <div class="code-block"><code id="new-key"><%= newKey %></code></div>
+      <button type="button" class="btn sm" onclick="navigator.clipboard.writeText(document.getElementById('new-key').textContent.trim()).then(function(){ this.textContent='Copied'; }.bind(this))">Copy key</button>
+    </div>
+  </div>
+<% } %>
+
+<% if (brand && view) { %>
+
+  <% if (!view.hasAny) { %>
+    <!-- The empty state IS the setup guide. A page that says "no data yet" and
+         nothing else is where an integration like this dies: the person looking
+         at it is the one who has to wire the form up, and sending them to a
+         separate docs page loses most of them. -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Connect <%= brand.name %>'s enquiry form</h2>
+        <span class="sub">Nothing has posted a lead for this brand yet</span>
+      </div>
+      <div class="card-body">
+        <%# The most common reason this page is empty is not that nobody has
+            enquired - it is that something has been posting into a 400 for
+            weeks. That diagnostic was only rendered in the populated view,
+            i.e. never visible in the one state where it is the whole answer. %>
+        <% if (brand.lead_last_error) { %>
+          <div class="notice warn">
+            <span class="notice-icon">&#9888;</span>
+            <div class="notice-body">
+              Something did post, and it was rejected
+              (<%= fmtDateTime(brand.lead_last_error_at) %>): <%= brand.lead_last_error %>
+            </div>
+          </div>
+        <% } %>
+        <p>Search Console and GA4 stop measuring at the click. Post your enquiries here and
+           every page gets a second column next to its clicks: how much business it actually produced.</p>
+
+        <h4>1. Issue an ingest key</h4>
+        <% if (brand.lead_key_hint) { %>
+          <p class="muted">A key ending <code>…<%= brand.lead_key_hint %></code> was issued
+            <%= fmtDateTime(brand.lead_key_created_at) %>.</p>
+          <%# Rotation and revocation have to live here too, not only in the
+              populated view below. A brand with a key and no leads is the
+              normal state during setup and the state a GDPR erasure leaves
+              behind, and it is exactly when a wrong or leaked key most needs
+              replacing - waiting for a first lead to expose the controls means
+              waiting for a lead the broken key cannot deliver. %>
+          <% if (perms.canWrite) { %>
+            <div class="btn-row">
+              <form method="POST" action="/leads/key" class="inline-form"
+                    onsubmit="return confirm('Issue a new key? The current one stops working immediately, and anything still posting with it will be rejected.')"><%- csrfField %>
+                <input type="hidden" name="brand_id" value="<%= brand.id %>">
+                <button type="submit" class="btn secondary sm">Replace key</button>
+              </form>
+              <form method="POST" action="/leads/key/revoke" class="inline-form"
+                    onsubmit="return confirm('Revoke this key? Every lead post from this brand will be rejected until a new key is issued.')"><%- csrfField %>
+                <input type="hidden" name="brand_id" value="<%= brand.id %>">
+                <button type="submit" class="btn danger-ghost sm">Revoke</button>
+              </form>
+            </div>
+          <% } %>
+        <% } else { %>
+          <form method="POST" action="/leads/key" class="inline-form"><%- csrfField %>
+            <input type="hidden" name="brand_id" value="<%= brand.id %>">
+            <button type="submit" class="btn sm">Issue ingest key</button>
+          </form>
+        <% } %>
+
+        <h4>2. Post each enquiry to this URL</h4>
+        <div class="code-block"><pre>POST <%= baseUrl %>/api/leads
+X-Lead-Key: &lt;your key&gt;
+Content-Type: application/json
+
+{
+  "email": "someone@example.com",
+  "name": "Jane Smith",
+  "phone": "+1 555 0100",
+  "message": "Enquiry from the contact form",
+  "landing_page": "https://<%= (brand.site_url || '').replace(/^https?:\/\//, '').replace(/\/$/, '') %>/contact",
+  "external_id": "form-submission-1234"
+}</pre></div>
+        <div class="hint">
+          Only <code>landing_page</code> matters for attribution - it is what lines the lead up
+          against Search Console. Everything else is optional. Send <code>external_id</code> if your
+          form or CRM has its own id: a repeat post with the same one updates the lead instead of
+          duplicating it, which is what makes a retry safe.
+        </div>
+
+        <h4>3. Update it later, from your CRM</h4>
+        <p>Post again with the same <code>external_id</code> and a
+           <code>"status"</code> of <code>qualified</code>, <code>won</code>, <code>lost</code> or
+           <code>spam</code>, plus a <code>"value"</code>. That is what turns "this page gets
+           enquiries" into "this page earns".</p>
+
+        <h4>Check the key without sending a fake lead</h4>
+        <div class="code-block"><pre>curl -H "X-Lead-Key: &lt;your key&gt;" <%= baseUrl %>/api/leads/ping</pre></div>
+      </div>
+    </div>
+  <% } else { %>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><%= brand.name %></h2>
+        <span class="sub"><%= win.from %> → <%= win.to %> · compared with the <%= win.days %> days before</span>
+      </div>
+      <div class="card-body">
+        <div class="grid cols-4" style="gap:14px">
+          <div class="stat" style="padding:0">
+            <div class="label">Leads</div>
+            <div class="value sm"><%= fmtInt(view.summary.leads) %></div>
+            <div><%- deltaHtml(view.summary.leads, view.summary.prior.leads) %></div>
+          </div>
+          <div class="stat" style="padding:0">
+            <div class="label">From organic search</div>
+            <div class="value sm"><%= fmtInt(view.summary.organic) %></div>
+            <div><%- deltaHtml(view.summary.organic, view.summary.prior.organic) %></div>
+          </div>
+          <div class="stat" style="padding:0">
+            <div class="label">Won</div>
+            <div class="value sm"><%= fmtInt(view.summary.won) %></div>
+            <div class="muted"><%= fmtInt(view.summary.qualified) %> qualified</div>
+          </div>
+          <div class="stat" style="padding:0">
+            <div class="label">Value won</div>
+            <div class="value sm"><%= fmtInt(view.summary.wonValue) %></div>
+            <div><%- deltaHtml(view.summary.wonValue, view.summary.prior.wonValue) %></div>
+          </div>
+        </div>
+
+        <% if (view.summary.spam) { %>
+          <p class="hint"><%= fmtInt(view.summary.spam) %> submission<%= view.summary.spam === 1 ? '' : 's' %>
+            marked as spam, excluded from every figure on this page. They are kept rather than deleted:
+            a page producing ten enquiries of which nine are spam is a finding, and deleting them would
+            make that page look merely quiet.</p>
+        <% } %>
+
+        <div class="section-divider"></div>
+        <%- include('partials/trendchart', {
+              label: 'Leads per day',
+              points: view.daily.map(function(p){ return { date: p.date, value: p.leads }; }),
+              color: '#147a52', fmt: 'int' }) %>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Which pages produce business</h2>
+        <span class="sub">Search Console clicks next to the enquiries those clicks turned into</span>
+      </div>
+      <div class="card-body">
+        <% if (!view.rows.length) { %>
+          <div class="empty">No page has produced a lead in this window.</div>
+        <% } else { %>
+          <div class="table-wrap"><table class="data">
+            <thead><tr>
+              <th>Page</th>
+              <th class="num">Leads</th>
+              <th class="num">Organic</th>
+              <th class="num">Won</th>
+              <th class="num">Value</th>
+              <th class="num">Clicks</th>
+              <th class="num">Position</th>
+              <th class="num" title="Leads per 100 Search Console clicks">Per 100 clicks</th>
+            </tr></thead>
+            <tbody>
+              <% view.rows.forEach(function(r){ %>
+                <tr>
+                  <td class="wrap"><a href="/leads?brand=<%= brand.id %>&days=<%= win.days %>#lead-list"><%= r.path %></a></td>
+                  <td class="num"><%= fmtInt(r.leads) %></td>
+                  <td class="num"><%= fmtInt(r.organicLeads) %></td>
+                  <td class="num"><%= fmtInt(r.won) %></td>
+                  <td class="num"><%= r.value ? fmtInt(r.value) : ' - ' %></td>
+                  <td class="num"><%= fmtInt(r.clicks) %></td>
+                  <td class="num"><%= fmtPos(r.position) %></td>
+                  <td class="num"><%= r.leadsPer100 == null ? ' - ' : r.leadsPer100.toFixed(1) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table></div>
+          <p class="hint">
+            <%= fmtInt(view.allPages - view.rows.length) %> further page<%= (view.allPages - view.rows.length) === 1 ? '' : 's' %>
+            had traffic but produced no lead in this window and are hidden here - they are in the Excel export's
+            attribution sheet.
+            <% if (view.unattributed && view.unattributed.n) { %>
+              <%= fmtInt(view.unattributed.n) %> lead<%= view.unattributed.n === 1 ? '' : 's' %>
+              arrived with no landing page attached and appear in no row above: that is a wiring
+              problem in whatever posts them, not a finding about a channel.
+            <% } %>
+          </p>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (view.summary.byChannel.length) { %>
+    <div class="card">
+      <div class="card-head"><h2>By channel</h2></div>
+      <div class="card-body">
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr><th>Channel</th><th class="num">Leads</th><th class="num">Value</th></tr></thead>
+          <tbody><% view.summary.byChannel.forEach(function(c){ %>
+            <tr><td><%= CHANNEL_LABEL[c.channel] || c.channel %></td>
+              <td class="num"><%= fmtInt(c.n) %></td>
+              <td class="num"><%= c.value ? fmtInt(c.value) : ' - ' %></td></tr>
+          <% }) %></tbody>
+        </table></div>
+      </div>
+    </div>
+    <% } %>
+
+    <div class="card" id="lead-list">
+      <div class="card-head">
+        <h2>Enquiries</h2>
+        <span class="sub">Most recent <%= Math.min(50, view.total) %> of <%= fmtInt(view.total) %> in this window</span>
+      </div>
+      <div class="card-body">
+        <div class="table-wrap"><table class="data compact">
+          <thead><tr>
+            <th>When</th><th>Contact</th><th>Page</th><th>Channel</th><th class="num">Value</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody>
+            <% view.recent.forEach(function(l){ %>
+              <tr>
+                <td class="narrow"><%= fmtDateTime(l.occurred_at) %></td>
+                <td class="wrap">
+                  <%= l.name || l.email || l.phone || ' - ' %>
+                  <% if (l.name && (l.email || l.phone)) { %>
+                    <div class="muted mono-sm"><%= l.email || l.phone %></div>
+                  <% } %>
+                </td>
+                <td class="wrap"><%= l.landing_path || ' - ' %></td>
+                <td><%= CHANNEL_LABEL[l.channel] || l.channel %></td>
+                <td class="num"><%= l.value == null ? ' - ' : fmtInt(l.value) %></td>
+                <td>
+                  <% if (perms.canWrite) { %>
+                    <form method="POST" action="/leads/<%= l.id %>/status" class="inline-form"><%- csrfField %>
+                      <select name="status" onchange="this.form.submit()" aria-label="Status">
+                        <% statuses.forEach(function(st){ %>
+                          <option value="<%= st %>" <%= l.status === st ? 'selected' : '' %>><%= st %></option>
+                        <% }) %>
+                      </select>
+                    </form>
+                  <% } else { %>
+                    <span class="badge neutral"><%= l.status %></span>
+                  <% } %>
+                </td>
+                <td class="num">
+                  <% if (perms.canWrite) { %>
+                    <form method="POST" action="/leads/<%= l.id %>/delete" class="inline-form"
+                          onsubmit="return confirm('Delete this lead permanently? This is the erasure a GDPR request asks for and it cannot be undone.')"><%- csrfField %>
+                      <button type="submit" class="btn danger-ghost sm">Delete</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Ingest key</h2>
+        <span class="sub">The credential whatever posts these leads authenticates with</span>
+      </div>
+      <div class="card-body">
+        <dl class="kv">
+          <dt>Endpoint</dt><dd class="mono-sm"><%= baseUrl %>/api/leads</dd>
+          <dt>Key</dt><dd><%= brand.lead_key_hint ? ('…' + brand.lead_key_hint) : 'none issued' %></dd>
+          <dt>Issued</dt><dd><%= brand.lead_key_created_at ? fmtDateTime(brand.lead_key_created_at) : ' - ' %></dd>
+          <dt>Last accepted post</dt><dd><%= brand.lead_last_seen_at ? fmtDateTime(brand.lead_last_seen_at) : 'never' %></dd>
+        </dl>
+        <% if (brand.lead_last_error) { %>
+          <!-- Surfaced rather than logged, because the failure this catches is
+               the silent one: a form wired up months ago that has been posting
+               into a 400 ever since, with a client wondering why the report is
+               empty. -->
+          <div class="notice warn">
+            <span class="notice-icon">&#9888;</span>
+            <div class="notice-body">
+              Last rejected post (<%= fmtDateTime(brand.lead_last_error_at) %>): <%= brand.lead_last_error %>
+            </div>
+          </div>
+        <% } %>
+        <% if (perms.canWrite) { %>
+          <div class="btn-row">
+            <form method="POST" action="/leads/key" class="inline-form"
+                  onsubmit="return confirm('Issue a new key? The current one stops working immediately, and anything still posting with it will be rejected.')"><%- csrfField %>
+              <input type="hidden" name="brand_id" value="<%= brand.id %>">
+              <button type="submit" class="btn secondary sm"><%= brand.lead_key_hint ? 'Replace key' : 'Issue key' %></button>
+            </form>
+            <% if (brand.lead_key_hint) { %>
+              <form method="POST" action="/leads/key/revoke" class="inline-form"
+                    onsubmit="return confirm('Revoke this key? Every lead post from this brand will be rejected until a new key is issued.')"><%- csrfField %>
+                <input type="hidden" name="brand_id" value="<%= brand.id %>">
+                <button type="submit" class="btn danger-ghost sm">Revoke</button>
+              </form>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+  <% } %>
+<% } %>
+<% } %>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>
