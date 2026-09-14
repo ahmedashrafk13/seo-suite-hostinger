@@ -20,8 +20,8 @@ require('dotenv').config();
 process.env.SMTP_HOST = '';
 process.env.PORT = process.env.TEAM_TEST_PORT || '4402';
 
-const db = require('./src/db');
-const team = require('./src/lib/team');
+const db = require('../src/db');
+const team = require('../src/lib/team');
 
 const BASE = `http://127.0.0.1:${process.env.PORT}`;
 const STAMP = Date.now();
@@ -84,7 +84,7 @@ function cleanup() {
 }
 
 (async () => {
-  const { server } = require('./src/app');
+  const { server } = require('../src/app');
   await new Promise((r) => setTimeout(r, 600));
 
   const hostTeam = db.prepare('SELECT * FROM teams WHERE owner_user_id=2').get();

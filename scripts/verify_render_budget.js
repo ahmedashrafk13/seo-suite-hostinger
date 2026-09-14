@@ -5,7 +5,7 @@
 const http = require('http');
 const path = require('path');
 
-const ROOT = process.argv[2] || __dirname;
+const ROOT = process.argv[2] || path.join(__dirname, '..');
 const renderer = require(path.join(ROOT, 'tools/node/lib/renderer'));
 const httpLib = require(path.join(ROOT, 'tools/node/lib/http'));
 

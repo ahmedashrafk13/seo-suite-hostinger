@@ -48,16 +48,16 @@ function section(title) {
 }
 
 (async () => {
-  const nlp = require('./src/lib/aiseo/nlp');
-  const fetcher = require('./src/lib/aiseo/fetcher');
-  const schemaAuto = require('./src/lib/aiseo/schemaAuto');
-  const providers = require('./src/lib/aiseo/providers');
-  const trackingCatalog = require('./src/lib/aiseo/trackingCatalog');
-  const onpage = require('./src/lib/aiseo/onpage');
-  const reputation = require('./src/lib/aiseo/reputation');
-  const competitive = require('./src/lib/aiseo/competitive');
-  const db = require('./src/db');
-  const store = require('./src/lib/aiseo/store');
+  const nlp = require('../src/lib/aiseo/nlp');
+  const fetcher = require('../src/lib/aiseo/fetcher');
+  const schemaAuto = require('../src/lib/aiseo/schemaAuto');
+  const providers = require('../src/lib/aiseo/providers');
+  const trackingCatalog = require('../src/lib/aiseo/trackingCatalog');
+  const onpage = require('../src/lib/aiseo/onpage');
+  const reputation = require('../src/lib/aiseo/reputation');
+  const competitive = require('../src/lib/aiseo/competitive');
+  const db = require('../src/db');
+  const store = require('../src/lib/aiseo/store');
 
   // =====================================================================
   section('1. Text measurement (nlp.js)');
@@ -551,7 +551,7 @@ Disallow:
   });
 
   // ---- the Reddit client ----------------------------------------------
-  const redditClient = require('./src/lib/aiseo/redditClient');
+  const redditClient = require('../src/lib/aiseo/redditClient');
 
   check('browser headers carry client hints that AGREE with the user agent', () => {
     redditClient.BROWSER_PROFILES.forEach((p) => {
@@ -867,7 +867,7 @@ Disallow:
 
   if (providers.has('public')) {
     await checkAsync('Google autocomplete returns suggestions', async () => {
-      const research = require('./src/lib/aiseo/research');
+      const research = require('../src/lib/aiseo/research');
       const out = await research.suggest('seo audit');
       assert.ok(Array.isArray(out), 'must return an array');
       if (!out.length) {
@@ -882,8 +882,8 @@ Disallow:
   if (FULL && brand) {
     section('12. Full live analyses (--full)');
 
-    const readiness = require('./src/lib/aiseo/readiness');
-    const tracking = require('./src/lib/aiseo/tracking');
+    const readiness = require('../src/lib/aiseo/readiness');
+    const tracking = require('../src/lib/aiseo/tracking');
 
     await checkAsync(`readiness runs end to end against ${brand.site_url}`, async () => {
       const run = await readiness.run({
@@ -984,6 +984,6 @@ Disallow:
   process.exit(failed ? 1 : 0);
 })().catch((err) => {
   console.error('\nverification crashed:', err);
-  try { require('./src/db').closeDb(); } catch { /* already closed */ }
+  try { require('../src/db').closeDb(); } catch { /* already closed */ }
   process.exit(1);
 });

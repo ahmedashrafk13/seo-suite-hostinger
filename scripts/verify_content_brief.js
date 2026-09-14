@@ -8,8 +8,8 @@
 // user + three test brands), cleaned up in a `finally` block regardless of
 // outcome. Run with: node verify_content_brief.js
 const assert = require('assert');
-const db = require('./src/db');
-const contentBrief = require('./src/lib/contentBrief');
+const db = require('../src/db');
+const contentBrief = require('../src/lib/contentBrief');
 
 const MARK = 'verify-content-brief-tmp';
 let pass = 0;

@@ -3,7 +3,7 @@
 // cache, so no database and no Google Ads call.
 const path = require('path');
 
-const ROOT = process.argv[2] || __dirname;
+const ROOT = process.argv[2] || path.join(__dirname, '..');
 const googlePath = require.resolve(path.join(ROOT, 'src/lib/google.js'));
 let lastCall = null;
 let RESPONSE = {};

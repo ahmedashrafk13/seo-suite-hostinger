@@ -23,8 +23,8 @@ process.env.SMTP_HOST = '';
 process.env.INPROCESS_CRON = '0';
 process.env.PORT = process.env.LEADS_TEST_PORT || '4403';
 
-const db = require('./src/db');
-const leadsLib = require('./src/lib/leads');
+const db = require('../src/db');
+const leadsLib = require('../src/lib/leads');
 
 const BASE = `http://127.0.0.1:${process.env.PORT}`;
 const STAMP = Date.now();
@@ -106,7 +106,7 @@ function daysAgo(n) {
 
 (async () => {
   cleanup();
-  require('./src/app');
+  require('../src/app');
   await new Promise((r) => setTimeout(r, 700));
 
   let brand;
@@ -282,7 +282,7 @@ function daysAgo(n) {
       db.prepare('INSERT OR REPLACE INTO gsc_daily (brand_id,date,clicks,impressions,ctr,position) VALUES (?,?,?,?,?,?)')
         .run(brand.id, d, 100 + i, 2000 + i * 10, 0.05, 7.5);
     }
-    const reportBuilder = require('./src/lib/reportBuilder');
+    const reportBuilder = require('../src/lib/reportBuilder');
     const reportRow = reportBuilder.generate(brand, { weekEnd: daysAgo(1) });
     check('a weekly report was generated for the test brand', !!reportRow && !!reportRow.id);
 
@@ -355,7 +355,7 @@ function daysAgo(n) {
 
     // Expiry is checked before revocation, on a second link, so neither test
     // depends on the other's state.
-    const shares = require('./src/lib/reportShares');
+    const shares = require('../src/lib/reportShares');
     const expired = shares.create(reportRow.id, db.prepare('SELECT id FROM users WHERE email=?').get(EMAIL).id,
       { label: 'expired', expiresOn: daysAgo(2) });
     pub = await anon(`/r/${expired.token}`);

@@ -8,7 +8,7 @@
 require('dotenv').config();
 const path = require('path');
 
-const ROOT = process.argv[2] || __dirname;
+const ROOT = process.argv[2] || path.join(__dirname, '..');
 const dbPath = require.resolve(path.join(ROOT, 'src/db.js'));
 require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true,
   exports: { prepare: () => ({ get: () => null, all: () => [], run: () => ({}) }) } };

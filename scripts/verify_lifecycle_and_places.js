@@ -19,11 +19,11 @@
 // Run:  node verify_lifecycle_and_places.js
 const assert = require('assert');
 
-const db = require('./src/db');
-const tasksLib = require('./src/lib/tasks');
-const clustering = require('./src/lib/clustering');
-const places = require('./src/lib/places');
-const S = require('./src/lib/seoSignals');
+const db = require('../src/db');
+const tasksLib = require('../src/lib/tasks');
+const clustering = require('../src/lib/clustering');
+const places = require('../src/lib/places');
+const S = require('../src/lib/seoSignals');
 
 let passed = 0;
 const failures = [];

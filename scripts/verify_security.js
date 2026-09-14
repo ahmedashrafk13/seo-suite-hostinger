@@ -91,11 +91,11 @@ function csrfToken(html) {
 function section(title) { console.log(`\n${title}`); }
 
 (async () => {
-  require('./src/app');
+  require('../src/app');
   // The boot sequence reconciles interrupted runs and probes for Python.
   await new Promise((r) => setTimeout(r, 2500));
 
-  const db = require('./src/db');
+  const db = require('../src/db');
   const owner = mkJar();
 
   // ------------------------------------------------------- response headers
@@ -228,7 +228,9 @@ function section(title) { console.log(`\n${title}`); }
   const memberDash = await req(member, 'GET', '/dashboard');
   const ownerDash = await req(owner, 'GET', '/dashboard');
   function navTaskCount(html) {
-    const m = html.match(/href="\/tasks"[\s\S]{0,600}?<span class="nav-badge">\s*(\d+)/);
+    // The badge carries an `urgent` modifier and a title attribute, so match the
+    // class as a prefix rather than requiring `class="nav-badge">` exactly.
+    const m = html.match(/href="\/tasks"[\s\S]{0,600}?<span class="nav-badge[^"]*"[^>]*>\s*(\d+)/);
     return m ? Number(m[1]) : null;
   }
   check('an approved member reaches the dashboard', memberDash.status === 200, `HTTP ${memberDash.status}`);

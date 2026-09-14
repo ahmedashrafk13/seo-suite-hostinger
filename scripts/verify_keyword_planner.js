@@ -7,7 +7,7 @@
 const path = require('path');
 const http = require('http');
 
-const ROOT = process.argv[2] || __dirname;
+const ROOT = process.argv[2] || path.join(__dirname, '..');
 const express = require(path.join(ROOT, 'node_modules/express'));
 
 // --- stub the database with a tiny in-memory store -------------------------

@@ -31,7 +31,7 @@ const os = require('os');
 
 process.env.DB_PATH = process.env.DB_PATH || 'tmp/verify-crawl-access.db';
 
-const crawlAuth = require('./src/lib/crawlAuth');
+const crawlAuth = require('../src/lib/crawlAuth');
 
 let pass = 0;
 let fail = 0;
@@ -156,7 +156,7 @@ function runNodeTool(script, args, { timeoutMs = 120000, env = null } = {}) {
 // checks the interpreter the app would actually pick rather than whatever
 // `python` happens to be on PATH.
 function runPythonTool(tool, script, args, { timeoutMs = 180000, env: extraEnv = null } = {}) {
-  const pythonEnv = require('./src/lib/pythonEnv');
+  const pythonEnv = require('../src/lib/pythonEnv');
   const env = pythonEnv.resolve(tool);
   if (!env.ok) return Promise.resolve({ skipped: true, reason: env.error });
   return new Promise((resolve) => {
@@ -178,7 +178,7 @@ function runPythonTool(tool, script, args, { timeoutMs = 180000, env: extraEnv =
 function parseAuditJson(text) {
   // Same extraction toolRunner uses, so a change to the output shape fails here
   // rather than silently in production.
-  const toolRunner = require('./src/lib/toolRunner');
+  const toolRunner = require('../src/lib/toolRunner');
   return toolRunner.extractJson(text);
 }
 
@@ -287,7 +287,7 @@ async function main() {
   // ------------------------------------------- the crawlers, actually crawling
   console.log('\nTechnical audit crawler (Node port)');
   {
-    const auditScript = path.join(__dirname, 'tools', 'node', 'audit', 'main.js');
+    const auditScript = path.join(__dirname, '..', 'tools', 'node', 'audit', 'main.js');
 
     const anon = await runNodeTool(auditScript, [bases.walled, '--max-pages', '20', '--json']);
     const anonJson = parseAuditJson(anon.out);
@@ -333,7 +333,7 @@ async function main() {
 
   console.log('\nInternal linking agent (Node port)');
   {
-    const linkScript = path.join(__dirname, 'tools', 'node', 'linking', 'main.js');
+    const linkScript = path.join(__dirname, '..', 'tools', 'node', 'linking', 'main.js');
     const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-linking-'));
 
     const authed = await runNodeTool(linkScript, [
@@ -528,8 +528,8 @@ weeks ahead. Open Tuesday to Sunday for lunch and dinner.</p>`;
       loginProbe.blocking === false, `wall=${loginProbe.wall} words=${loginProbe.words}`);
 
     // And the run itself, end to end, with no credentials at all.
-    const toolRunner = require('./src/lib/toolRunner');
-    const db = require('./src/db');
+    const toolRunner = require('../src/lib/toolRunner');
+    const db = require('../src/db');
     db.prepare(`INSERT OR IGNORE INTO users (id, email, password_hash, role, status)
       VALUES (1,'verify@example.com','x','admin','active')`).run();
     const runId = toolRunner.startAudit({
@@ -1021,7 +1021,7 @@ fixture is the response shape rather than the text.</p>
     const spaBase = `http://127.0.0.1:${spa.address().port}`;
     const spaAuth = { cookie: 'spa=1', headers: {}, basicUser: '', basicPass: '' };
 
-    const pyAudit = path.join(__dirname, 'tools', 'webtechstackdetector', 'main.py');
+    const pyAudit = path.join(__dirname, '..', 'tools', 'webtechstackdetector', 'main.py');
 
     // Is Playwright actually usable here? The audit only renders when it is.
     const pwCheck = await runPythonTool('audit', pyAudit, ['--help'], { timeoutMs: 60000 });
@@ -1097,7 +1097,7 @@ fixture is the response shape rather than the text.</p>
   console.log('');
   console.log('Editing stored credentials without destroying them');
   {
-    const db = require('./src/db');
+    const db = require('../src/db');
     db.prepare(`INSERT OR IGNORE INTO users (id, email, password_hash, role, status)
       VALUES (1,'verify@example.com','x','admin','active')`).run();
     db.prepare(`INSERT OR IGNORE INTO brands (id, user_id, name, site_url)
@@ -1153,7 +1153,7 @@ fixture is the response shape rather than the text.</p>
     // the next save — which is how "(stored — retype to replace)" became a
     // header value. Grepping the file for that phrase would also match the
     // comment explaining the bug, so the element itself is what is inspected.
-    const tpl = fs.readFileSync(path.join(__dirname, 'views', 'brand-detail.ejs'), 'utf8');
+    const tpl = fs.readFileSync(path.join(__dirname, '..', 'views', 'brand-detail.ejs'), 'utf8');
     const ta = /<textarea[^>]*name="auth_headers"[\s\S]*?<\/textarea>/.exec(tpl);
     check('the header textarea exists on the brand form', !!ta);
     if (ta) {
@@ -1199,7 +1199,7 @@ fixture is the response shape rather than the text.</p>
     // line at all — otherwise the app would spawn them with credentials they
     // ignore, and every gated crawl would silently go back to reading login
     // pages. Checked in both implementations, since both had to be taught.
-    const nodeAudit = path.join(__dirname, 'tools', 'node', 'audit', 'main.js');
+    const nodeAudit = path.join(__dirname, '..', 'tools', 'node', 'audit', 'main.js');
     const nodeViaEnv = await runNodeTool(nodeAudit,
       [bases.walled, '--max-pages', '20', '--json'],
       { env: crawlAuth.toEnv(cookieAuth) });
@@ -1210,7 +1210,7 @@ fixture is the response shape rather than the text.</p>
     check('no credential value appears in the command line it was given',
       !JSON.stringify([bases.walled, '--max-pages', '20', '--json']).includes('letmein'));
 
-    const pyAudit = path.join(__dirname, 'tools', 'webtechstackdetector', 'main.py');
+    const pyAudit = path.join(__dirname, '..', 'tools', 'webtechstackdetector', 'main.py');
     const pyViaEnv = await runPythonTool('audit', pyAudit,
       [bases.walled, '--max-pages', '20', '--json'],
       { env: crawlAuth.toEnv(cookieAuth) });
@@ -1276,7 +1276,7 @@ fixture is the response shape rather than the text.</p>
     });
     await new Promise((r) => spa.listen(0, '127.0.0.1', r));
     const spaBase = `http://127.0.0.1:${spa.address().port}`;
-    const pyLinking = path.join(__dirname, 'tools', 'internal-linking-agent', 'internal_link_agent.py');
+    const pyLinking = path.join(__dirname, '..', 'tools', 'internal-linking-agent', 'internal_link_agent.py');
 
     const titleFrom = (outDir) => {
       const f = path.join(outDir, 'crawl_data.json');
@@ -1339,7 +1339,7 @@ fixture is the response shape rather than the text.</p>
   console.log('');
   console.log('Credential scope');
   {
-    const httpLib = require('./tools/node/lib/http');
+    const httpLib = require('../tools/node/lib/http');
     const scoped = { headers: { Cookie: 'sess=SECRET' }, site: 'https://client.example.com/' };
     const cases = [
       ['the site itself', 'https://client.example.com/page', true],
@@ -1371,7 +1371,7 @@ fixture is the response shape rather than the text.</p>
   console.log('');
   console.log('AI SEO analyses: credentials, scope and opt-out');
   {
-    const fetcher = require('./src/lib/aiseo/fetcher');
+    const fetcher = require('../src/lib/aiseo/fetcher');
 
     // Two servers: the brand's own gated site, and a third party it links to.
     const seen = { own: [], third: [] };
@@ -1590,7 +1590,7 @@ fixture is the response shape rather than the text.</p>
   console.log('');
   console.log('Python implementations (skipped where the interpreter cannot run them)');
   {
-    const pyAudit = path.join(__dirname, 'tools', 'webtechstackdetector', 'main.py');
+    const pyAudit = path.join(__dirname, '..', 'tools', 'webtechstackdetector', 'main.py');
     const anon = await runPythonTool('audit', pyAudit, [bases.walled, '--max-pages', '20', '--json']);
     if (anon.skipped) {
       console.log(`  skip  Python audit — ${anon.reason}`);
@@ -1631,7 +1631,7 @@ fixture is the response shape rather than the text.</p>
         `exit ${badHeader.code}`);
     }
 
-    const pyLinking = path.join(__dirname, 'tools', 'internal-linking-agent', 'internal_link_agent.py');
+    const pyLinking = path.join(__dirname, '..', 'tools', 'internal-linking-agent', 'internal_link_agent.py');
     const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-pylinking-'));
     const linkRun = await runPythonTool('linking', pyLinking, [
       bases.walled, '--max-pages', '20', '--out', outDir, ...crawlAuth.toArgs(cookieAuth),
@@ -1738,8 +1738,8 @@ fixture is the response shape rather than the text.</p>
     {
       const target = process.env.LIVE_AUDIT_URL || 'https://www.americanwebbuilders.com/';
       const pages = '25';
-      const nodeScript = path.join(__dirname, 'tools', 'node', 'audit', 'main.js');
-      const pyScript = path.join(__dirname, 'tools', 'webtechstackdetector', 'main.py');
+      const nodeScript = path.join(__dirname, '..', 'tools', 'node', 'audit', 'main.js');
+      const pyScript = path.join(__dirname, '..', 'tools', 'webtechstackdetector', 'main.py');
 
       const nodeRun = await runNodeTool(nodeScript, [target, '--max-pages', pages, '--json'],
         { timeoutMs: 420000 });
@@ -1811,8 +1811,8 @@ fixture is the response shape rather than the text.</p>
   {
     // The guard must stop a run rather than let it finish and be scored. Driven
     // through toolRunner so the real path is exercised, not a reimplementation.
-    const toolRunner = require('./src/lib/toolRunner');
-    const db = require('./src/db');
+    const toolRunner = require('../src/lib/toolRunner');
+    const db = require('../src/db');
     db.prepare(`INSERT OR IGNORE INTO users (id, email, password_hash, role, status)
       VALUES (1,'verify@example.com','x','admin','active')`).run();
 

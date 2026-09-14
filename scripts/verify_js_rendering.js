@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = process.argv[2] || __dirname;
+const ROOT = process.argv[2] || path.join(__dirname, '..');
 const ejs = require(path.join(ROOT, 'node_modules/ejs'));
 const VIEWS = path.join(ROOT, 'views');
 

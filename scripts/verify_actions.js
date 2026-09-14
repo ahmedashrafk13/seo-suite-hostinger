@@ -31,10 +31,10 @@ const path = require('path');
 const http = require('http');
 const express = require('express');
 
-const db = require('./src/db');
-const notify = require('./src/lib/notify');
-const teamLib = require('./src/lib/team');
-const csrf = require('./src/lib/csrf');
+const db = require('../src/db');
+const notify = require('../src/lib/notify');
+const teamLib = require('../src/lib/team');
+const csrf = require('../src/lib/csrf');
 
 // A fixed token, so the harness can put it in every POST body. Using the real
 // middleware rather than skipping it is the point: this file exists to prove
@@ -46,7 +46,7 @@ const USER_ID = Number(process.env.SMOKE_USER_ID || 2);
 
 const app = express();
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
+app.set('views', path.join(__dirname, '..', 'views'));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(express.json({ limit: '5mb' }));
 app.use((req, res, next) => {
@@ -99,9 +99,9 @@ app.use(csrf.verify);
 
 const pass = (req, res, next) => next();
 app.set('requireAuth', pass);
-[['/brands', './src/routes/brands'], ['/keywords', './src/routes/keywords'],
-  ['/tasks', './src/routes/tasks'], ['/alerts', './src/routes/alerts'],
-  ['/linking', './src/routes/linking'], ['/audit', './src/routes/audit']]
+[['/brands', '../src/routes/brands'], ['/keywords', '../src/routes/keywords'],
+  ['/tasks', '../src/routes/tasks'], ['/alerts', '../src/routes/alerts'],
+  ['/linking', '../src/routes/linking'], ['/audit', '../src/routes/audit']]
   .forEach(([m, mod]) => app.use(m, pass, require(mod)));
 
 const errors = new Map();

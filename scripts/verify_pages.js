@@ -23,17 +23,17 @@ const path = require('path');
 const http = require('http');
 const express = require('express');
 
-const db = require('./src/db');
-const notify = require('./src/lib/notify');
-const teamLib = require('./src/lib/team');
-const csrf = require('./src/lib/csrf');
+const db = require('../src/db');
+const notify = require('../src/lib/notify');
+const teamLib = require('../src/lib/team');
+const csrf = require('../src/lib/csrf');
 
 const USER_ID = Number(process.env.SMOKE_USER_ID || 2);
 
 const app = express();
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-app.use(express.static(path.join(__dirname, 'public')));
+app.set('views', path.join(__dirname, '..', 'views'));
+app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(express.json({ limit: '5mb' }));
 
@@ -124,26 +124,26 @@ app.use((req, res, next) => {
 });
 
 const MOUNTS = [
-  ['/dashboard', './src/routes/dashboard'],
-  ['/performance', './src/routes/performance'],
-  ['/brands', './src/routes/brands'],
-  ['/connect', './src/routes/connect'],
-  ['/audit', './src/routes/audit'],
-  ['/pagespeed', './src/routes/pagespeed'],
-  ['/linking', './src/routes/linking'],
-  ['/keywords', './src/routes/keywords'],
-  ['/alerts', './src/routes/alerts'],
-  ['/tasks', './src/routes/tasks'],
-  ['/reports', './src/routes/reports'],
-  ['/settings', './src/routes/settings'],
-  ['/team', './src/routes/team'],
-  ['/onboarding', './src/routes/onboarding'],
-  ['/workflow', './src/routes/workflow'],
-  ['/ai-assist', './src/routes/aiAssist'],
+  ['/dashboard', '../src/routes/dashboard'],
+  ['/performance', '../src/routes/performance'],
+  ['/brands', '../src/routes/brands'],
+  ['/connect', '../src/routes/connect'],
+  ['/audit', '../src/routes/audit'],
+  ['/pagespeed', '../src/routes/pagespeed'],
+  ['/linking', '../src/routes/linking'],
+  ['/keywords', '../src/routes/keywords'],
+  ['/alerts', '../src/routes/alerts'],
+  ['/tasks', '../src/routes/tasks'],
+  ['/reports', '../src/routes/reports'],
+  ['/settings', '../src/routes/settings'],
+  ['/team', '../src/routes/team'],
+  ['/onboarding', '../src/routes/onboarding'],
+  ['/workflow', '../src/routes/workflow'],
+  ['/ai-assist', '../src/routes/aiAssist'],
   // The sidebar links to fifteen /ai-seo/* pages on every page of the app.
   // Without this mount they were all reported as broken on every run --
   // fifteen false failures that make the real ones easy to miss.
-  ['/ai-seo', './src/routes/aiseo'],
+  ['/ai-seo', '../src/routes/aiseo'],
 ];
 MOUNTS.forEach(([mount, mod]) => {
   try { app.use(mount, passThrough, require(mod)); } catch (err) {

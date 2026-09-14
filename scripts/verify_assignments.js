@@ -11,11 +11,11 @@
 require('dotenv').config();
 process.env.SMTP_HOST = '';
 
-const db = require('./src/db');
-const team = require('./src/lib/team');
-const queue = require('./src/lib/assignmentQueue');
-const tasksLib = require('./src/lib/tasks');
-const notify = require('./src/lib/notify');
+const db = require('../src/db');
+const team = require('../src/lib/team');
+const queue = require('../src/lib/assignmentQueue');
+const tasksLib = require('../src/lib/tasks');
+const notify = require('../src/lib/notify');
 
 const STAMP = Date.now();
 const DEV_NAME = `QA Dev ${STAMP}`;

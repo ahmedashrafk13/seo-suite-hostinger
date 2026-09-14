@@ -792,7 +792,7 @@ async function build() {
   }
 
   // --------------------------------------------------------------- write
-  const outDir = path.join(__dirname, 'reports');
+  const outDir = path.join(__dirname, '..', 'reports');
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
   const xlsxPath = path.join(outDir, 'ai-seo-requirements-and-fixes.xlsx');

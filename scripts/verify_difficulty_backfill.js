@@ -10,7 +10,7 @@
 //   node verify_difficulty_backfill.js
 const Module = require('module');
 const path = require('path');
-const ROOT = process.argv[2] || process.cwd();
+const ROOT = process.argv[2] || path.join(__dirname, '..');
 const real = Module._load;
 
 // ------------------------------------------------------------- fake tables

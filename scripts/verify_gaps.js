@@ -45,19 +45,19 @@ async function checkAsync(name, fn) {
 }
 
 (async () => {
-  const markets = require('./src/lib/aiseo/markets');
-  const serpLite = require('./src/lib/aiseo/serpLite');
-  const keywordMetrics = require('./src/lib/aiseo/keywordMetrics');
-  const boilerplate = require('./src/lib/aiseo/boilerplate');
-  const headings = require('./src/lib/aiseo/headings');
-  const pageType = require('./src/lib/aiseo/pageType');
-  const schemaBuilder = require('./src/lib/aiseo/schemaBuilder');
-  const linkFinder = require('./src/lib/aiseo/linkFinder');
-  const siteReadiness = require('./src/lib/aiseo/siteReadiness');
-  const reviewPlatforms = require('./src/lib/aiseo/reviewPlatforms');
-  const gapAnalysis = require('./src/lib/aiseo/gapAnalysis');
-  const providers = require('./src/lib/aiseo/providers');
-  const { parseDocument } = require('./src/lib/aiseo/fetcher');
+  const markets = require('../src/lib/aiseo/markets');
+  const serpLite = require('../src/lib/aiseo/serpLite');
+  const keywordMetrics = require('../src/lib/aiseo/keywordMetrics');
+  const boilerplate = require('../src/lib/aiseo/boilerplate');
+  const headings = require('../src/lib/aiseo/headings');
+  const pageType = require('../src/lib/aiseo/pageType');
+  const schemaBuilder = require('../src/lib/aiseo/schemaBuilder');
+  const linkFinder = require('../src/lib/aiseo/linkFinder');
+  const siteReadiness = require('../src/lib/aiseo/siteReadiness');
+  const reviewPlatforms = require('../src/lib/aiseo/reviewPlatforms');
+  const gapAnalysis = require('../src/lib/aiseo/gapAnalysis');
+  const providers = require('../src/lib/aiseo/providers');
+  const { parseDocument } = require('../src/lib/aiseo/fetcher');
 
   const doc = (url, html) => parseDocument(url, html);
 
@@ -712,7 +712,7 @@ async function checkAsync(name, fn) {
     });
 
     await checkAsync('the second suggestion index returns phrasings Google does not', async () => {
-      const research = require('./src/lib/aiseo/research');
+      const research = require('../src/lib/aiseo/research');
       const bing = await serpLite.relatedSearches('flat roof repair cost', { market: 'GB' });
       assert.ok(bing.ok, `bing suggest failed: ${bing.error}`);
       const google = await research.suggest('flat roof repair cost', { market: 'GB' });
@@ -738,7 +738,7 @@ async function checkAsync(name, fn) {
 
     await checkAsync('the referring-page search returns parseable results', async () => {
       // Guards the silent-zero: this returned ok:true with no items for months.
-      const webMentions = require('./src/lib/aiseo/webMentions');
+      const webMentions = require('../src/lib/aiseo/webMentions');
       const r = await webMentions.referringPages('wikipedia.org', { limit: 8 });
       assert.ok(r.ok, `search failed: ${r.error}`);
       assert.ok(r.resultsSeen > 0, 'the search returned no results at all — the parser is broken again');
@@ -766,5 +766,5 @@ async function checkAsync(name, fn) {
     failures.forEach((f) => console.log(`\n${f.name}\n${f.err.stack}`));
     process.exitCode = 1;
   }
-  try { require('./src/db').closeDb(); } catch { /* already closed */ }
+  try { require('../src/db').closeDb(); } catch { /* already closed */ }
 })();

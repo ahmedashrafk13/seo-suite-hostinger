@@ -1274,7 +1274,7 @@ const doc = new Document({
   }],
 });
 
-const outDir = path.join(__dirname, 'reports');
+const outDir = path.join(__dirname, '..', 'reports');
 if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 const outFile = path.join(outDir, 'SEO-Platform-Overview.docx');
 
