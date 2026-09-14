@@ -474,6 +474,117 @@ Run it with the server **stopped**: the WebAssembly SQLite driver is
 single-writer, and a second process opening `data/app.db` while the app is
 running has corrupted it before.
 
+## Leads: measuring the thing after the click
+
+Every other number in this suite measures attention — impressions, clicks,
+sessions, positions — and all of them stop at the moment a visitor arrives. A
+client does not ask whether a page gained clicks; they ask whether it produced
+business. `/leads` closes that gap by holding the conversions themselves and
+lining them up against Search Console, page by page.
+
+**Leads are posted in, not scraped out.** GA4 already counts conversion events
+and this deliberately does not use them, for three reasons configuration cannot
+fix: a GA4 conversion is a browser event, so consent refusals and content
+blockers remove a material and *unknowable* fraction of them; it counts a form
+submission rather than a lead, so spam and double-submits each count once; and
+nothing downstream of the form is visible to it at all, so "which page produces
+enquiries worth having" is unanswerable — that verdict is formed days later, by
+a human, in a CRM.
+
+So the source of truth is the system that already knows:
+
+```
+POST https://your-app/api/leads
+X-Lead-Key: sk_lead_...
+Content-Type: application/json
+
+{ "email": "jane@example.com", "landing_page": "https://example.com/contact/",
+  "external_id": "form-1234", "medium": "organic" }
+```
+
+`GET /api/leads/ping` with the same key confirms the wiring without putting a
+fake lead into a client's real numbers, which is otherwise exactly what people
+do and then leave there.
+
+A few decisions worth not re-litigating:
+
+- **The key identifies the brand.** There is no brand id in the body: one would
+  be an authorisation bypass dressed as a convenience. Keys are per brand,
+  stored as a SHA-256 hash, shown once, and revocable.
+- **`external_id` makes the endpoint idempotent, and more.** A repeat post with
+  the same id updates the lead rather than duplicating it — which is what makes
+  a CRM's retry safe, and also how a lead later becomes `won` with a value
+  attached. That second post is the one that turns "this page gets enquiries"
+  into "this page earns".
+- **Everything is reduced to a normalised path on the way in.** `gsc_page_daily`
+  stores an absolute URL and `ga4_page_daily` stores a path; a form posts
+  whatever the browser had, query string and all. All three are collapsed to a
+  lowercase-host, no-query, no-trailing-slash path so the join is an equality
+  test (`src/lib/leads.js`, `normalisePath`). Case *inside* the path is
+  preserved: `/Services` and `/services` can be two pages on most servers.
+- **Two URL spellings of one page combine their positions by impression
+  weight.** Averaging two averaged positions is wrong whenever the two URLs are
+  not equally visible, which is the normal case for a redirect pair.
+- **A lead with no landing page is reported separately, never folded into
+  "direct".** They mean different things: the first is a wiring fault to fix,
+  the second is a finding about a channel. Merging them deflates every page's
+  contribution with nothing on screen to notice it by.
+- **A rejected post is recorded on the brand and shown on the page.** The
+  expensive failure here is silent: a form wired up months ago that has been
+  posting into a `400` ever since, with a client wondering why the report is
+  empty.
+- **An unrecognised referrer is `referral`, not `organic`.** The direction of
+  that error matters, because this is the number used to argue that SEO is
+  working.
+
+`POST /api/leads` is mounted **above** `csrf.verify` in `src/app.js`, alongside
+`/internal/cron` and for the same reason: it authenticates with a shared secret
+in a header and has no session to hold a token. That placement is load-bearing.
+The exemption is safe precisely because the endpoint does not authenticate by
+cookie — a forged cross-site post carries no ingest key.
+
+**These rows identify real people**, which is a category of data nothing else in
+this database held. `data/app.db` was already gitignored and must not be copied
+off the host; that rule now also carries a GDPR consequence. Contact details
+leave the app only through the Leads page and its Excel export, both of which
+need a session. Deleting a lead is a hard delete, because a "deleted" flag on a
+row still holding someone's email is not an erasure.
+
+## Sharing a report with a client
+
+`/r/<token>` serves one weekly report to someone with no account.
+
+The obvious feature request here is a client login. This app deliberately does
+not have one, for the reason `src/lib/team.js` already states: a client account
+is a password that will be reused and leaked, an inbox to reset it from, and a
+permission surface over a workspace containing every *other* client's data. A
+share link inverts all three — it grants exactly one report, it is revoked in
+one click, and there is nothing behind it to escalate to.
+
+The token is 32 bytes of `crypto.randomBytes`, stored hashed and shown once. The
+page is served `noindex`, `Referrer-Policy: no-referrer` and
+`Cache-Control: private, no-store`, because a capability URL that Googlebot
+finds in a forwarded email is a capability URL in the index. Links can carry an
+optional expiry, and every open is counted — which is the field an agency
+actually checks, since the real question about a report is not what it says but
+whether the client opened it.
+
+The shared page carries the report's figures, the specialist's **commentary**
+(one field on the report, rendered identically by the report page, the print
+view and every share link — not three drafts of it), lead **totals** for that
+report's own week, and the agency's **report branding** from the brand page:
+company name, logo URL, accent colour, contact line and footer. The accent is
+the only themeable colour; the severity palette is not, because a warning that
+no longer reads as one is worse than an off-brand red.
+
+It carries **no lead's name, email or phone number**. `verify_leads.js` asserts
+that against the rendered page rather than trusting the template — a shared URL
+is a URL that gets forwarded.
+
+```
+npm run verify:leads   # 66 checks, drives the real app on a spare port
+```
+
 ## Security posture
 
 Every response carries a Content-Security-Policy, `nosniff`, `X-Frame-Options`,

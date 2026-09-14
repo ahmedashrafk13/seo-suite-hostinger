@@ -12,7 +12,8 @@
     "dev": "node src/app.js",
     "cron": "node src/cron.js",
     "doctor": "node src/doctor.js",
-    "verify:security": "node verify_security.js"
+    "verify:security": "node verify_security.js",
+    "verify:leads": "node verify_leads.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

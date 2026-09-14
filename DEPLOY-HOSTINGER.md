@@ -230,3 +230,45 @@ restart, that is the app correctly noticing that the process running it is gone.
 
 **Upgrading to a VPS later.** Install `better-sqlite3` and `bcrypt`, set
 `INPROCESS_CRON=1`, and delete the hPanel cron job. Nothing else changes.
+
+---
+
+## JavaScript rendering (optional, but needed for React/Vue/Angular clients)
+
+Every crawler here reads raw HTML and runs no JavaScript. On a client site that
+ships an empty shell and builds the page in the browser, that means an audit
+reads zero words and the internal-linking crawler reads zero links.
+
+Chromium cannot be installed on shared hosting - no root, no apt, no compiler,
+and Passenger stops the app when it idles - so rendering goes through an API.
+
+**Setup is one line in `.env`:**
+
+```
+ZENROWS_API_KEYS=key_one,key_two
+```
+
+Several keys are drained IN ORDER: the first is used until the provider says
+its allowance is spent, then the next takes over. Nothing else to install -
+the renderer uses only Node built-ins, so `npm install` is unchanged.
+
+**What it costs.** Rendering is billed per page, so the raw fetch happens first
+and for free, and a credit is spent only once that free HTML has *proved* the
+page is a shell (a framework mount point present, and under 120 readable
+words). A server-rendered site never reaches the paid path and costs nothing.
+
+`RENDER_BUDGET` caps how many pages one crawl may render. Left unset it is a
+quarter of the page budget - 125 on a 500-page audit - so the worst case of a
+run is knowable before it starts rather than after the bill. Set it to `0` to
+turn rendering off entirely.
+
+> Do not leave `RENDER_BUDGET=` empty-but-present in `.env`. An empty value
+> used to read as a deliberate zero and silently disabled rendering; that is
+> now handled, but an explicit number or no line at all is still clearer.
+
+**Verify after deploying:**
+
+```
+node verify_renderer.js        # key pool, failover, masking
+node verify_render_budget.js   # proves credits are spent only where needed
+```

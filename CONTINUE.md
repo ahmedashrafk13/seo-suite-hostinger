@@ -272,7 +272,23 @@ expose. If the user confirms they want it, the integration point is a new
 `analytics.js` reader → new Performance tab), so the shape of the work is
 already proven three times over in this codebase.
 
-### 4. Lead/CRM conversion data
+### 4. Lead/CRM conversion data — BUILT (path (a) of the two below)
+
+Done. `POST /api/leads` (a generic inbound webhook, authenticated by a per-brand
+ingest key) writes into a `leads` table keyed by brand + normalised landing path
++ timestamp, and `/leads` joins it against `gsc_page_daily`/`ga4_page_daily` to
+answer "which SEO pages actually produce leads". Lead totals also appear on the
+weekly report's print view and on client share links. See the README sections
+"Leads: measuring the thing after the click" and "Sharing a report with a
+client", `src/lib/leads.js`, and `npm run verify:leads` (66 checks over HTTP).
+
+Path (b) — a direct integration with a named CRM — is still open and still needs
+the user to name the CRM first. It would be an adapter that posts into the same
+endpoint, not a second ingest path.
+
+The original note is kept below for the reasoning behind the choice.
+
+### 4a. Lead/CRM conversion data (original note)
 
 The brief lists this as a data source but no integration exists beyond GA4's
 built-in conversions. Two realistic paths: (a) a generic inbound webhook

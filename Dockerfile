@@ -82,6 +82,12 @@ ENV TRUST_PROXY=1
 # Without this the crawler subprocesses accumulate as zombies on a long-lived
 # machine until it runs out of PIDs.
 ENV TINI_SUBREAPER=1
+# V8 sizes its own heap from the machine's memory and guesses low: on the
+# 512MB Fly VM it settled on ~256MB, and a 60-page architecture crawl exited
+# 134 ("Reached heap limit") against that ceiling while the machine itself
+# still had room. Stating the number leaves headroom for the non-heap side
+# (sockets, the SQLite driver, buffers) without leaving 200MB unused.
+ENV NODE_OPTIONS=--max-old-space-size=384
 
 WORKDIR /app
 
