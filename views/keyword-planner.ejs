@@ -1,0 +1,921 @@
+<%
+/* ============================================================================
+   Keyword Planner.
+
+   Three tools on one page, because they are three questions about the same
+   keyword list and switching between them should not mean losing the list:
+
+     Ideas       what else could we target?      generateKeywordIdeas
+     Metrics     what is MY list worth?          generateKeywordHistoricalMetrics
+     Forecast    what would buying it cost?      generateKeywordForecastMetrics
+
+   The tabs are plain links carrying the form state in the query string, so the
+   page works with JavaScript off and a result is a shareable URL. The one
+   script at the bottom is the location type-ahead, which is an enhancement:
+   without it the country dropdown still targets a whole country.
+
+   EVERY NUMBER ON THIS PAGE CAME FROM GOOGLE ADS. Nothing is blended with the
+   keyless sources /ai-seo/research falls back to, nothing is scaled, and the
+   basis line under each table names the account, country, language and network
+   that produced it. The one exception is the forecast's cost-per-day, which is
+   division and is labelled derived.
+   ============================================================================ */
+const f = form;
+const tab = (result && result.kind === 'forecast') ? 'forecast' : f.tab;
+
+/* Tab links carry the whole form forward. A researcher who has set a country,
+   language and filter set should not have to set them again to ask the next
+   question about the same list. */
+function tabHref(t) {
+  const qs = new URLSearchParams({
+    tab: t,
+    keywords: f.keywordsText,
+    url: f.url,
+    market: f.market,
+    language: f.language,
+    network: f.network,
+    seed_mode: f.seedMode,
+    geo_ids: f.geoIds.join(','),
+    geo_labels: f.geoLabels,
+    sort: f.sort,
+    bing: f.bing ? '1' : '',
+    google: f.google ? '1' : '',
+    google_present: '1',
+  });
+  return '/keyword-planner?' + qs.toString();
+}
+
+/* The Bing column is driven by whether Bing was ASKED, not by whether it
+   answered.
+   It used to key off "does any row have a value", which meant that a run where
+   Bing genuinely had no data for these keywords produced no column at all -
+   indistinguishable from the checkbox not working, which is exactly how it was
+   reported. Asking and getting nothing is a real answer and now looks like
+   one: the column appears with a dash per row and the coverage note says how
+   many keywords Bing had data for. */
+/* GOOGLE'S CLOSE-VARIANT BUCKETS.
+   Google does not report per-phrase demand: it groups close variants and gives
+   every member the SAME figure. That is why "seo", "search engine
+   optimization" and "seo engine optimization" all come back as 90,500 - it is
+   one bucket of demand shown three times, not three keywords each worth
+   90,500. Bing reports the literal string, so a phrase nobody actually types
+   is blank there, and the pair reads as "Bing is broken" when it is in fact
+   Bing disagreeing usefully.
+   Identical figures are the tell, so they are counted and marked. Three or
+   more is the threshold: two rows can share a figure by coincidence, a whole
+   cluster of them cannot. */
+const volumeCounts = new Map();
+if (result && result.rows) {
+  result.rows.forEach(function (r) {
+    if (r.volume == null) return;
+    volumeCounts.set(r.volume, (volumeCounts.get(r.volume) || 0) + 1);
+  });
+}
+function bucketSize(r) {
+  if (r.volume == null) return 0;
+  const n = volumeCounts.get(r.volume) || 0;
+  return n >= 3 ? n : 0;
+}
+const hasBuckets = Array.from(volumeCounts.values()).some(function (n) { return n >= 3; });
+
+const bingAsked = Boolean(f.bing && result && result.kind !== 'forecast');
+const hasBing = bingAsked && Boolean(result && result.rows);
+const bingMatched = hasBing ? result.rows.filter(function (r) { return r.bingVolume != null; }).length : 0;
+
+/* Month columns come from the longest series in the result, so a keyword with
+   a short history simply has blanks rather than shifting every other row's
+   columns out of alignment. */
+const showMonths = Boolean(f.showMonths && result && result.rows);
+let monthCols = [];
+if (showMonths) {
+  let longest = [];
+  result.rows.forEach(function (r) {
+    if ((r.monthly || []).length > longest.length) longest = r.monthly;
+  });
+  monthCols = longest.map(function (m) { return m.label; });
+}
+
+const nf = new Intl.NumberFormat('en-US');
+function n(v) { return v == null ? '-' : nf.format(v); }
+function money(v) { return v == null ? '-' : '$' + Number(v).toFixed(2); }
+
+/* Google reports competition twice: a LOW/MEDIUM/HIGH band and a 0-100 index.
+   Both are shown - the band is what Keyword Planner itself displays, the index
+   is what you sort and filter on. */
+const COMP_CLASS = { LOW: 'good', MEDIUM: 'medium', HIGH: 'high' };
+function compBadge(row) {
+  if (!row.competition && row.competitionIndex == null) return '<span class="dim">-</span>';
+  const cls = COMP_CLASS[row.competition] || 'neutral';
+  const label = row.competition ? row.competition.toLowerCase() : 'unknown';
+  const idx = row.competitionIndex == null ? '' : ' ' + row.competitionIndex;
+  return '<span class="badge ' + cls + '">' + label + idx + '</span>';
+}
+
+function trendCell(v) {
+  if (v == null) return '<span class="dim">-</span>';
+  const cls = v > 5 ? 'good' : (v < -5 ? 'bad' : '');
+  const sign = v > 0 ? '+' : '';
+  return '<span class="' + cls + '">' + sign + v + '%</span>';
+}
+%>
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<%- include('partials/pagehead', {
+      heading: 'Keyword Planner',
+      lede: "Google Ads' own keyword data, unblended: ideas, twelve-month history, competition, top-of-page bids and spend forecasts.",
+      actions: '<a class="btn secondary" href="/ai-seo/research">Blended keyword research</a>'
+    }) %>
+
+<% if (!access.ok) { %>
+  <div class="notice" role="status">
+    <div>
+      <strong>Keyword Planner is not available yet.</strong>
+      <p class="mt-0"><%= access.reason %></p>
+      <p class="mt-0"><%= access.fix %> <a href="/connect">Open the Google connection page</a>, which runs a live probe and reports exactly what Google says.</p>
+    </div>
+  </div>
+<% } else { %>
+  <div class="notice" role="status">
+    <div>
+      Querying <strong><%= access.mode === 'shared' ? 'the shared agency Ads account' : "this team's Ads account" %></strong>
+      <span class="mono-sm"><%= access.customerId %></span><%= access.name ? ' - ' + access.name : '' %><% if (access.ownerEmail) { %>, authorised by <%= access.ownerEmail %><% } %>.
+      <% if (access.staleOwnSelection) { %>
+        <br><strong>Note:</strong> this team selected its own Ads account (<span class="mono-sm"><%= access.staleOwnSelection %></span>)
+        but its Google connection has no Ads access, so the shared account is answering instead.
+        <a href="/connect">Reconnect Google</a> to use the chosen account.
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
+<% if (typeof savedAt !== 'undefined' && savedAt) { %>
+  <div class="notice" role="status">
+    <div>
+      Showing a <strong>saved run</strong> from <%= fmtDateTime(savedAt) %>, rendered from storage - no API
+      call was made to open it. The form below is refilled with the settings that produced it, so submitting
+      again re-runs it against today's data.
+    </div>
+  </div>
+<% } %>
+
+<% if (error) { %>
+  <div class="error-box" role="alert">
+    <strong>Google Ads refused the request.</strong>
+    <p class="mt-0"><%= error.message %></p>
+    <% if (error.hint) { %><p class="mt-0"><em><%= error.hint %></em></p><% } %>
+    <% if (error.raw) { %>
+      <details class="disclosure"><summary>Raw response</summary>
+        <pre class="pre mono-sm"><%= error.raw %></pre>
+      </details>
+    <% } %>
+  </div>
+<% } %>
+
+<div class="row" style="margin-bottom:var(--s-4)">
+  <div class="segmented" role="tablist" aria-label="Keyword Planner tools">
+    <a href="<%= tabHref('ideas') %>" class="<%= tab === 'ideas' ? 'active' : '' %>" role="tab" aria-selected="<%= tab === 'ideas' %>">Find ideas</a>
+    <a href="<%= tabHref('historical') %>" class="<%= tab === 'historical' ? 'active' : '' %>" role="tab" aria-selected="<%= tab === 'historical' %>">Metrics for my list</a>
+    <a href="<%= tabHref('forecast') %>" class="<%= tab === 'forecast' ? 'active' : '' %>" role="tab" aria-selected="<%= tab === 'forecast' %>">Forecast spend</a>
+  </div>
+</div>
+
+<%
+/* ------------------------------------------------------------------ forms --
+   The three forms share a targeting block (country, language, network,
+   locations, date range), emitted once as a partial-by-function rather than
+   copied three times. */
+%>
+<form method="POST" action="/keyword-planner/<%= tab %>" id="kp-form">
+  <%- csrfField %>
+  <input type="hidden" name="tab" value="<%= tab %>">
+
+  <div class="card">
+    <div class="card-head">
+      <h2>
+        <% if (tab === 'ideas') { %>Find new keywords
+        <% } else if (tab === 'historical') { %>Search volume and forecasts for my keywords
+        <% } else { %>Forecast what this list would cost to buy<% } %>
+      </h2>
+      <span class="sub">
+        <% if (tab === 'ideas') { %>
+          Google expands a seed of up to <%= maxSeed %> keywords, a page, or a whole site into its own suggestions.
+        <% } else if (tab === 'historical') { %>
+          Metrics for exactly the keywords you enter - no expansion, up to <%= maxHistorical %> at a time.
+        <% } else { %>
+          Google's Ads forecast for this keyword list at a given bid, over a date range.
+        <% } %>
+      </span>
+    </div>
+    <div class="card-body">
+
+      <% if (tab === 'ideas') { %>
+        <div class="form-row">
+          <div class="field">
+            <label for="seed_mode">Starting point</label>
+            <select id="seed_mode" name="seed_mode">
+              <% seedModes.forEach(function (m) { %>
+                <option value="<%= m.value %>" <%= f.seedMode === m.value ? 'selected' : '' %>><%= m.label %></option>
+              <% }) %>
+            </select>
+            <div class="hint">"Entire site" asks Google for the whole domain; a page URL reads just that page.</div>
+          </div>
+          <div class="field">
+            <label for="url">Page or site URL</label>
+            <input type="url" id="url" name="url" value="<%= f.url %>" placeholder="https://example.com/services">
+            <div class="hint">Used by the three URL-based starting points; ignored otherwise.</div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="field">
+        <label for="keywords">
+          <% if (tab === 'ideas') { %>Seed keywords<% } else if (tab === 'historical') { %>Keywords<% } else { %>Keywords to forecast<% } %>
+        </label>
+        <textarea id="keywords" name="keywords" rows="<%= tab === 'ideas' ? 5 : 9 %>"
+          placeholder="one keyword per line, or paste a CSV column"><%= f.keywordsText %></textarea>
+        <div class="hint">
+          One per line. A pasted CSV row uses its first column, and a "keyword" header line is ignored.
+          <% if (tab === 'ideas') { %>Google accepts <%= maxSeed %> seed keywords; anything past that is dropped.
+          <% } else { %>Up to <%= maxHistorical %> keywords per request.<% } %>
+        </div>
+      </div>
+
+      <%/* ---- shared targeting ---- */%>
+      <div class="form-row">
+        <div class="field">
+          <label for="market">Country</label>
+          <select id="market" name="market">
+            <% marketList.forEach(function (m) { %>
+              <option value="<%= m.code %>" <%= f.market === m.code ? 'selected' : '' %>><%= m.name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="language">Language</label>
+          <select id="language" name="language">
+            <% languages.forEach(function (l) { %>
+              <option value="<%= l.code %>" <%= f.language === l.code ? 'selected' : '' %>><%= l.name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="network">Network</label>
+          <select id="network" name="network">
+            <% networks.forEach(function (nw) { %>
+              <option value="<%= nw.value %>" <%= f.network === nw.value ? 'selected' : '' %>><%= nw.label %></option>
+            <% }) %>
+          </select>
+          <div class="hint">Search partners raises every volume; Search only is the comparable figure.</div>
+        </div>
+      </div>
+
+      <%
+      /* SEARCH ENGINES, stated in the open.
+         This was a checkbox inside the collapsed "request options" section,
+         where nobody found it - the page looked Google-only, which is exactly
+         the wrong impression when a second engine is one click away. It sits
+         under the targeting row instead, because "which engines am I
+         measuring" is the same kind of question as "which country and
+         language", not a request tuning detail. */
+      %>
+      <% if (tab !== 'forecast') { %>
+        <div class="field">
+          <label>Search engines</label>
+          <div class="checkbox-row">
+            <%
+            /* Google is a real choice on "Metrics for my list", and a statement
+               on "Find ideas".
+               That split is not a UI preference, it is what the APIs can do:
+               Bing has no keyword-suggestion endpoint here, so ideas can only
+               come from Google - but "here is my list, what is it worth" is a
+               question Bing answers perfectly well on its own. Turning Google
+               off on that tab spends no Google Ads quota and works with no Ads
+               account at all. On the ideas tab a ticked-and-disabled box just
+               drew the question "can you unfreeze it?", so there it is a chip
+               that cannot be mistaken for a control. */
+            %>
+            <input type="hidden" name="google_present" value="1">
+            <label class="check">
+              <input type="checkbox" name="google" value="1" <%= f.google ? 'checked' : '' %>>
+              <span>Google <span class="dim">(Keyword Planner - volume, competition, bids)</span></span>
+            </label>
+            <label class="check">
+              <input type="checkbox" name="bing" value="1" <%= f.bing ? 'checked' : '' %>>
+              <span>Bing <span class="dim">(free, adds its own column)</span></span>
+            </label>
+          </div>
+          <div class="hint">
+            Bing is a second, independent engine - not a correction to Google's figure, and never blended into
+            it. Its numbers are much smaller because its share of search is, so compare keywords against each
+            other inside the Bing column rather than against the Google one. Every row is checked, but Bing's
+            API takes one keyword per request, so a big run takes time - roughly
+            <strong>25 seconds for 500 keywords</strong>. Leave the page open while it works.
+            <% if (tab === 'historical') { %>
+              <br><strong>Bing only:</strong> untick Google to skip the Google Ads call entirely - no Ads quota
+              spent, and it works even with no Ads account connected. Google-only fields (competition,
+              top-of-page bids, the twelve-month curve) will be empty, because only Google reports them.
+            <% } else { %>
+              <br><strong>On this tab Google must stay on:</strong> keyword ideas come from Google's
+              suggestion endpoint and Bing has no equivalent, so there is nothing for Bing alone to expand.
+              To run Bing on its own, paste your list into <em>Metrics for my list</em>.
+            <% } %>
+          </div>
+        </div>
+      <% } %>
+
+      <%/* ---- city / region targeting ---- */%>
+      <div class="field">
+        <label for="geo-search">Narrow to cities or regions <span class="dim">(optional)</span></label>
+        <input type="search" id="geo-search" autocomplete="off" placeholder="Type a city, state or metro, then pick from the list">
+        <input type="hidden" name="geo_ids" id="geo-ids" value="<%= f.geoIds.join(',') %>">
+        <input type="hidden" name="geo_labels" id="geo-labels" value="<%= f.geoLabels %>">
+        <div id="geo-results" class="row" style="margin-top:6px"></div>
+        <div id="geo-chosen" class="row" style="margin-top:6px"></div>
+        <div class="hint">Added on top of the country above. Leave empty to target the whole country.</div>
+      </div>
+
+      <% if (tab !== 'forecast') { %>
+        <details class="disclosure" <%= (f.startYearMonth || f.endYearMonth || f.deviceBreakdown || f.includeAdultKeywords) ? 'open' : '' %>>
+          <summary>Date range and request options</summary>
+          <div class="form-row">
+            <div class="field">
+              <label for="start_month">History from</label>
+              <input type="month" id="start_month" name="start_month" value="<%= f.startYearMonth %>">
+            </div>
+            <div class="field">
+              <label for="end_month">History to</label>
+              <input type="month" id="end_month" name="end_month" value="<%= f.endYearMonth %>">
+            </div>
+            <% if (tab === 'ideas') { %>
+              <div class="field">
+                <label for="page_size">Maximum ideas</label>
+                <input type="number" id="page_size" name="page_size" min="10" max="1000" step="10" value="<%= f.pageSize || 500 %>">
+              </div>
+            <% } %>
+          </div>
+          <div class="hint" style="margin-bottom:var(--s-3)">
+            Leave both months empty for Google's default of the last full twelve months. Set both to compare a season year on year.
+          </div>
+          <div class="checkbox-row">
+            <label class="check"><input type="checkbox" name="devices" value="1" <%= f.deviceBreakdown ? 'checked' : '' %>>
+              <span>Break searches down by device</span></label>
+            <label class="check"><input type="checkbox" name="show_months" value="1" <%= f.showMonths ? 'checked' : '' %>>
+              <span>Show every month as a column</span></label>
+            <% if (tab === 'ideas') { %>
+              <%/* Marker: this checkbox defaults on, so the route needs to know
+                    it was rendered before it can trust an absent field to mean
+                    "unchecked" rather than "not asked". */%>
+              <input type="hidden" name="annotations_present" value="1">
+              <label class="check"><input type="checkbox" name="annotations" value="1" <%= f.annotations ? 'checked' : '' %>>
+                <span>Group ideas by concept</span></label>
+            <% } %>
+            <label class="check"><input type="checkbox" name="adult" value="1" <%= f.includeAdultKeywords ? 'checked' : '' %>>
+              <span>Include adult keywords</span></label>
+          </div>
+        </details>
+
+        <details class="disclosure" <%= (f.minVolume || f.maxVolume || f.maxCompetitionIndex || f.maxTopBid || f.includeTerms || f.excludeTerms || f.minWords || f.questionsOnly) ? 'open' : '' %>>
+          <summary>Refine the results</summary>
+          <div class="form-row">
+            <div class="field">
+              <label for="min_volume">Minimum monthly searches</label>
+              <input type="number" id="min_volume" name="min_volume" min="0" value="<%= f.minVolume %>">
+            </div>
+            <div class="field">
+              <label for="max_volume">Maximum monthly searches</label>
+              <input type="number" id="max_volume" name="max_volume" min="0" value="<%= f.maxVolume %>">
+            </div>
+            <div class="field">
+              <label for="max_competition">Maximum competition index</label>
+              <input type="number" id="max_competition" name="max_competition" min="0" max="100" value="<%= f.maxCompetitionIndex %>">
+              <div class="hint">0-100. Google's own scale.</div>
+            </div>
+            <div class="field">
+              <label for="max_bid">Maximum top-of-page bid</label>
+              <input type="number" id="max_bid" name="max_bid" min="0" step="0.01" value="<%= f.maxTopBid %>">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="field">
+              <label for="include_terms">Must contain any of</label>
+              <input type="text" id="include_terms" name="include_terms" value="<%= f.includeTerms %>" placeholder="comma separated">
+            </div>
+            <div class="field">
+              <label for="exclude_terms">Must not contain</label>
+              <input type="text" id="exclude_terms" name="exclude_terms" value="<%= f.excludeTerms %>" placeholder="free, jobs, salary">
+            </div>
+            <div class="field">
+              <label for="min_words">Minimum words</label>
+              <input type="number" id="min_words" name="min_words" min="1" max="10" value="<%= f.minWords %>">
+              <div class="hint">3 or more isolates long-tail terms.</div>
+            </div>
+            <div class="field">
+              <label for="sort">Sort by</label>
+              <select id="sort" name="sort">
+                <% sorts.forEach(function (s) { %>
+                  <option value="<%= s.value %>" <%= f.sort === s.value ? 'selected' : '' %>><%= s.label %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+          <div class="checkbox-row">
+            <label class="check"><input type="checkbox" name="questions_only" value="1" <%= f.questionsOnly ? 'checked' : '' %>>
+              <span>Questions only (how, what, why, can, is...)</span></label>
+          </div>
+          <div class="hint">
+            Google accepts none of these as request parameters on these methods, so they are applied to the rows it returns.
+            The count of what they removed is shown with the results.
+          </div>
+        </details>
+      <% } else { %>
+        <div class="form-row">
+          <div class="field">
+            <label for="max_cpc">Maximum CPC bid</label>
+            <input type="number" id="max_cpc" name="max_cpc" min="0.01" step="0.01" value="<%= f.maxCpcBid || '2.00' %>" required>
+            <div class="hint">In the Ads account's own currency.</div>
+          </div>
+          <div class="field">
+            <label for="match_type">Match type</label>
+            <select id="match_type" name="match_type">
+              <% matchTypes.forEach(function (mt) { %>
+                <option value="<%= mt %>" <%= f.matchType === mt ? 'selected' : '' %>><%= mt.toLowerCase() %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label for="start_date">Forecast from</label>
+            <input type="date" id="start_date" name="start_date" value="<%= f.startDate %>">
+          </div>
+          <div class="field">
+            <label for="end_date">Forecast to</label>
+            <input type="date" id="end_date" name="end_date" value="<%= f.endDate %>">
+          </div>
+        </div>
+        <div class="hint">
+          Leave the dates empty for the next 30 days. Google refuses a range starting sooner than two days
+          from now, and forecasts at most a year ahead.
+          <br><strong>Not offered here because Google's forecast API does not accept them:</strong> negative
+          keywords, an expected conversion rate, and a network choice. Each was tried against the live
+          endpoint and rejected as an unknown field, so a control for it would be a control that does nothing.
+        </div>
+      <% } %>
+
+      <div class="section-divider"></div>
+      <div class="row">
+        <%
+        /* A Bing-only run needs no Google Ads account, so the missing-account
+           state must not disable it - that would hide the one path still open
+           to a team without Ads access. */
+        const _needsAds = !(tab === 'historical' && !f.google && f.bing);
+        %>
+        <button class="btn" type="submit" <%= (access.ok || !_needsAds) ? '' : 'disabled' %>>
+          <% if (tab === 'ideas') { %>Find keyword ideas
+          <% } else if (tab === 'historical') { %>Get metrics
+          <% } else { %>Run forecast<% } %>
+        </button>
+        <% if (tab !== 'forecast') { %>
+          <button class="btn secondary" type="submit" formaction="/keyword-planner/export.csv" <%= (access.ok || !_needsAds) ? '' : 'disabled' %>>Download CSV</button>
+        <% } %>
+        <% if (!access.ok && _needsAds) { %>
+          <span class="hint">
+            Connect a Google Ads account to enable this<%= tab === 'historical' ? ' - or untick Google and run against Bing alone.' : '.' %>
+          </span>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</form>
+
+<%
+/* ---------------------------------------------------------------- results -- */
+%>
+<% if (result && result.kind === 'forecast') { %>
+  <div class="stat-row">
+    <div class="stat is-primary">
+      <div class="label"><span>Clicks</span></div>
+      <span class="value"><%= n(result.metrics.clicks == null ? null : Math.round(result.metrics.clicks)) %></span>
+      <div class="meta">over <%= result.period.days %> days</div>
+    </div>
+    <div class="stat">
+      <div class="label"><span>Impressions</span></div>
+      <span class="value"><%= n(result.metrics.impressions == null ? null : Math.round(result.metrics.impressions)) %></span>
+      <div class="meta"><%= result.metrics.ctr == null ? '' : result.metrics.ctr + '% CTR' %></div>
+    </div>
+    <div class="stat">
+      <div class="label"><span>Cost</span></div>
+      <span class="value"><%= money(result.metrics.cost) %></span>
+      <div class="meta"><%= result.metrics.costPerDay == null ? '' : money(result.metrics.costPerDay) + '/day (derived)' %></div>
+    </div>
+    <div class="stat">
+      <div class="label"><span>Average CPC</span></div>
+      <span class="value"><%= money(result.metrics.averageCpc) %></span>
+      <div class="meta">at a <%= money(result.maxCpcBid) %> max bid</div>
+    </div>
+    <% if (result.metrics.conversions != null) { %>
+      <div class="stat">
+        <div class="label"><span>Conversions</span></div>
+        <span class="value"><%= n(Math.round(result.metrics.conversions)) %></span>
+        <div class="meta"><%= result.metrics.averageCpa == null ? '' : money(result.metrics.averageCpa) + ' per conversion' %></div>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="mt-0">
+        <%= n(result.keywordCount) %> keywords on <%= result.matchType.toLowerCase() %> match,
+        <%= result.period.startDate %> to <%= result.period.endDate %>.
+        <% if (result.conversionRateInput == null) { %>
+          Conversions are not forecast because no expected conversion rate was given.
+        <% } %>
+      </p>
+      <p class="basis">
+        google ads <%= result.basis.apiVersion %> &middot; <%= result.basis.account %> &middot;
+        <%= result.basis.market %> &middot; <%= result.basis.language %> &middot; <%= result.basis.network %>
+      </p>
+      <% if (result.truncatedSeed) { %>
+        <p class="hint"><%= result.truncatedSeed %> keywords past the limit were not included in this forecast.</p>
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
+<% if (result && result.kind !== 'forecast') { %>
+  <% if (result.devices && result.devices.length) { %>
+    <div class="stat-row">
+      <% result.devices.forEach(function (d) { %>
+        <div class="stat">
+          <div class="label"><span><%= d.device %></span></div>
+          <span class="value sm"><%= n(d.searches) %></span>
+          <div class="meta"><%= d.share %>% of searches</div>
+          <span class="meter"><span style="width:<%= d.share %>%"></span></span>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <% if (result.conceptGroups && result.conceptGroups.length > 1) { %>
+    <div class="card">
+      <div class="card-head">
+        <h3>Idea groups</h3>
+        <span class="sub">Google's own concept grouping, which is what Keyword Planner shows in its grouped view</span>
+      </div>
+      <div class="card-body" style="padding-top:var(--s-3)">
+        <div class="row">
+          <% result.conceptGroups.forEach(function (g) { %>
+            <span class="chip"><%= g.name %> <span class="dim"><%= g.keywords %> kw &middot; <%= n(g.volume) %>/mo</span></span>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><%= result.kind === 'ideas' ? 'Keyword ideas' : 'Keyword metrics' %></h3>
+      <span class="sub">
+        <%= n(result.total) %> keywords
+        <% if (result.filteredOut) { %>&middot; <%= n(result.filteredOut) %> removed by your refinements<% } %>
+        <% if (hasBing) { %>
+          &middot; Bing checked <%= n(result.bingChecked || 0) %><%= (result.bingCapped ? ' of ' + n(result.total) : '') %>,
+          data for <%= n(bingMatched) %>
+        <% } %>
+      </span>
+    </div>
+
+    <%
+    /* GOOGLE FOUND NO IDEAS - the state that reads as a broken page.
+       Google mixes the seeds back into its results, so a dead seed comes back
+       as a normal-looking one-row table with no explanation. The commonest
+       cause by far is a typo: Google Ads does not spell-correct, so a
+       misspelling is treated as a real but obscure term and returns itself and
+       nothing else. Tested live: "seo serivces" returns 1 row, "seo services"
+       returns 500. */
+    const noIdeas = result.kind === 'ideas' && !result.newIdeas;
+    %>
+    <% if (noIdeas) { %>
+      <div class="card-body" style="padding-bottom:0">
+        <div class="notice" role="status">
+          <div>
+            <strong>Google found no new keyword ideas for this seed.</strong>
+            <p class="mt-0">
+              It returned only the <%= result.seedCount === 1 ? 'term' : 'terms' %> you entered, which usually means one of:
+            </p>
+            <ul style="margin:6px 0 8px 18px;padding:0">
+              <li><strong>A spelling mistake.</strong> Google Ads does not correct spelling - a misspelled
+                word is treated as a real but very rare term, so it returns itself and nothing else. This is
+                the most common cause by far. Check the seed above carefully.</li>
+              <li><strong>The seed is too specific.</strong> Long phrases and brand names have no idea
+                ecosystem around them. Try the shortest version of the topic.</li>
+              <li><strong>Wrong country or language</strong> for the term.</li>
+            </ul>
+            <p class="mt-0 hint">
+              Try a broader head term - "seo services" rather than "affordable seo services company" - or
+              switch the starting point to a page URL and let Google read the page instead.
+            </p>
+          </div>
+        </div>
+      </div>
+    <% } %>
+
+    <% if (hasBing && !bingMatched && !noIdeas) { %>
+      <div class="card-body" style="padding-bottom:0">
+        <div class="notice" role="status">
+          <div>
+            <strong>Bing was queried and returned no volume for these keywords.</strong>
+            That is an answer, not a failure - Bing's search share is a fraction of Google's, so long-tail
+            terms frequently have too little activity for it to report. The Bing column below is shown with
+            a dash per row so it is clear the lookup ran.
+            <% if (result.bingNote) { %><br><span class="hint"><%= result.bingNote %></span><% } %>
+          </div>
+        </div>
+      </div>
+    <% } %>
+
+    <% if (result.kind === 'historical' && result.missing && result.missing.length) { %>
+      <div class="card-body" style="padding-bottom:0">
+        <div class="notice">
+          <div>
+            <strong>Google returned no data for <%= result.missing.length %> of your keywords.</strong>
+            <p class="mt-0">That means too little search activity to report, or a typo - it does not mean zero searches.
+              <span class="mono-sm"><%= result.missing.slice(0, 25).join(', ') %><%= result.missing.length > 25 ? ' ...' : '' %></span></p>
+          </div>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="card-body" style="padding:0">
+      <% if (!result.rows.length) { %>
+        <div class="empty-state" style="padding:16px">
+          <div class="icon">&#9906;</div>
+          Google returned no keywords for that request.
+          <% if (result.returned) { %>Every one of the <%= result.returned %> it returned was removed by your refinements.<% } %>
+          <% if (!result.returned) { %>An empty result with a working connection is also what a test-access developer token produces - <a href="/connect">the connection page</a> tells the two apart.<% } %>
+        </div>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr>
+                <th>Keyword</th>
+                <th class="num"><%= hasBing ? 'Google searches/mo' : 'Avg monthly searches' %></th>
+                <% if (hasBing) { %><th class="num">Bing searches/mo</th><% } %>
+                <th>Competition</th>
+                <th class="num">Top of page bid (low)</th>
+                <th class="num">Top of page bid (high)</th>
+                <th class="num" title="Average of the last three months against the three before them">3-month change</th>
+                <th class="num" title="Average of the last three months against the same three months a year earlier">Year on year</th>
+                <th class="num">Trend</th>
+                <th>History</th>
+                <% if (showMonths) { monthCols.forEach(function (label) { %>
+                  <th class="num" style="white-space:nowrap"><%= label %></th>
+                <% }) } %>
+                <% if (result.kind === 'ideas') { %><th>Group</th><% } %>
+              </tr>
+            </thead>
+            <tbody>
+              <% result.rows.forEach(function (r) { %>
+                <tr>
+                  <td>
+                    <%= r.keyword %>
+                    <% if (r.isSeed) { %> <span class="badge neutral">seed</span><% } %>
+                    <% if (r.closeVariants && r.closeVariants.length) { %>
+                      <div class="hint">also counts: <%= r.closeVariants.join(', ') %></div>
+                    <% } %>
+                  </td>
+                  <td class="num">
+                    <%= n(r.volume) %>
+                    <% var _b = bucketSize(r); if (_b) { %>
+                      <span class="dim" style="font-size:11px"
+                        title="Google reports this same figure for <%= _b %> keywords in these results. It groups close variants into one bucket of demand, so this is the bucket's volume, not this exact phrase's.">&#8942;<%= _b %></span>
+                    <% } %>
+                  </td>
+                  <% if (hasBing) { %>
+                    <td class="num">
+                      <% if (r.bingVolume === 0) { %>
+                        <%/* A MEASURED zero, not a missing value. Bing returned
+                             a full time series for this phrase and every week
+                             in it was zero, which is a different statement from
+                             "Bing has never heard of this phrase" below - so it
+                             keeps the number and explains itself. */%>
+                        <span title="Bing tracks this phrase but recorded no search activity across the weeks it returned. This is a measured zero, not missing data - unlike a dash, which means Bing has no record of the phrase at all.">0</span>
+                      <% } else if (r.bingVolume != null) { %>
+                        <%= n(r.bingVolume) %>
+                      <% } else if (r.bingChecked) { %>
+                        <span class="dim" title="Bing has no record of this exact phrase. Bing reports the literal string, so a close variant that nobody actually types is blank here even when Google shows a large number for its variant bucket.">-</span>
+                      <% } else { %>
+                        <span class="dim" title="Not looked up: Bing's API takes one keyword per request, so only the first rows are checked">&middot;&middot;&middot;</span>
+                      <% } %>
+                    </td>
+                  <% } %>
+                  <td><%- compBadge(r) %></td>
+                  <td class="num"><%= money(r.lowBid) %></td>
+                  <td class="num"><%= money(r.highBid) %></td>
+                  <td class="num"><%- trendCell(r.change3m) %></td>
+                  <td class="num"><%- trendCell(r.changeYoY) %></td>
+                  <td class="num"><%- trendCell(r.trendPct) %></td>
+                  <td class="narrow">
+                    <% if (r.monthly && r.monthly.length > 1) { %>
+                      <span class="spark" title="<%= r.monthly.map(function (m) { return m.label + ': ' + (m.volume == null ? 'n/a' : m.volume); }).join(' | ') %>">
+                        <%- include('partials/sparkline', { points: r.monthly.map(function (m) { return m.volume || 0; }) }) %>
+                      </span>
+                    <% } else { %><span class="dim">-</span><% } %>
+                  </td>
+                  <% if (showMonths) {
+                       var byLabel = {};
+                       (r.monthly || []).forEach(function (m) { byLabel[m.label] = m.volume; });
+                       monthCols.forEach(function (label) { %>
+                    <td class="num"><%= byLabel[label] == null ? '-' : n(byLabel[label]) %></td>
+                  <% }) } %>
+                  <% if (result.kind === 'ideas') { %>
+                    <td><%= r.conceptGroup || '-' %></td>
+                  <% } %>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="card-foot">
+      <p class="basis">
+        google ads <%= result.basis.apiVersion %> &middot; <%= result.basis.account %> &middot;
+        <%= result.basis.market %> &middot; <%= result.basis.language %> &middot; <%= result.basis.network %>
+      </p>
+      <% if (hasBuckets) { %>
+        <p class="hint">
+          <strong>&#8942;N next to a Google figure</strong> means Google reports that identical number for N
+          keywords here. Google groups close variants into one bucket and shows every member the bucket's
+          total, so those rows are one opportunity, not N of them - and a phrase inside the bucket that
+          nobody actually types will be blank in the Bing column, because Bing reports the literal string.
+          That disagreement is the useful part: it tells you which spelling in the bucket is the real one.
+        </p>
+      <% } %>
+      <% if (result.bingNote) { %>
+        <p class="hint"><strong>Bing:</strong> <%= result.bingNote %></p>
+        <%/* Shown whenever Bing ran, not only when a run was truncated: the
+             three empty states exist on every run, and the legend explaining
+             them is exactly what was missing when they were first queried. */%>
+        <% if (hasBing) { %>
+          <p class="hint">
+            In the Bing column, <strong>0</strong> is a measured zero - Bing tracks the phrase and saw no
+            activity; <strong>-</strong> means Bing has no record of that exact phrase at all; and
+            <strong>&middot;&middot;&middot;</strong> means that row was never looked up - Bing rate-limited
+            the run and the remainder was skipped. They are three different answers, so they are drawn
+            differently. Bing's allowance refills over a few minutes, so a skipped row is worth re-running;
+            a dash is not.
+          </p>
+        <% } %>
+      <% } %>
+      <% if (result.truncatedSeed) { %>
+        <p class="hint"><%= result.truncatedSeed %> keywords past Google's limit were not sent.</p>
+      <% } %>
+      <% if (result.nextPageToken) { %>
+        <p class="hint">Google has more ideas than the maximum you asked for. Raise "Maximum ideas", or narrow the seed.</p>
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
+<% if (history && history.length) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>Saved runs</h3>
+      <span class="sub">Open one to see every keyword and every metric it captured - no API quota is spent</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table class="data">
+          <thead>
+            <tr>
+              <th>Run</th><th>Tool</th><th>Engines</th><th>Country</th>
+              <th class="num">Rows</th><th>Saved</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% history.forEach(function (h) { %>
+              <tr<%= String(h.id) === String(runId) ? ' style="background:var(--surface-3)"' : '' %>>
+                <td><a href="/keyword-planner/run/<%= h.id %>"><strong><%= h.label || ('Run #' + h.id) %></strong></a></td>
+                <td><%= h.kind === 'ideas' ? 'Find ideas' : (h.kind === 'forecast' ? 'Forecast' : 'Metrics') %></td>
+                <td><%= h.engines || 'google' %></td>
+                <td><%= h.market %></td>
+                <td class="num"><%= h.row_count %></td>
+                <td class="narrow"><%= fmtDateTime(h.created_at) %></td>
+                <td style="white-space:nowrap">
+                  <a class="btn secondary xs" href="/keyword-planner/run/<%= h.id %>">Open all <%= h.row_count %> keywords</a>
+                  <form method="POST" action="/keyword-planner/run/<%= h.id %>/delete" style="display:inline"
+                        onsubmit="return confirm('Delete this saved run?')"><%- csrfField %>
+                    <button class="btn ghost xs" type="submit">Delete</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<script>
+/* Location type-ahead. An enhancement only: with this script absent the
+   country dropdown above still targets a whole country, and the hidden fields
+   simply stay empty. Chosen locations are kept as chips so a submitted form
+   comes back showing what it targeted rather than a row of opaque ids. */
+(function () {
+  var box = document.getElementById('geo-search');
+  if (!box) return;
+  var ids = document.getElementById('geo-ids');
+  var labels = document.getElementById('geo-labels');
+  var results = document.getElementById('geo-results');
+  var chosen = document.getElementById('geo-chosen');
+  var market = document.getElementById('market');
+  var timer = null;
+
+  function parts(v) { return (v || '').split('|').filter(Boolean); }
+
+  function renderChosen() {
+    var idList = parts(ids.value.replace(/,/g, '|'));
+    var nameList = parts(labels.value);
+    chosen.innerHTML = '';
+    idList.forEach(function (id, i) {
+      var chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip';
+      chip.textContent = (nameList[i] || id) + '  ×';
+      chip.title = 'Remove this location';
+      chip.addEventListener('click', function () {
+        idList.splice(i, 1); nameList.splice(i, 1);
+        ids.value = idList.join(',');
+        labels.value = nameList.join('|');
+        renderChosen();
+      });
+      chosen.appendChild(chip);
+    });
+  }
+
+  function add(id, name) {
+    var idList = parts(ids.value.replace(/,/g, '|'));
+    if (idList.indexOf(id) >= 0) return;
+    idList.push(id);
+    var nameList = parts(labels.value);
+    nameList.push(name);
+    ids.value = idList.join(',');
+    labels.value = nameList.join('|');
+    results.innerHTML = '';
+    box.value = '';
+    renderChosen();
+  }
+
+  box.addEventListener('input', function () {
+    clearTimeout(timer);
+    var q = box.value.trim();
+    if (q.length < 3) { results.innerHTML = ''; return; }
+    timer = setTimeout(function () {
+      var url = '/keyword-planner/geo?q=' + encodeURIComponent(q)
+              + '&country=' + encodeURIComponent(market ? market.value : '');
+      fetch(url, { headers: { 'Accept': 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          results.innerHTML = '';
+          if (!d.ok) {
+            var e = document.createElement('span');
+            e.className = 'hint';
+            e.textContent = d.error || 'Location lookup failed.';
+            results.appendChild(e);
+            return;
+          }
+          if (!d.results.length) {
+            var none = document.createElement('span');
+            none.className = 'hint';
+            none.textContent = 'No locations match that.';
+            results.appendChild(none);
+            return;
+          }
+          d.results.forEach(function (g) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'chip';
+            var where = g.parents && g.parents.length ? ' (' + g.parents.join(', ') + ')' : '';
+            b.textContent = g.name + where + (g.type ? ' · ' + g.type.toLowerCase() : '');
+            b.addEventListener('click', function () { add(g.id, g.name + where); });
+            results.appendChild(b);
+          });
+        })
+        .catch(function () { results.innerHTML = ''; });
+    }, 300);
+  });
+
+  renderChosen();
+})();
+</script>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

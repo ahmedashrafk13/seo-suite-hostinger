@@ -6,6 +6,19 @@
 <%- include('partials/sidebar') %>
 <%- include('partials/topbar') %>
 
+<%
+/* Search-volume columns appear only when the run was actually enriched with
+   Google Keyword Planner data. Tested on the CLUSTERS, not on a flag: a run
+   stored before this existed has no volume fields at all, and a run where the
+   lookup failed has the fields set to null. Both should render exactly as
+   they did before rather than showing a column of dashes. */
+const hasVolume = (clusters || []).some(function (c) { return c.searchVolume != null; });
+/* Read straight off the run, NOT off the `res` alias declared further down:
+   that is a `var`, so it is hoisted into scope here but still undefined, and
+   reading it at this point would silently yield null forever. */
+const plannerNote = (run && run.result && run.result.plannerNote) || null;
+%>
+
     <div class="toolbar">
       <a class="btn ghost sm" href="/keywords">&larr; Keyword clustering</a>
       <div class="spacer"></div>
@@ -31,7 +44,20 @@
         <div class="value"><%= clusters.length %></div>
         <div class="meta">after filters</div>
       </div>
+      <% if (hasVolume) { %>
+        <div class="stat is-primary">
+          <div class="label"><span>Total searches/mo</span></div>
+          <div class="value">
+            <%= (clusters || []).reduce(function (a, c) { return a + (c.searchVolume || 0); }, 0).toLocaleString('en-US') %>
+          </div>
+          <div class="meta">Google Keyword Planner, shown clusters</div>
+        </div>
+      <% } %>
     </div>
+
+    <% if (plannerNote) { %>
+      <div class="notice" role="status"><div><%= plannerNote %></div></div>
+    <% } %>
 
     <div class="card">
       <div class="card-head">
@@ -109,6 +135,11 @@
                   <th class="num">Keywords</th>
                   <th>Intent</th>
                   <th>Suggested page type</th>
+                  <% if (hasVolume) { %>
+                    <th class="num">Searches/mo</th>
+                    <th class="num">Top bid</th>
+                    <th class="num">Traffic value</th>
+                  <% } %>
                   <th class="num">Impressions</th>
                   <th class="num">Clicks</th>
                   <th class="num">Avg pos</th>
@@ -130,7 +161,7 @@
                       'Create new page': 'accent',
                       'Improve existing page': 'medium',
                       'Consolidate existing pages': 'high',
-                      'Existing page — already strong': 'good',
+                      'Existing page - already strong': 'good',
                     })[c.recommendation] || 'neutral';
                   %>
                   <tr>
@@ -140,8 +171,8 @@
                           typeof so runs saved before these fields existed
                           still render. %>
                       <% if (c.isGeoTargeted) { %><span class="badge neutral" title="This cluster targets a specific location and is kept separate from national keywords">📍 <%= c.placeKey %></span><% } %>
-                      <% if (c.isHub) { %><span class="badge neutral" title="Covers several distinct sub-topics — consider a hub page with child pages">Hub</span><% } %>
-                      <% if (c.needsReview) { %><span class="badge warn" title="These keywords are only loosely related — check the grouping before commissioning">Check grouping</span><% } %>
+                      <% if (c.isHub) { %><span class="badge neutral" title="Covers several distinct sub-topics - consider a hub page with child pages">Hub</span><% } %>
+                      <% if (c.needsReview) { %><span class="badge warn" title="These keywords are only loosely related - check the grouping before commissioning">Check grouping</span><% } %>
                       <% if ((c.subClusters || []).length >= 2) { %>
                         <div class="sub-line">Sub-topics: <%= c.subClusters.slice(0, 4).map(function(s){ return s.label; }).join(' · ') %><%= c.subClusters.length > 4 ? ' …' : '' %></div>
                       <% } %>
@@ -155,9 +186,19 @@
                     <td class="num"><%= c.keywordCount %></td>
                     <td><span class="badge <%= intentBadge %>"><%= c.intent %></span> <span class="hint"><%= c.intentConfidence %></span></td>
                     <td class="wide"><%= c.suggestedPageType %></td>
+                    <% if (hasVolume) { %>
+                      <td class="num">
+                        <%= c.searchVolume == null ? ' - ' : Math.round(c.searchVolume).toLocaleString('en-US') %>
+                        <% if (c.searchVolume != null && c.volumeKeywords < c.keywordCount) { %>
+                          <div class="sub-line" title="Google reported no volume for the other keywords in this cluster"><%= c.volumeKeywords %> of <%= c.keywordCount %> kw</div>
+                        <% } %>
+                      </td>
+                      <td class="num"><%= c.topCpc == null ? ' - ' : '$' + Number(c.topCpc).toFixed(2) %></td>
+                      <td class="num"><%= c.trafficValue == null ? ' - ' : '$' + Math.round(c.trafficValue).toLocaleString('en-US') %></td>
+                    <% } %>
                     <td class="num"><%= Math.round(c.totalImpressions).toLocaleString('en-US') %></td>
                     <td class="num"><%= Math.round(c.totalClicks).toLocaleString('en-US') %></td>
-                    <td class="num"><%= c.avgPosition == null ? '—' : c.avgPosition.toFixed(1) %></td>
+                    <td class="num"><%= c.avgPosition == null ? ' - ' : c.avgPosition.toFixed(1) %></td>
                     <td class="wide">
                       <span class="badge <%= recBadge %>"><%= c.recommendation %></span>
                       <div class="sub-line"><%= c.recommendationReason %></div>

@@ -33,7 +33,67 @@ router.get('/', (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/run', (req, res, next) => {
+// Attaches Google Keyword Planner volume to a keyword list before it is
+// clustered.
+//
+// WHY THIS IS A SEPARATE STEP. clustering.cluster() is synchronous and is
+// called from several places; making it async to fetch volumes would ripple
+// through all of them. Enriching the INPUT keeps the clustering engine pure
+// and means a run either has volume on every keyword or on none, which is
+// what the roll-up in that file assumes.
+//
+// NEVER FATAL. A clustering run that worked yesterday without an Ads account
+// must still work today: if the lookup fails for any reason - no developer
+// token, no account, a quota error, a sunset API version - the keywords go
+// through unenriched and the reason is surfaced on the result page as a note,
+// not as a failed run.
+async function attachPlannerVolume(userId, input, { market, language }) {
+  const planner = require('../lib/aiseo/keywordPlanner');
+  const terms = input.map((x) => (typeof x === 'string' ? x : x.keyword)).filter(Boolean);
+  if (!terms.length) return { input, note: null };
+
+  // Google caps a single historical-metrics call; beyond that the run would
+  // be partially enriched, which the roll-up reports honestly but which is
+  // worth naming on the page rather than leaving to be noticed.
+  const capped = terms.slice(0, planner.MAX_HISTORICAL_KEYWORDS);
+  try {
+    const res = await planner.historical(userId, {
+      keywords: capped, market, language, network: 'GOOGLE_SEARCH',
+    });
+    const byKeyword = new Map();
+    res.rows.forEach((r) => {
+      const row = { volume: r.volume, cpc: r.highBid, competition: r.competition };
+      byKeyword.set(r.keyword.toLowerCase(), row);
+      // Google folds plurals and spacing variants into one row and names the
+      // terms it merged. Mapping those back means a user's own keyword gets
+      // the volume Google actually reported for it, instead of looking like a
+      // keyword Google had no data for.
+      (r.closeVariants || []).forEach((v) => byKeyword.set(String(v).toLowerCase(), row));
+    });
+
+    const enriched = input.map((x) => {
+      const obj = typeof x === 'string' ? { keyword: x } : { ...x };
+      const hit = byKeyword.get(String(obj.keyword || '').toLowerCase());
+      return hit ? { ...obj, ...hit } : obj;
+    });
+    const matched = enriched.filter((x) => x.volume != null).length;
+    return {
+      input: enriched,
+      note: matched
+        ? `Google Keyword Planner volume attached to ${matched} of ${terms.length} keywords`
+          + (terms.length > capped.length ? ` (only the first ${capped.length} were looked up)` : '')
+          + `. Source: ${res.basis.account}, ${res.basis.market}, ${res.basis.language}.`
+        : 'Google Keyword Planner returned no volume for any of these keywords, so clusters are ordered by Search Console impressions.',
+    };
+  } catch (err) {
+    return {
+      input,
+      note: `Search volume was not attached: ${err.message} Clusters are ordered by Search Console impressions instead.`,
+    };
+  }
+}
+
+router.post('/run', async (req, res, next) => {
   try {
     const userId = req.dataUserId;
     const brandId = req.body.brand_id ? Number(req.body.brand_id) : null;
@@ -56,13 +116,27 @@ router.post('/run', (req, res, next) => {
           'No Search Console keywords matched those settings. Lower the minimum impressions, widen the window, or sync the brand first.'
         ));
       }
-      if (!name) name = `${brand.name} — Search Console keywords`;
+      if (!name) name = `${brand.name} - Search Console keywords`;
     } else {
       input = clustering.parseKeywordInput(req.body.keywords || '');
       if (!input.length) {
         return res.redirect('/keywords?error=' + encodeURIComponent('No keywords were found in that input. Paste one keyword per line, or a CSV with a "keyword" column.'));
       }
       if (!name) name = `Pasted list (${input.length} keywords)`;
+    }
+
+    // Opt-in, because it spends a Google Ads API call and needs a connected
+    // account. Default ON when one is available: a cluster list ordered by
+    // real demand is the better answer, and the checkbox exists mainly so a
+    // large paste can skip the lookup.
+    let plannerNote = null;
+    if (req.body.with_volume === '1') {
+      const enriched = await attachPlannerVolume(userId, input, {
+        market: (brand && brand.market) || 'US',
+        language: (brand && brand.locale) || 'en',
+      });
+      input = enriched.input;
+      plannerNote = enriched.note;
     }
 
     const result = clustering.cluster(input, {
@@ -72,6 +146,9 @@ router.post('/run', (req, res, next) => {
       market: (brand && brand.market) || null,
       minSimilarity: Math.min(0.9, Math.max(0.1, parseFloat(req.body.min_similarity) || 0.4)),
     });
+    // Stored with the run so the result page can state where the numbers came
+    // from months later, when the Ads connection may look different.
+    if (plannerNote) result.plannerNote = plannerNote;
 
     const runId = clustering.saveRun(userId, brand ? brand.id : null, name, source, result);
     res.redirect(`/keywords/${runId}`);
@@ -79,7 +156,7 @@ router.post('/run', (req, res, next) => {
 });
 
 // ------------------------------------------------------------ content briefs
-// Registered before GET /:id — Express matches routes in definition order,
+// Registered before GET /:id - Express matches routes in definition order,
 // and a bare "/:id" pattern would otherwise swallow "/briefs" as if "briefs"
 // were a run id (confirmed as a real bug during testing: GET /keywords/briefs
 // 404'd because it hit /:id first with id="briefs").
@@ -106,7 +183,7 @@ router.get('/brief/:briefId', (req, res, next) => {
       return res.status(404).render('error', { title: 'Not found', active: 'keywords', message: 'That content brief does not exist.' });
     }
     res.render('brief-detail', {
-      title: `Brief — ${row.primary_keyword}`, active: 'briefs', pageTitle: 'Content brief',
+      title: `Brief - ${row.primary_keyword}`, active: 'briefs', pageTitle: 'Content brief',
       row, d: row.data,
       // Stored briefs are frozen snapshots; the view warns when one predates
       // the current generator so nobody writes from stale output.
@@ -158,7 +235,7 @@ router.get('/:id', (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// A cluster must be approved before "Content brief" will generate one — see
+// A cluster must be approved before "Content brief" will generate one - see
 // the approved_clusters table comment in db.js for why.
 router.post('/:id/cluster/:clusterId/approve', (req, res, next) => {
   try {
@@ -173,7 +250,7 @@ router.post('/:id/cluster/:clusterId/approve', (req, res, next) => {
       VALUES (?,?,?,?,?)
       ON CONFLICT(keyword_run_id, cluster_id) DO UPDATE SET approved_by=excluded.approved_by, approved_at=datetime('now')`)
       .run(userId, run.id, cluster.id, cluster.primaryKeyword, approver);
-    res.redirect(`/keywords/${run.id}?msg=` + encodeURIComponent(`Approved "${cluster.primaryKeyword}" for content — brief can now be generated.`));
+    res.redirect(`/keywords/${run.id}?msg=` + encodeURIComponent(`Approved "${cluster.primaryKeyword}" for content - brief can now be generated.`));
   } catch (err) { next(err); }
 });
 
@@ -201,9 +278,9 @@ router.post('/:id/create-tasks', (req, res, next) => {
     const parts = [];
     parts.push(created
       ? `${created} content task${created === 1 ? '' : 's'} added to the backlog.`
-      : 'No new tasks — these clusters already have tasks.');
+      : 'No new tasks - these clusters already have tasks.');
     if (retired && retired.resolved) {
-      parts.push(`${retired.resolved} earlier cluster task${retired.resolved === 1 ? '' : 's'} auto-resolved — those topics no longer appear.`);
+      parts.push(`${retired.resolved} earlier cluster task${retired.resolved === 1 ? '' : 's'} auto-resolved - those topics no longer appear.`);
     }
     if (retired && retired.annotated) {
       parts.push(`${retired.annotated} in-progress task${retired.annotated === 1 ? '' : 's'} flagged as no longer detected, but left open.`);
@@ -237,7 +314,7 @@ router.post('/:id/cluster/:clusterId/brief', (req, res, next) => {
       .get(run.id, req.params.clusterId);
     if (!approved) {
       return res.redirect(`/keywords/${run.id}?error=` + encodeURIComponent(
-        'Approve this keyword before generating a brief for it — briefs are only built for keywords the SEO team has signed off on.'
+        'Approve this keyword before generating a brief for it - briefs are only built for keywords the SEO team has signed off on.'
       ));
     }
 
@@ -290,7 +367,7 @@ router.get('/:id/csv', async (req, res) => {
           { header: 'Impressions', key: 'impressions', width: 12 },
           { header: 'Clicks', key: 'clicks', width: 10 },
           { header: 'Avg Position', key: 'avg_position', width: 12 },
-          { header: 'Recommendation', key: 'recommendation', width: 30, dropdown: ['Create new page', 'Consolidate existing pages', 'Existing page — already strong', 'Improve existing page'] },
+          { header: 'Recommendation', key: 'recommendation', width: 30, dropdown: ['Create new page', 'Consolidate existing pages', 'Existing page - already strong', 'Improve existing page'] },
           { header: 'Reason', key: 'reason', width: 50 },
           { header: 'Existing Page', key: 'existing_page', width: 40 },
           { header: 'Competing URLs', key: 'competing_urls', width: 50 },

@@ -1,4 +1,4 @@
-// KEYWORD METRICS — search volume and keyword difficulty, with the basis named.
+// KEYWORD METRICS - search volume and keyword difficulty, with the basis named.
 //
 // THE PROBLEM THIS SOLVES, AND THE RULE IT KEEPS
 // The suite was asked for search volume, a country filter on it, and keyword
@@ -10,13 +10,13 @@
 //
 //   VOLUME
 //     'google-ads'   Google Ads Keyword Planner, via the Google Ads API on the
-//                    OAuth principal already connected. Google's own numbers —
+//                    OAuth principal already connected. Google's own numbers - 
 //                    the same ones every keyword tool resells. Needs a
 //                    developer token (GOOGLE_ADS_DEVELOPER_TOKEN).
 //     'dataforseo'   DataForSEO's Google Ads passthrough. Same origin as above.
 //     'semrush'      Semrush's own database.
-//     'search-console'  This site's real impressions. Not volume — DEMAND THIS
-//                    SITE ALREADY SEES — and labelled that way. Always present
+//     'search-console'  This site's real impressions. Not volume - DEMAND THIS
+//                    SITE ALREADY SEES - and labelled that way. Always present
 //                    where GSC is connected, and always the most trustworthy
 //                    row on the page because it is a measurement of this exact
 //                    property.
@@ -190,9 +190,9 @@ async function semrushMetrics(keywords, market, cred) {
 //
 // Three things must be in place, and lib/google.js owns all three so that a
 // failure names WHICH one is missing rather than returning a bare 401:
-//   - the `adwords` OAuth scope on the team's Google connection
-//   - GOOGLE_ADS_DEVELOPER_TOKEN (the app's, applied for once)
-//   - a Google Ads account chosen by the team on /connect
+//  - the `adwords` OAuth scope on the team's Google connection
+//  - GOOGLE_ADS_DEVELOPER_TOKEN (the app's, applied for once)
+//  - a Google Ads account chosen by the team on /connect
 //
 // Language constants. Google Ads takes a languageConstants id, not a language
 // code, and the previous version of this function hardcoded English for every
@@ -218,8 +218,8 @@ async function googleAdsVolume(keywords, market, { userId }) {
   const google = require('../google');
 
   // Which Ads account, and whose OAuth token. In the shared agency model the
-  // principal is NOT the team running the research — it is the agency
-  // connection that holds the Ads scope — so the resolved userId must be used
+  // principal is NOT the team running the research - it is the agency
+  // connection that holds the Ads scope - so the resolved userId must be used
   // for the request, not the one passed in.
   const principal = google.resolveAdsPrincipal(userId);
   if (!principal.ok) throw new Error(principal.reason);
@@ -291,8 +291,8 @@ async function googleAdsVolume(keywords, market, { userId }) {
 // basis note says so in words. It deliberately does NOT multiply by an
 // assumed Google/Bing ratio: a scaled number would read exactly like a Google
 // volume while being a guess built on a guess, which is the one thing the rest
-// of this module refuses to do. What Bing gives honestly is RELATIVE demand —
-// which of two keywords is bigger, and roughly by how much — and that is what
+// of this module refuses to do. What Bing gives honestly is RELATIVE demand - 
+// which of two keywords is bigger, and roughly by how much - and that is what
 // keyword prioritisation actually needs.
 //
 // ONE KEYWORD PER REQUEST. Unlike DataForSEO (700 per call) GetKeywordStats
@@ -300,8 +300,34 @@ async function googleAdsVolume(keywords, market, { userId }) {
 // the small concurrency: this is paced to stay well inside Bing's quota rather
 // than to finish fastest.
 const BING_WMT_BASE = 'https://ssl.bing.com/webmaster/api.svc/json';
-const BING_MAX_KEYWORDS = 120;
-const BING_CONCURRENCY = 4;
+//
+// BING DOES THROTTLE - MEASURED, AFTER GETTING THIS WRONG ONCE.
+// Short bursts look completely clean: 40 requests at concurrency 4, 60 at 10
+// and 80 at 20 all returned 5.5, 11.7 and 19.0 keywords/sec with ZERO non-200
+// responses, which is easy to read as "there is no limit". There is. Push a
+// 500-keyword run and Bing answers `ErrorCode 4: ThrottleUser` - and because
+// the allowance is a rolling one, it arrives partway through a large batch
+// rather than at a predictable count.
+//
+// So the design is not a fixed ration but a RESPONSE to throttling:
+//   * a modest default concurrency, because rate is what Bing objects to;
+//   * per-keyword retry with backoff when it says ThrottleUser;
+//   * and, above all, partial results are kept - a throttle at keyword 380
+//     must not discard the 379 answers already in hand.
+//
+// The ceiling is a request-duration guard rather than a quota: one HTTP round
+// trip per keyword means ~90s for 500 keywords at this concurrency. It is set
+// to the largest result the app can produce so that nothing on screen is
+// skipped for arbitrary reasons. Both are env-overridable.
+const BING_MAX_KEYWORDS = Math.max(1, Number(process.env.BING_MAX_KEYWORDS) || 1000);
+const BING_CONCURRENCY = Math.max(1, Number(process.env.BING_CONCURRENCY) || 4);
+// How many times a single throttled keyword is retried, and how long it waits.
+// Linear rather than exponential: the allowance refills steadily, so a long
+// first sleep wastes more time than it saves.
+const BING_THROTTLE_RETRIES = 3;
+const BING_THROTTLE_BACKOFF_MS = 1500;
+// Consecutive fully-retried throttles before the run gives up on the rest.
+const BING_THROTTLE_GIVE_UP = Math.max(1, Number(process.env.BING_THROTTLE_GIVE_UP) || 5);
 
 // Bing serialises dates as /Date(1712345678000)/ or /Date(1712345678000+0000)/.
 function bingDate(v) {
@@ -316,7 +342,7 @@ function bingDate(v) {
 // The field actually populated has varied across Bing's own docs and versions
 // (Impressions on some responses, Broad/Exact/Phrase match counts on others),
 // so this reads whichever is present in a stated order instead of assuming
-// one. If none is present the entry is skipped rather than counted as zero —
+// one. If none is present the entry is skipped rather than counted as zero - 
 // a missing field is not a keyword nobody searches for.
 function bingCount(entry) {
   for (const f of ['Impressions', 'Broad', 'Phrase', 'Exact']) {
@@ -337,19 +363,49 @@ async function bingVolume(keywords, market, cred) {
   // response is diagnosable from the page instead of looking like "no data".
   const unparsed = [];
 
+  // Set once a throttle is seen, so the page can distinguish "Bing had no data
+  // for these" from "Bing stopped answering partway through".
+  let throttled = false;
+  // Consecutive keywords that exhausted their retries. Once Bing is refusing
+  // steadily, continuing is pure waste: a measured 250-keyword run ground on
+  // for 107 seconds to answer 15, because every remaining keyword still paid
+  // four requests and three backoffs before giving up. Stopping early turns
+  // that into a fast, honest partial answer.
+  let consecutiveThrottles = 0;
+  let stoppedEarly = false;
+
   const results = await mapLimit(list, BING_CONCURRENCY, async (kw) => {
     const params = new URLSearchParams({ apikey: key, q: kw });
     if (!m.worldwide && m.gl) {
       params.set('country', m.gl);
       params.set('language', `${m.dfsLanguage || 'en'}-${String(m.gl).toUpperCase()}`);
     }
-    const res = await fetchPage(`${BING_WMT_BASE}/GetKeywordStats?${params.toString()}`, {
-      timeout: 25000,
-      headers: { Accept: 'application/json' },
-    });
+
+    // Retry loop for throttling ONLY. Every other failure - a bad key, a
+    // changed response shape - is permanent, and retrying it would turn one
+    // clear error into four slow ones.
+    // Everything after the cut-off is skipped rather than attempted.
+    if (stoppedEarly) return null;
+
+    let res = null;
+    for (let attempt = 0; ; attempt += 1) {
+      res = await fetchPage(`${BING_WMT_BASE}/GetKeywordStats?${params.toString()}`, {
+        timeout: 25000,
+        headers: { Accept: 'application/json' },
+      });
+      const isThrottle = res.body && /ThrottleUser|"ErrorCode"\s*:\s*4/.test(String(res.body));
+      if (!isThrottle) { consecutiveThrottles = 0; break; }
+      throttled = true;
+      if (attempt >= BING_THROTTLE_RETRIES) {
+        consecutiveThrottles += 1;
+        if (consecutiveThrottles >= BING_THROTTLE_GIVE_UP) stoppedEarly = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, BING_THROTTLE_BACKOFF_MS * (attempt + 1)));
+    }
     // Parse BEFORE checking the status code. Bing puts its only useful
-    // diagnostic in the body — an invalid key is HTTP 400 with
-    // {"ErrorCode":3,"Message":"ERROR!!! InvalidApiKey"} — so bailing out on
+    // diagnostic in the body - an invalid key is HTTP 400 with
+    // {"ErrorCode":3,"Message":"ERROR!!! InvalidApiKey"} - so bailing out on
     // !res.ok first would replace "your key is wrong" with a bare "HTTP 400".
     let parsed = null;
     if (res.body) {
@@ -369,7 +425,7 @@ async function bingVolume(keywords, market, cred) {
     }
 
     // The response is a time series. Build the monthly array the merge layer
-    // already understands, and take the mean as the headline figure — the
+    // already understands, and take the mean as the headline figure - the
     // same convention every "monthly search volume" in this file uses.
     const monthly = [];
     rows.forEach((r) => {
@@ -403,6 +459,15 @@ async function bingVolume(keywords, market, cred) {
     throw new Error(first
       || (unparsed.length ? `unexpected response shape: ${unparsed[0]}` : 'no keyword stats returned'));
   }
+  // Throttling is reported ALONGSIDE the answers that did arrive, never
+  // instead of them. Losing 379 good rows because keyword 380 was refused is
+  // the failure mode this whole retry path exists to prevent.
+  // A PROPERTY, not a map entry. enrich()'s mergeInto walks this map with
+  // forEach and would turn a sentinel key into a keyword row called
+  // "__throttled__" in the middle of a client's research table.
+  if (throttled) {
+    out.throttled = { answered: out.size, asked: list.length, stoppedEarly };
+  }
   return out;
 }
 
@@ -411,8 +476,8 @@ async function bingVolume(keywords, market, cred) {
 // Relative interest, 0-100, per country. Keyless.
 //
 // The endpoint needs a two-step token handshake and prefixes its JSON with a
-// XSSI guard, both of which are handled here. It is fragile by nature — an
-// unofficial endpoint — so every failure is caught and reported rather than
+// XSSI guard, both of which are handled here. It is fragile by nature - an
+// unofficial endpoint - so every failure is caught and reported rather than
 // thrown, and Trends is never the only reason a research run succeeds.
 //
 // Trends compares at most five terms per request and the values are RELATIVE
@@ -429,14 +494,14 @@ function parseTrends(body) {
 
 // THE COOKIE, AND WHY THIS IS NOT OPTIONAL.
 //
-// The Trends API endpoints answer a cookieless request with a flat HTTP 429 —
+// The Trends API endpoints answer a cookieless request with a flat HTTP 429 - 
 // every time, not intermittently. Verified: three consecutive attempts all
 // returned 429 with an identical 1,701-byte body, so it is a hard requirement
 // rather than a rate limit that backing off would clear.
 //
 // A single GET of the Trends web page sets an NID cookie, and the same request
-// carrying that cookie returns 200. Without this, relative interest — the
-// DEFAULT demand signal whenever no paid volume credential is configured —
+// carrying that cookie returns 200. Without this, relative interest - the
+// DEFAULT demand signal whenever no paid volume credential is configured - 
 // would have been permanently empty while reporting itself as merely
 // unavailable.
 //
@@ -574,7 +639,7 @@ async function trendsInterest(keywords, { market = 'ZZ', time = 'today 12-m', ma
       } else {
         // The anchor scored zero in this batch, so nothing in it can be put on
         // the same scale. Recorded rather than silently mis-scaled.
-        errors.push(`batch anchored on "${anchor}" returned zero interest for the anchor — ${batch.slice(1).join(', ')} could not be placed on the same scale`);
+        errors.push(`batch anchored on "${anchor}" returned zero interest for the anchor - ${batch.slice(1).join(', ')} could not be placed on the same scale`);
       }
     } catch (err) {
       errors.push(String(err.message).slice(0, 160));
@@ -596,7 +661,7 @@ async function trendsInterest(keywords, { market = 'ZZ', time = 'today 12-m', ma
 // ------------------------------------------------------- SERP difficulty proxy
 
 // Domains whose presence in a result set genuinely raises the bar for a new
-// page. Not an authority score — a named list of sites that are hard to
+// page. Not an authority score - a named list of sites that are hard to
 // outrank on any topic they cover, which is a claim that can be checked.
 const HIGH_AUTHORITY = new Set([
   'wikipedia.org', 'en.wikipedia.org', 'britannica.com', 'investopedia.com',
@@ -622,13 +687,13 @@ function isGovEdu(domain) {
 // The proxy score, stated as a formula so it can be argued with.
 //
 //   authorityShare   share of results on a named high-authority domain, or a
-//                    .gov/.edu. Weight 45 — the single strongest signal that a
+//                    .gov/.edu. Weight 45 - the single strongest signal that a
 //                    new page will struggle.
 //   titleMatchShare  share of results whose title contains the whole keyword.
-//                    Weight 25 — pages deliberately built for this term.
-//   homepageShare    share of results that are a site root. Weight 15 — a SERP
+//                    Weight 25 - pages deliberately built for this term.
+//   homepageShare    share of results that are a site root. Weight 15 - a SERP
 //                    answered by homepages is a head term.
-//   ugcShare         share from forums and UGC platforms. Weight -20 — a SERP
+//   ugcShare         share from forums and UGC platforms. Weight -20 - a SERP
 //                    Google fills with Reddit is one where a good page wins.
 //   thinResults      fewer than 6 usable results. Adds uncertainty, recorded
 //                    but not scored, and downgrades `confidence`.
@@ -798,7 +863,7 @@ async function enrich(keywords, {
 
     // Trends always runs when no measured volume was obtained, because it is
     // the only free answer to "and in which country". It is additive, never a
-    // substitute — it populates its own field.
+    // substitute - it populates its own field.
     if (!gotVolume && providers.has('google-trends')) {
       try {
         const t = await trendsInterest(list, { market, maxKeywords: trendsLimit });
@@ -845,8 +910,8 @@ async function enrich(keywords, {
     }
 
     // The cache comes before any fetching. A stored score costs nothing, so
-    // every keyword scored by a previous run — for this brand or any other
-    // asking about the same keyword in the same country — is filled in first,
+    // every keyword scored by a previous run - for this brand or any other
+    // asking about the same keyword in the same country - is filled in first,
     // and the paced-request budget below is spent only on what is genuinely
     // unknown. This is what lets coverage reach every keyword over time
     // instead of the dozen a single run can afford.
@@ -877,7 +942,7 @@ async function enrich(keywords, {
     }
 
     // The keyless proxy, for the top N keywords only. Each one costs a paced
-    // SERP request, so this is capped and the cap is REPORTED — a silent
+    // SERP request, so this is capped and the cap is REPORTED - a silent
     // truncation would read as "these are the only difficult keywords".
     // Anything past the cap is QUEUED rather than abandoned: the scheduled
     // backfill job drains it, and the next run reads those scores from the
@@ -928,7 +993,7 @@ async function enrich(keywords, {
         rung: 'serp-proxy',
         outcome: `${hits} of ${targets.length} sampled`
           + (overflow.length
-            ? ` — capped at ${difficultyLimit}; ${overflow.length} keyword${overflow.length === 1 ? '' : 's'} `
+            ? ` - capped at ${difficultyLimit}; ${overflow.length} keyword${overflow.length === 1 ? '' : 's'} `
               + (queued
                 ? `queued for the background scorer (${queued} newly queued), and will appear on the next run rather than being guessed now`
                 : 'left without a difficulty rather than guessed')
@@ -967,7 +1032,7 @@ async function enrich(keywords, {
         return 'Search volume is measured against Google, from the source named on each row.';
       }
       if (sources.has('bing-webmaster')) {
-        return 'Search volume is measured, but against BING, not Google — from Bing Webmaster Tools. '
+        return 'Search volume is measured, but against BING, not Google - from Bing Webmaster Tools. '
           + 'Bing carries a fraction of Google\'s search traffic, so treat these as relative demand '
           + '(which keyword is bigger, and roughly by how much) rather than as the absolute monthly '
           + 'Google figure a Keyword Planner number would give. No multiplier has been applied.';
