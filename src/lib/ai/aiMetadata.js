@@ -1,4 +1,4 @@
-// AI Metadata Optimization — reads the pages the technical audit already
+// AI Metadata Optimization - reads the pages the technical audit already
 // flagged as missing or duplicating a title/meta description (read-only, the
 // audit crawler itself is never touched), takes up to MAX_PAGES of them, and
 // makes ONE batched AI call asking for a suggested title + meta description

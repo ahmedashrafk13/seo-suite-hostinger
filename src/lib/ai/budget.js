@@ -1,10 +1,10 @@
 // Cost tracking + hard budget guard, shared by AI Assist and the AI SEO
-// suite (the env var is named AI_LAB_SPEND_CAP_USD for historical reasons —
+// suite (the env var is named AI_LAB_SPEND_CAP_USD for historical reasons - 
 // it still caps combined spend across both).
 //
 // Pricing constants are env-configurable, with defaults matching gpt-4.1-mini
 // public list pricing as of early 2026: $0.40 / 1M input tokens,
-// $1.60 / 1M output tokens. THESE ARE APPROXIMATE DEFAULTS — verify/adjust
+// $1.60 / 1M output tokens. THESE ARE APPROXIMATE DEFAULTS - verify/adjust
 // them against the actual Azure Enterprise Agreement pricing page, since
 // negotiated rates can differ from public list price.
 const db = require('../../db');
@@ -37,14 +37,14 @@ function estimateTokens(text) {
 function preflightCheck({ systemPrompt, userPrompt, maxTokens }) {
   const spent = totalSpend();
   if (spent >= SPEND_CAP_USD) {
-    return { allowed: false, reason: `AI spend cap of $${SPEND_CAP_USD.toFixed(2)} reached — see the cost dashboard.`, spent };
+    return { allowed: false, reason: `AI spend cap of $${SPEND_CAP_USD.toFixed(2)} reached - see the cost dashboard.`, spent };
   }
   const estPromptTokens = estimateTokens(systemPrompt) + estimateTokens(userPrompt);
   const estCost = costFor(estPromptTokens, Number(maxTokens) || 0);
   if (spent + estCost > SPEND_CAP_USD) {
     return {
       allowed: false,
-      reason: `AI spend cap of $${SPEND_CAP_USD.toFixed(2)} reached — see the cost dashboard.`,
+      reason: `AI spend cap of $${SPEND_CAP_USD.toFixed(2)} reached - see the cost dashboard.`,
       spent, estCost,
     };
   }

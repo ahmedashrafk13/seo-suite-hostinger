@@ -7,7 +7,7 @@
 <%- include('../partials/topbar') %>
 
     <div class="toolbar">
-      <a class="btn ghost sm" href="/ai-assist">&larr; AI Assist</a>
+      <a class="btn ghost sm" href="/ai-seo">&larr; AI Assist</a>
       <div class="spacer"></div>
       <% if (run) { %>
       <a class="btn secondary sm" href="/audit/<%= run.id %>" target="_blank" rel="noopener">View real audit run &rarr;</a>
@@ -16,7 +16,7 @@
 
     <div class="card">
       <div class="card-head">
-        <h3>AI Metadata Optimization — <%= brand.name %></h3>
+        <h3>AI Metadata Optimization - <%= brand.name %></h3>
         <% if (pages.length) { %>
         <form method="POST" action="/ai-assist/<%= brand.id %>/metadata/generate"><%- csrfField %>
           <button class="btn sm" type="submit"><%= row ? 'Regenerate (new billed call)' : 'Generate with AI' %></button>
@@ -26,9 +26,9 @@
       </div>
       <div class="card-body">
         <% if (!run) { %>
-          <div class="empty-state">No completed technical audit for this brand yet — run one from the Technical audit page first.</div>
+          <div class="empty-state">No completed technical audit for this brand yet - run one from the Technical audit page first.</div>
         <% } else if (!pages.length) { %>
-          <div class="empty-state">The latest audit found no pages with a missing or duplicated title/meta description — nothing to send to AI.</div>
+          <div class="empty-state">The latest audit found no pages with a missing or duplicated title/meta description - nothing to send to AI.</div>
         <% } else { %>
           <% if (row) { %>
             <p class="hint">Generated <%= fmtDateTime(row.created_at) %> · <%= fmtInt(row.prompt_tokens) %> prompt / <%= fmtInt(row.completion_tokens) %> completion tokens · $<%= Number(row.cost_usd).toFixed(4) %></p>
@@ -42,8 +42,8 @@
               <tr>
                 <td><a href="<%= p.url %>" target="_blank" rel="noopener"><%= p.url %></a></td>
                 <td><% p.issues.forEach(function(i){ %><span class="badge medium"><%= i %></span> <% }) %></td>
-                <td><%= note ? note.title : (row ? '—' : 'Not generated yet') %></td>
-                <td><%= note ? note.description : (row ? '—' : 'Not generated yet') %></td>
+                <td><%= note ? note.title : (row ? ' - ' : 'Not generated yet') %></td>
+                <td><%= note ? note.description : (row ? ' - ' : 'Not generated yet') %></td>
               </tr>
             <% }) %>
             </tbody>

@@ -1,11 +1,10 @@
-// AI Assist — AI-generated content briefs, opportunity recommendations,
+// AI Assist - AI-generated content briefs, opportunity recommendations,
 // linking rationale, metadata rewrites and task rewrites, one page per brand
-// per feature. Every generation here is a manual, explicit button click —
+// per feature. Every generation here is a manual, explicit button click - 
 // nothing in this file is ever called from alertEngine.js or any scheduled
 // job, and every call is logged against the shared spend cap.
 const express = require('express');
 const db = require('../db');
-const budget = require('../lib/ai/budget');
 const aiBrief = require('../lib/ai/aiBrief');
 const aiOpportunities = require('../lib/ai/aiOpportunities');
 const aiLinking = require('../lib/ai/aiLinking');
@@ -27,18 +26,17 @@ function safeJson(text, fallback) {
 }
 
 // ------------------------------------------------------------------- hub
-router.get('/', (req, res, next) => {
-  try {
-    const userId = req.dataUserId;
-    res.render('ai-assist/hub', {
-      title: 'AI Assist', active: 'ai-assist', pageTitle: 'AI Assist',
-      brands: brandsFor(userId),
-      dashboard: budget.dashboard(),
-      flash: req.query.msg || null,
-      flashError: req.query.error || null,
-    });
-  } catch (err) { next(err); }
-});
+//
+// The hub lives on the AI visibility overview now. It was only ever a budget
+// readout and five links, which meant loading a page to read one number and
+// click straight back out; /ai-seo shows the same budget and links each tool
+// per brand, so the brand no longer has to be chosen twice.
+//
+// Kept as a redirect rather than deleted: this URL is in bookmarks, in the
+// onboarding copy and in the workflow map, and a 404 would be a worse answer
+// than the page people were looking for. The generation routes below are
+// untouched.
+router.get('/', (req, res) => res.redirect(302, '/ai-seo'));
 
 // ---------------------------------------------------------- a. content brief
 router.get('/:brandId/brief/:clusterKey', (req, res, next) => {
@@ -50,13 +48,13 @@ router.get('/:brandId/brief/:clusterKey', (req, res, next) => {
 
     const resolved = aiBrief.resolve(userId, brand, clusterKey);
     if (!resolved) {
-      return res.status(404).render('error', { title: 'Not found', active: 'ai-assist', message: 'That keyword cluster could not be found — it may belong to a different brand or a deleted run.' });
+      return res.status(404).render('error', { title: 'Not found', active: 'ai-assist', message: 'That keyword cluster could not be found - it may belong to a different brand or a deleted run.' });
     }
 
     const existing = aiBrief.latestForClusterKey(brand.id, clusterKey);
 
     res.render('ai-assist/brief', {
-      title: `AI Brief — ${resolved.cluster.primaryKeyword}`, active: 'ai-assist', pageTitle: 'AI Content Brief',
+      title: `AI Brief - ${resolved.cluster.primaryKeyword}`, active: 'ai-assist', pageTitle: 'AI Content Brief',
       brand, brands: brandsFor(userId),
       clusterKey, resolved,
       row: existing ? { ...existing, headings: safeJson(existing.headings_json, []) } : null,
@@ -97,7 +95,7 @@ router.get('/:brandId/opportunities', (req, res, next) => {
     const cached = aiOpportunities.findCached(brand.id, inputHash);
 
     res.render('ai-assist/opportunities', {
-      title: `AI Opportunities — ${brand.name}`, active: 'ai-assist', pageTitle: 'AI Opportunity Recommendations',
+      title: `AI Opportunities - ${brand.name}`, active: 'ai-assist', pageTitle: 'AI Opportunity Recommendations',
       brand, brands: brandsFor(userIdOf(req)),
       result, findings,
       row: cached ? { ...cached, notes: safeJson(cached.findings_json, {}) } : null,
@@ -113,7 +111,7 @@ router.post('/:brandId/opportunities/generate', async (req, res, next) => {
     if (!brand) return res.redirect('/ai-assist?error=' + encodeURIComponent('Brand not found.'));
     const force = req.body.force === '1';
     const r = await aiOpportunities.generate(brand, { force });
-    if (r.empty) return res.redirect(`/ai-assist/${brand.id}/opportunities?error=` + encodeURIComponent('No opportunities found for this brand yet — nothing to send to AI.'));
+    if (r.empty) return res.redirect(`/ai-assist/${brand.id}/opportunities?error=` + encodeURIComponent('No opportunities found for this brand yet - nothing to send to AI.'));
     res.redirect(`/ai-assist/${brand.id}/opportunities?msg=` + encodeURIComponent(
       r.cached ? 'Showing the cached AI recommendations (no new API call).' : 'AI recommendations generated.'
     ));
@@ -138,7 +136,7 @@ router.get('/:brandId/linking', (req, res, next) => {
     }
 
     res.render('ai-assist/linking', {
-      title: `AI Linking Rationale — ${brand.name}`, active: 'ai-assist', pageTitle: 'AI Linking Rationale',
+      title: `AI Linking Rationale - ${brand.name}`, active: 'ai-assist', pageTitle: 'AI Linking Rationale',
       brand, brands: brandsFor(req.dataUserId),
       run, recs, maxRecs: aiLinking.MAX_RECS,
       row: cached ? { ...cached, notes: safeJson(cached.notes_json, {}) } : null,
@@ -179,7 +177,7 @@ router.get('/:brandId/metadata', (req, res, next) => {
     }
 
     res.render('ai-assist/metadata', {
-      title: `AI Metadata Optimization — ${brand.name}`, active: 'ai-assist', pageTitle: 'AI Metadata Optimization',
+      title: `AI Metadata Optimization - ${brand.name}`, active: 'ai-assist', pageTitle: 'AI Metadata Optimization',
       brand, brands: brandsFor(req.dataUserId),
       run, pages, maxPages: aiMetadata.MAX_PAGES,
       row: cached ? { ...cached, notes: safeJson(cached.notes_json, {}) } : null,
@@ -220,7 +218,7 @@ router.get('/:brandId/tasks', (req, res, next) => {
     }
 
     res.render('ai-assist/tasks', {
-      title: `AI Task Recommendations — ${brand.name}`, active: 'ai-assist', pageTitle: 'AI Task Recommendations',
+      title: `AI Task Recommendations - ${brand.name}`, active: 'ai-assist', pageTitle: 'AI Task Recommendations',
       brand, brands: brandsFor(req.dataUserId),
       tasks,
       row: cached ? { ...cached, notes: safeJson(cached.notes_json, {}) } : null,
@@ -236,7 +234,7 @@ router.post('/:brandId/tasks/generate', async (req, res, next) => {
     if (!brand) return res.redirect('/ai-assist?error=' + encodeURIComponent('Brand not found.'));
     const force = req.body.force === '1';
     const r = await aiTasks.generate(brand, { force });
-    if (r.empty) return res.redirect(`/ai-assist/${brand.id}/tasks?error=` + encodeURIComponent('No open tasks found for this brand — nothing to send to AI.'));
+    if (r.empty) return res.redirect(`/ai-assist/${brand.id}/tasks?error=` + encodeURIComponent('No open tasks found for this brand - nothing to send to AI.'));
     res.redirect(`/ai-assist/${brand.id}/tasks?msg=` + encodeURIComponent(
       r.cached ? 'Showing the cached AI-rewritten actions (no new API call).' : 'AI-rewritten task actions generated.'
     ));

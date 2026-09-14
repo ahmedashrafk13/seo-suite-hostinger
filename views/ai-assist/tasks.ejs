@@ -7,14 +7,14 @@
 <%- include('../partials/topbar') %>
 
     <div class="toolbar">
-      <a class="btn ghost sm" href="/ai-assist">&larr; AI Assist</a>
+      <a class="btn ghost sm" href="/ai-seo">&larr; AI Assist</a>
       <div class="spacer"></div>
       <a class="btn secondary sm" href="/tasks?brand=<%= brand.id %>" target="_blank" rel="noopener">View real task board &rarr;</a>
     </div>
 
     <div class="card">
       <div class="card-head">
-        <h3>AI Task Recommendations — <%= brand.name %></h3>
+        <h3>AI Task Recommendations - <%= brand.name %></h3>
         <% if (tasks.length) { %>
         <form method="POST" action="/ai-assist/<%= brand.id %>/tasks/generate"><%- csrfField %>
           <button class="btn sm" type="submit"><%= row ? 'Regenerate (new billed call)' : 'Generate with AI' %></button>
@@ -24,7 +24,7 @@
       </div>
       <div class="card-body">
         <% if (!tasks.length) { %>
-          <div class="empty-state">No open tasks for this brand — nothing to generate from.</div>
+          <div class="empty-state">No open tasks for this brand - nothing to generate from.</div>
         <% } else { %>
           <% if (row) { %>
             <p class="hint">Generated <%= fmtDateTime(row.created_at) %> · <%= fmtInt(row.prompt_tokens) %> prompt / <%= fmtInt(row.completion_tokens) %> completion tokens · $<%= Number(row.cost_usd).toFixed(4) %></p>
@@ -36,7 +36,7 @@
               <tr>
                 <td><a href="/tasks/<%= t.id %>" target="_blank" rel="noopener"><%= t.title %></a></td>
                 <td><span class="badge <%= t.severity %>"><%= t.severity %></span></td>
-                <td><%= (row && row.notes && row.notes[String(t.id)]) || (row ? '—' : (t.detail || '').slice(0, 200)) %></td>
+                <td><%= (row && row.notes && row.notes[String(t.id)]) || (row ? ' - ' : (t.detail || '').slice(0, 200)) %></td>
               </tr>
             <% }) %>
             </tbody>

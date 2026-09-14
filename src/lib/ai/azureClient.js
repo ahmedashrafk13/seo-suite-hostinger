@@ -7,7 +7,7 @@
 // `{ prompt_tokens, completion_tokens }` in the OpenAI shape.
 //
 // Cost control lives in ./budget.js, which every call here goes through
-// BEFORE any HTTP request is made — this module never calls the API without
+// BEFORE any HTTP request is made - this module never calls the API without
 // that check passing first, and never retries more than once (Key A, then
 // Key B, then fail).
 const budget = require('./budget');
@@ -18,7 +18,7 @@ function endpointUrl() {
 }
 
 // A generation takes roughly 5-15 seconds in practice, so the ceiling is
-// generous rather than tight — but it must exist.
+// generous rather than tight - but it must exist.
 //
 // Originally there was none. That was survivable while every call sat inside a
 // user's request, where the browser and Passenger both eventually gave up. It
@@ -57,13 +57,13 @@ const TRUNCATION_RETRY_CEILING = Number(process.env.AZURE_OPENAI_MAX_TOKENS_CEIL
 // the parsed JSON object the model returned.
 //
 // `feature` and `brandId` are only used for the pre-flight estimate and the
-// usage-log row written after a successful call — the caller does not need
+// usage-log row written after a successful call - the caller does not need
 // to log usage itself.
 //
 // `temperature` defaults low (0.2) rather than the API's own default (~1.0).
 // Every prompt in this app asks for extraction, classification or a
-// structured judgement from data already supplied — never open-ended
-// creative writing — so a low temperature does not narrow what the model is
+// structured judgement from data already supplied - never open-ended
+// creative writing - so a low temperature does not narrow what the model is
 // allowed to say, only how much it hedges/pads/rambles while saying it. Less
 // rambling means fewer completion tokens billed for the same answer, and a
 // more repeatable answer for the same cached inputs.
@@ -74,7 +74,7 @@ async function generate({
     throw new Error('Azure OpenAI is not configured (missing AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_KEY_A).');
   }
 
-  // Hard cap + conservative pre-flight estimate — refuses BEFORE any network
+  // Hard cap + conservative pre-flight estimate - refuses BEFORE any network
   // call if the cap is already reached or this call alone could blow past it.
   const preflight = budget.preflightCheck({ systemPrompt, userPrompt, maxTokens });
   if (!preflight.allowed) {
@@ -121,7 +121,7 @@ async function generate({
   // that it finishes: when the answer needs more room than max_tokens allows,
   // the reply is cut off mid-string and JSON.parse reports something like
   // "Unterminated string in JSON at position 8401". That reads as a broken
-  // model or a broken prompt. It is neither — it is a budget that was too
+  // model or a broken prompt. It is neither - it is a budget that was too
   // small, and the API says so plainly in finish_reason, which nothing here
   // was reading.
   //
@@ -159,7 +159,7 @@ async function generate({
             effectiveCap = retryCap;
           }
         } catch (retryErr) {
-          // Keep the first response and let the checks below report on it —
+          // Keep the first response and let the checks below report on it - 
           // a failed retry must not replace "the answer was too long" with a
           // network error that happened afterwards.
         }

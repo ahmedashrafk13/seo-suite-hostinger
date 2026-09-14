@@ -7,7 +7,7 @@
 <%- include('../partials/topbar') %>
 
     <div class="toolbar">
-      <a class="btn ghost sm" href="/ai-assist">&larr; AI Assist</a>
+      <a class="btn ghost sm" href="/ai-seo">&larr; AI Assist</a>
       <div class="spacer"></div>
       <a class="btn secondary sm" href="/keywords/<%= realBriefLinkRunId %>" target="_blank" rel="noopener">View real clustering run &rarr;</a>
     </div>
@@ -28,7 +28,7 @@
           </div>
           <div class="stat">
             <div class="label">Word count target (real data)</div>
-            <div class="value sm"><%= resolved.wordCountRange ? (fmtInt(resolved.wordCountRange.low) + '–' + fmtInt(resolved.wordCountRange.high)) : 'Not enough data' %></div>
+            <div class="value sm"><%= resolved.wordCountRange ? (fmtInt(resolved.wordCountRange.low) + '-' + fmtInt(resolved.wordCountRange.high)) : 'Not enough data' %></div>
           </div>
           <div class="stat">
             <div class="label">Recommendation (real data)</div>
@@ -53,7 +53,7 @@
       </div>
       <div class="card-body">
         <% if (!row) { %>
-          <div class="empty-state">Not generated yet. Click "Generate with AI" above — this makes one real, billed API call.</div>
+          <div class="empty-state">Not generated yet. Click "Generate with AI" above - this makes one real, billed API call.</div>
         <% } else { %>
           <div class="grid cols-2">
             <div>

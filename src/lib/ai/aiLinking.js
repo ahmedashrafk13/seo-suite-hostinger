@@ -1,4 +1,4 @@
-// AI Linking Rationale — reads the existing recommendations.xlsx output via
+// AI Linking Rationale - reads the existing recommendations.xlsx output via
 // csvStore (read-only, existing reader; the Python agent itself is never
 // touched), takes the top N by priority (capped at 25 to control cost), and
 // makes ONE batched AI call asking for a short "why this link matters"

@@ -7,7 +7,7 @@
 <%- include('../partials/topbar') %>
 
     <div class="toolbar">
-      <a class="btn ghost sm" href="/ai-assist">&larr; AI Assist</a>
+      <a class="btn ghost sm" href="/ai-seo">&larr; AI Assist</a>
       <% if (run) { %>
       <div class="spacer"></div>
       <a class="btn secondary sm" href="/linking/<%= run.id %>" target="_blank" rel="noopener">View real linking run &rarr;</a>
@@ -16,7 +16,7 @@
 
     <div class="card">
       <div class="card-head">
-        <h3>AI Linking Rationale — <%= brand.name %></h3>
+        <h3>AI Linking Rationale - <%= brand.name %></h3>
         <% if (run && recs.length) { %>
         <form method="POST" action="/ai-assist/<%= brand.id %>/linking/generate"><%- csrfField %>
           <button class="btn sm" type="submit"><%= row ? 'Regenerate (new billed call)' : 'Generate with AI' %></button>
@@ -42,7 +42,7 @@
                 <td><%= shortUrl(r.source_url) %></td>
                 <td><%= shortUrl(r.target_url) %></td>
                 <td><%= r.anchor_text %></td>
-                <td><%= (row && row.notes && row.notes[r.id]) || (row ? '—' : 'Not generated yet') %></td>
+                <td><%= (row && row.notes && row.notes[r.id]) || (row ? ' - ' : 'Not generated yet') %></td>
               </tr>
             <% }) %>
             </tbody>

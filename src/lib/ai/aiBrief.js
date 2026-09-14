@@ -1,7 +1,7 @@
-// AI Content Brief — AI Assist's AI-written fields for lib/contentBrief.js's briefs.
+// AI Content Brief - AI Assist's AI-written fields for lib/contentBrief.js's briefs.
 //
 // Reuses clustering.js's already-computed cluster (via contentBrief.findCluster,
-// which is a read-only lookup into an existing keyword_run — it does not call
+// which is a read-only lookup into an existing keyword_run - it does not call
 // any of contentBrief.js's own generation logic) so the comparison is fair:
 // the real, already-computed factual fields (word-count range, internal link
 // suggestions) come from the same data both features share; only the

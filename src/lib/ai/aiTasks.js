@@ -1,4 +1,4 @@
-// AI Task Recommendations — reads open tasks via tasks.js's existing
+// AI Task Recommendations - reads open tasks via tasks.js's existing
 // accessors (read-only), then makes ONE batched AI call covering all open
 // tasks for the brand, asking GPT to rewrite each task's recommended action
 // into more specific, context-aware phrasing given the task's real fields.

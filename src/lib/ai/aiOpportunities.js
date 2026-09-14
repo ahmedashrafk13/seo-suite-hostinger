@@ -1,15 +1,15 @@
-// AI Opportunity Recommendations — AI Assist's rewrite of
+// AI Opportunity Recommendations - AI Assist's rewrite of
 // lib/opportunities.js's findings. Reads the real, already-computed findings via
 // opportunities.analyse() (read-only), then makes ONE batched AI call
 // covering every finding for the brand, asking for a punchier, more specific
 // recommendation string per finding. The underlying numbers are identical
-// either way — only the recommendation text differs.
+// either way - only the recommendation text differs.
 const db = require('../../db');
 const opportunities = require('../opportunities');
 const azureClient = require('./azureClient');
 const { hashInputs } = require('./hash');
 
-const SYSTEM_PROMPT = 'You are a senior SEO consultant. You will be given a JSON array of SEO findings, each with an id, type, page/query and key numbers. For EACH finding, write one punchy, specific, human-readable recommendation sentence (max ~30 words) that goes beyond a generic template — reference the actual numbers/URL/query given. Return a JSON object of the exact shape {"recommendations": [{"id": "<same id as input>", "text": "..."}]}, one entry per input finding, same order, no omissions. Return JSON only, no prose.';
+const SYSTEM_PROMPT = 'You are a senior SEO consultant. You will be given a JSON array of SEO findings, each with an id, type, page/query and key numbers. For EACH finding, write one punchy, specific, human-readable recommendation sentence (max ~30 words) that goes beyond a generic template - reference the actual numbers/URL/query given. Return a JSON object of the exact shape {"recommendations": [{"id": "<same id as input>", "text": "..."}]}, one entry per input finding, same order, no omissions. Return JSON only, no prose.';
 
 function compactFindings(result) {
   return result.opportunities.slice(0, 60).map((o, i) => ({
