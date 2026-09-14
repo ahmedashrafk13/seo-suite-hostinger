@@ -6,6 +6,12 @@
 <%- include('partials/sidebar') %>
 <%- include('partials/topbar') %>
 
+<%- include('partials/pagehead', {
+      heading: "Team",
+      lede: "Who can see this workspace, and what each of them is allowed to change."
+    }) %>
+
+
 <%
 function roleBadge(role) {
   return role === 'admin' ? 'accent' : (role === 'dev' ? 'neutral' : 'good');
@@ -21,14 +27,14 @@ function roleBadge(role) {
     <div class="card-body">
       <p class="hint" style="margin-top:0">
         These people signed up with your invite code. They can sign in but see nothing at all until you approve
-        them — pick the role they should have first.
+        them - pick the role they should have first.
       </p>
       <% pending.forEach(function(m){ %>
         <form method="POST" action="/team/members/<%= m.id %>/approve" class="approval-row"><%- csrfField %>
           <div class="ar-who">
             <span class="avatar"><%= (m.name || m.email).slice(0,2) %></span>
             <div>
-              <div class="ar-name"><%= m.name || '—' %></div>
+              <div class="ar-name"><%= m.name || ' - ' %></div>
               <div class="ar-mail"><%= m.email %></div>
             </div>
           </div>
@@ -53,7 +59,7 @@ function roleBadge(role) {
   <div>
     <div class="card">
       <div class="card-head">
-        <h2>SEO team — portal access</h2>
+        <h2>SEO team - portal access</h2>
         <span class="sub"><%= members.length %> in <%= team ? team.name : 'this workspace' %></span>
       </div>
       <div class="table-wrap">
@@ -125,14 +131,14 @@ function roleBadge(role) {
       <div class="card-foot">
         <strong>Admin</strong> runs the workspace and can always assign ·
         <strong>SEO</strong> does the work, and can assign only if you allow it.
-        Only these two roles can sign in — developers and writers are managed below and never see the portal.
+        Only these two roles can sign in - developers and writers are managed below and never see the portal.
       </div>
     </div>
 
     <div class="card">
       <div class="card-head">
         <h2>Developers &amp; writers</h2>
-        <span class="sub">No portal access — they receive work by email only</span>
+        <span class="sub">No portal access - they receive work by email only</span>
       </div>
       <div class="card-body" style="padding-bottom:0">
         <p class="hint" style="margin-top:0">
@@ -160,7 +166,7 @@ function roleBadge(role) {
                 </td>
                 <td><span class="badge <%= roleBadge(p.role) %>"><%= p.role %></span></td>
                 <td class="num"><%= p.assignment_count %></td>
-                <td class="narrow"><%= p.last_assigned_at ? fmtDateTime(p.last_assigned_at) : '—' %></td>
+                <td class="narrow"><%= p.last_assigned_at ? fmtDateTime(p.last_assigned_at) : ' - ' %></td>
                 <td>
                   <% if (p.active) { %>
                     <form method="POST" action="/team/people/<%= p.id %>/remove" class="inline-form"><%- csrfField %>
@@ -177,7 +183,7 @@ function roleBadge(role) {
         <div class="section-divider" style="margin-top:0"></div>
         <h4 style="margin-bottom:8px">Add a developer or writer</h4>
         <p class="hint" style="margin-top:0">
-          A name and an email is all that is needed. They never get a login — email is how they receive work, so the
+          A name and an email is all that is needed. They never get a login - email is how they receive work, so the
           address is required.
         </p>
         <form method="POST" action="/team/people"><%- csrfField %>
@@ -193,8 +199,8 @@ function roleBadge(role) {
             <div>
               <label for="p-role">They are a</label>
               <select id="p-role" name="role">
-                <option value="dev">Developer — implements fixes</option>
-                <option value="writer">Writer — produces content</option>
+                <option value="dev">Developer - implements fixes</option>
+                <option value="writer">Writer - produces content</option>
               </select>
             </div>
           </div>
@@ -224,9 +230,9 @@ function roleBadge(role) {
                     <% if (a.brand_name) { %><div class="sub-line"><%= a.brand_name %></div><% } %>
                   </td>
                   <td class="wrap"><%= a.assignee %></td>
-                  <td class="wrap"><%= a.assignee_email || '—' %></td>
-                  <td class="wrap"><%= a.assigned_by_name || a.assigned_by_email || '—' %></td>
-                  <td class="narrow"><%= a.assigned_at ? fmtDateTime(a.assigned_at) : '—' %></td>
+                  <td class="wrap"><%= a.assignee_email || ' - ' %></td>
+                  <td class="wrap"><%= a.assigned_by_name || a.assigned_by_email || ' - ' %></td>
+                  <td class="narrow"><%= a.assigned_at ? fmtDateTime(a.assigned_at) : ' - ' %></td>
                   <td>
                     <% if (a.last_sent === 1) { %><span class="badge good">sent</span>
                     <% } else if (a.last_sent === 0) { %><span class="badge critical">failed</span>
@@ -252,7 +258,7 @@ function roleBadge(role) {
         <label for="invite-url">Invite link</label>
         <input type="text" id="invite-url" value="<%= signupUrl %>" readonly
                onclick="this.select()" style="font-family:var(--mono);font-size:11.5px">
-        <div class="hint">Invite code: <code><%= team ? team.invite_code : '—' %></code></div>
+        <div class="hint">Invite code: <code><%= team ? team.invite_code : ' - ' %></code></div>
         <form method="POST" action="/team/invite/rotate" style="margin-top:12px"
               onsubmit="return confirm('Generate a new code? The current link will stop working.')"><%- csrfField %>
           <button class="btn secondary sm block" type="submit">Generate a new code</button>
@@ -267,20 +273,20 @@ function roleBadge(role) {
           <table class="data compact">
             <thead><tr><th>Action</th><th>Admin</th><th>SEO</th><th>Dev / Writer</th></tr></thead>
             <tbody>
-              <tr><td>Sign in at all</td><td>✓</td><td>✓</td><td>—</td></tr>
-              <tr><td>See brands &amp; data</td><td>✓</td><td>✓</td><td>—</td></tr>
-              <tr><td>Assign tasks</td><td>✓</td><td>if allowed</td><td>—</td></tr>
-              <tr><td>Update tasks</td><td>✓</td><td>✓</td><td>—</td></tr>
-              <tr><td>Approve SEO sign-off</td><td>✓</td><td>✓</td><td>—</td></tr>
-              <tr><td>Run audits &amp; syncs</td><td>✓</td><td>✓</td><td>—</td></tr>
-              <tr><td>Manage the workspace</td><td>✓</td><td>—</td><td>—</td></tr>
-              <tr><td>Connect Google</td><td>✓</td><td>—</td><td>—</td></tr>
+              <tr><td>Sign in at all</td><td>✓</td><td>✓</td><td> - </td></tr>
+              <tr><td>See brands &amp; data</td><td>✓</td><td>✓</td><td> - </td></tr>
+              <tr><td>Assign tasks</td><td>✓</td><td>if allowed</td><td> - </td></tr>
+              <tr><td>Update tasks</td><td>✓</td><td>✓</td><td> - </td></tr>
+              <tr><td>Approve SEO sign-off</td><td>✓</td><td>✓</td><td> - </td></tr>
+              <tr><td>Run audits &amp; syncs</td><td>✓</td><td>✓</td><td> - </td></tr>
+              <tr><td>Manage the workspace</td><td>✓</td><td></td><td></td></tr>
+              <tr><td>Connect Google</td><td>✓</td><td></td><td></td></tr>
               <tr><td>Receive tasks by email</td><td>✓</td><td>✓</td><td>✓</td></tr>
             </tbody>
           </table>
         </div>
         <p class="hint">
-          Everyone with an account shares the same brands, tasks and Google connection — the workspace belongs to
+          Everyone with an account shares the same brands, tasks and Google connection - the workspace belongs to
           the team, not to whoever created it. Developers and writers hold no account, so a client's data is never
           exposed to someone outside the SEO team.
         </p>

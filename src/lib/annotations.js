@@ -1,10 +1,10 @@
-// CHANGE ANNOTATIONS — the timeline that makes a chart attributable.
+// CHANGE ANNOTATIONS - the timeline that makes a chart attributable.
 //
 // THE PROBLEM THIS SOLVES
 // Every chart in this app answers "what happened". None of them could answer
 // "why", and the reason is that the causes were never written down. A traffic
-// inflection has four common explanations — a Google update, a deploy, a
-// content push, a migration — and after three weeks they are indistinguishable
+// inflection has four common explanations - a Google update, a deploy, a
+// content push, a migration - and after three weeks they are indistinguishable
 // from each other and from noise. The specialist ends up reconstructing the
 // month from memory, a Slack search and the client's recollection of when the
 // redesign went live.
@@ -18,7 +18,7 @@
 // Google publishes confirmed ranking updates on its Search Status Dashboard,
 // but there is no stable machine-readable feed of them, and the page's markup
 // changes. Scraping it would give a list that silently goes empty the next
-// time the page is rebuilt — and an empty update list looks exactly like a
+// time the page is rebuilt - and an empty update list looks exactly like a
 // quiet quarter, which is the failure mode this whole codebase refuses.
 //
 // So the confirmed updates are a vendored constant with a stated as-of date.
@@ -93,7 +93,7 @@ function kindMeta(key) {
 // dates: a chart is read against when the change started reaching users.
 //
 // AS_OF is rendered in the UI. When it is months behind today, the page says
-// so and offers the manual-entry form — see the header note above.
+// so and offers the manual-entry form - see the header note above.
 const ALGO_AS_OF = '2026-03-01';
 const ALGO_UPDATES = [
   { key: 'google-2024-03-core', date: '2024-03-05', title: 'March 2024 core update', detail: 'Core update paired with new spam policies; the longest and most volatile core rollout to date, targeting unhelpful content at scale.' },
@@ -198,7 +198,7 @@ function get(id, userId) {
 //
 // A site-wide annotation (brand_id NULL) belongs to EVERY brand's timeline,
 // which is why the filter is "this brand or nobody's" rather than an equality
-// test. Getting that wrong would hide algorithm updates from every chart —
+// test. Getting that wrong would hide algorithm updates from every chart - 
 // the events most worth seeing.
 function forBrand(userId, brandId, { from = null, to = null, kinds = null, limit = 500 } = {}) {
   const where = ['a.user_id = ?'];

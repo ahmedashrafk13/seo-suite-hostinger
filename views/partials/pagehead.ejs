@@ -1,0 +1,38 @@
+<%
+/* ============================================================================
+   Page header.
+
+   Every page states the same three things in the same place: what this page
+   is, one line on what it is for, and its primary actions on the right.
+
+   Before this, actions lived wherever the page happened to put them: a "Start
+   audit" button at the bottom of a form, "Sync now" floating in a filter bar,
+   an export link buried in a card footer. Same job, six different locations.
+
+   Usage (an EJS include passing heading, lede and an actions HTML string):
+
+       include('partials/pagehead', {
+         heading: 'Technical audit',
+         lede:    'Crawl a domain, score its health, and turn failing checks into tasks.',
+         actions: '<a class="btn" href="/audit">Run an audit</a>'
+       })
+
+   Every field is optional except `heading`. `lede` should be one sentence; if
+   a page needs more explanation than that, the explanation belongs next to
+   the control it explains, not stacked above the whole page.
+   ============================================================================ */
+const _heading = typeof heading !== 'undefined' ? heading : (typeof pageTitle !== 'undefined' ? pageTitle : title);
+const _lede    = typeof lede    !== 'undefined' ? lede    : null;
+const _actions = typeof actions !== 'undefined' ? actions : null;
+const _eyebrow = typeof eyebrow !== 'undefined' ? eyebrow : null;
+%>
+<div class="pagehead">
+  <div class="pagehead-main">
+    <% if (_eyebrow) { %><span class="pagehead-eyebrow"><%= _eyebrow %></span><% } %>
+    <h1><%= _heading %></h1>
+    <% if (_lede) { %><p class="ph-sub"><%= _lede %></p><% } %>
+  </div>
+  <% if (_actions) { %>
+    <div class="pagehead-actions"><%- _actions %></div>
+  <% } %>
+</div>

@@ -6,6 +6,13 @@
 <%- include('partials/sidebar') %>
 <%- include('partials/topbar') %>
 
+<%- include('partials/pagehead', {
+      heading: "Brands",
+      lede: "A brand pairs a website with its Search Console property and its GA4 property. Everything else is organised per brand.",
+      actions: '<a class="btn" href="/brands/import">Import from Google</a>'
+    }) %>
+
+
 <% if (!connected) { %>
   <div class="notice warn">
     <span class="notice-icon">&#9888;</span>
@@ -18,7 +25,7 @@
 <% if (fetchError) { %>
   <div class="notice warn">
     <span class="notice-icon">&#9888;</span>
-    <div class="notice-body">Could not load your Google property list — <%= fetchError %></div>
+    <div class="notice-body">Could not load your Google property list - <%= fetchError %></div>
   </div>
 <% } %>
 
@@ -135,7 +142,6 @@ if (sites) {
     <div class="card">
       <div class="card-head">
         <h3>Add a brand</h3>
-        <% if (connected) { %><a class="btn secondary sm" href="/brands/import">Import all from Google</a><% } %>
       </div>
       <div class="card-body">
         <form method="POST" action="/brands/create"><%- csrfField %>
@@ -154,7 +160,7 @@ if (sites) {
             <label for="gsc_property">Search Console property</label>
             <% if (sites && sites.length) { %>
               <select id="gsc_property" name="gsc_property">
-                <option value="">— none —</option>
+                <option value="">None</option>
                 <% sites.forEach(function(s){ %>
                   <option value="<%= s.siteUrl %>"><%= s.siteUrl %> (<%= s.permissionLevel %>)</option>
                 <% }) %>
@@ -171,7 +177,7 @@ if (sites) {
             <label for="ga4_property_id">GA4 property</label>
             <% if (ga4Props && ga4Props.length) { %>
               <select id="ga4_property_id" name="ga4_property_id">
-                <option value="">— none —</option>
+                <option value="">None</option>
                 <% ga4Props.forEach(function(p){ %>
                   <option value="<%= p.id %>"><%= p.account %> › <%= p.name %> (<%= p.id %>)</option>
                 <% }) %>

@@ -1,7 +1,7 @@
 <%
 // d = row.data (the reportBuilder output). Small local helpers so the
 // markup below stays readable.
-function pct(v) { return v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`; }
+function pct(v) { return v == null ? ' - ' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`; }
 function num(v) { return fmtInt(v); }
 function deltaCls(abs, invert) {
   if (!abs) return 'flat';
@@ -212,10 +212,10 @@ function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
         <a class="btn ghost sm" href="/linking/<%= d.linking.runId %>">Full report</a>
       </div>
       <div class="card-body" style="font-size:13px;display:flex;flex-direction:column;gap:4px">
-        <div>Orphan pages: <strong><%= d.linking.orphanPages == null ? '—' : d.linking.orphanPages %></strong></div>
-        <div>Under-linked pages: <strong><%= d.linking.underlinkedPages == null ? '—' : d.linking.underlinkedPages %></strong></div>
-        <div>Cannibalisation pairs: <strong><%= d.linking.cannibalizationPairs == null ? '—' : d.linking.cannibalizationPairs %></strong></div>
-        <div>Recommendations: <strong><%= d.linking.recommendationCount == null ? '—' : d.linking.recommendationCount %></strong></div>
+        <div>Orphan pages: <strong><%= d.linking.orphanPages == null ? ' - ' : d.linking.orphanPages %></strong></div>
+        <div>Under-linked pages: <strong><%= d.linking.underlinkedPages == null ? ' - ' : d.linking.underlinkedPages %></strong></div>
+        <div>Cannibalisation pairs: <strong><%= d.linking.cannibalizationPairs == null ? ' - ' : d.linking.cannibalizationPairs %></strong></div>
+        <div>Recommendations: <strong><%= d.linking.recommendationCount == null ? ' - ' : d.linking.recommendationCount %></strong></div>
       </div>
     </div>
     <% } %>
@@ -227,9 +227,9 @@ function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
         <% ['mobile','desktop'].forEach(function(strategy){ var c = d.cwv[strategy]; if (!c) return; %>
           <div style="margin-bottom:8px">
             <strong style="font-size:12.8px;text-transform:capitalize"><%= strategy %></strong>
-            <span class="badge <%= c.score >= 90 ? 'good' : (c.score >= 50 ? 'medium' : 'critical') %>" style="margin-left:6px"><%= c.score == null ? '—' : c.score %></span>
+            <span class="badge <%= c.score >= 90 ? 'good' : (c.score >= 50 ? 'medium' : 'critical') %>" style="margin-left:6px"><%= c.score == null ? ' - ' : c.score %></span>
             <div style="font-size:12px;color:var(--text-2);margin-top:2px">
-              LCP <%= c.lcp == null ? '—' : num(c.lcp) + 'ms' %> &middot; INP <%= c.inp == null ? '—' : num(c.inp) + 'ms' %> &middot; CLS <%= c.cls == null ? '—' : Number(c.cls).toFixed(3) %>
+              LCP <%= c.lcp == null ? ' - ' : num(c.lcp) + 'ms' %> &middot; INP <%= c.inp == null ? ' - ' : num(c.inp) + 'ms' %> &middot; CLS <%= c.cls == null ? ' - ' : Number(c.cls).toFixed(3) %>
             </div>
           </div>
         <% }) %>
@@ -276,7 +276,7 @@ function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
 
 <% if (d.full) { %>
   <%
-  // Appendix — the complete synced dataset for the report week. Each block is
+  // Appendix - the complete synced dataset for the report week. Each block is
   // a <details> so the page stays readable: the report leads with its
   // interpretation, and the raw numbers are one click away rather than
   // 2,000 rows of scrolling.
@@ -284,7 +284,7 @@ function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
   function gscTable(rows, head) {
     if (!rows || !rows.length) return '<div class="empty-state">Nothing synced for this dimension.</div>';
     const body = rows.map((r) => `<tr>
-      <td class="wrap">${String(r.entity == null ? '—' : r.entity).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</td>
+      <td class="wrap">${String(r.entity == null ? ' - ' : r.entity).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</td>
       <td class="num">${fmtInt(r.clicks)}</td>
       <td class="num">${fmtInt(r.impressions)}</td>
       <td class="num">${fmtPct((r.ctr || 0) * 100, 2)}</td>
@@ -304,7 +304,7 @@ function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
     </div>
     <div class="card-body">
       <p class="hint" style="margin:0">
-        Long lists are capped for readability — up to <%= F.limits.queries %> queries and pages, <%= F.limits.countries %> countries,
+        Long lists are capped for readability - up to <%= F.limits.queries %> queries and pages, <%= F.limits.countries %> countries,
         <%= F.limits.sources %> traffic sources and <%= F.limits.events %> events. The Excel export carries the same rows in full-width columns.
       </p>
     </div>
@@ -342,7 +342,7 @@ function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
         <p class="hint">
           <% if (F.gsc.queryPagePeriod) { %>
             Snapshot of the whole sync window (<%= fmtDate(F.gsc.queryPagePeriod.period_start) %> &rarr; <%= fmtDate(F.gsc.queryPagePeriod.period_end) %>),
-            not just the report week — Search Console does not return this pairing per day.
+            not just the report week - Search Console does not return this pairing per day.
           <% } else { %>No query-to-page data synced yet.<% } %>
         </p>
         <% if (F.gsc.queryPage.length) { %>
@@ -371,8 +371,8 @@ function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
           <tbody>
             <% F.gsc.sitemaps.forEach(function(s){ %>
               <tr><td class="url wrap"><%= s.path %></td><td><%= s.is_sitemaps_index ? 'Sitemap index' : (s.type || 'Sitemap') %></td>
-                <td class="num"><%= s.submitted_count == null ? '—' : num(s.submitted_count) %></td>
-                <td class="num"><%= s.indexed_count == null ? '—' : num(s.indexed_count) %></td>
+                <td class="num"><%= s.submitted_count == null ? ' - ' : num(s.submitted_count) %></td>
+                <td class="num"><%= s.indexed_count == null ? ' - ' : num(s.indexed_count) %></td>
                 <td><%= s.last_downloaded ? fmtDate(s.last_downloaded) : 'Not yet read' %></td>
                 <td class="num"><%= s.warnings %></td><td class="num"><%= s.errors %></td></tr>
             <% }) %>
@@ -397,10 +397,10 @@ function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
                 <tr>
                   <td class="url wrap"><%= shortUrl(r.url, 60) %></td>
                   <td><span class="badge <%= r.verdict === 'PASS' ? 'good' : (r.error ? 'neutral' : 'critical') %>"><%= r.error ? 'error' : (r.verdict || 'unknown') %></span></td>
-                  <td class="wrap"><%= r.error ? r.error : (r.coverage_state || '—') %></td>
-                  <td class="url wrap"><%= r.user_canonical ? shortUrl(r.user_canonical, 40) : '—' %></td>
-                  <td class="url wrap"><%= r.google_canonical ? shortUrl(r.google_canonical, 40) : '—' %></td>
-                  <td class="narrow"><%= r.last_crawl_time ? fmtDate(r.last_crawl_time) : '—' %></td>
+                  <td class="wrap"><%= r.error ? r.error : (r.coverage_state || ' - ') %></td>
+                  <td class="url wrap"><%= r.user_canonical ? shortUrl(r.user_canonical, 40) : ' - ' %></td>
+                  <td class="url wrap"><%= r.google_canonical ? shortUrl(r.google_canonical, 40) : ' - ' %></td>
+                  <td class="narrow"><%= r.last_crawl_time ? fmtDate(r.last_crawl_time) : ' - ' %></td>
                 </tr>
               <% }) %>
             </tbody>
@@ -494,7 +494,7 @@ function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
       </details>
 
       <details class="plain">
-        <summary>Acquisition — source / medium (<%= F.ga4.acquisition.length %>)</summary>
+        <summary>Acquisition - source / medium (<%= F.ga4.acquisition.length %>)</summary>
         <div class="table-wrap"><table class="data compact">
           <thead><tr><th>Source / medium</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">New users</th><th class="num">Conversions</th></tr></thead>
           <tbody>
@@ -534,12 +534,12 @@ function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
           <tbody>
             <% F.site.psi.forEach(function(p){ %>
               <tr><td class="narrow"><%= fmtDateTime(p.captured_at) %></td><td><%= p.strategy %></td>
-                <td class="num"><%= p.perf_score == null ? '—' : p.perf_score %></td>
-                <td class="num"><%= p.lcp == null ? '—' : num(p.lcp) + 'ms' %></td>
-                <td class="num"><%= p.inp == null ? '—' : num(p.inp) + 'ms' %></td>
-                <td class="num"><%= p.cls == null ? '—' : Number(p.cls).toFixed(3) %></td>
-                <td class="num"><%= p.fcp == null ? '—' : num(p.fcp) + 'ms' %></td>
-                <td class="num"><%= p.ttfb == null ? '—' : num(p.ttfb) + 'ms' %></td>
+                <td class="num"><%= p.perf_score == null ? ' - ' : p.perf_score %></td>
+                <td class="num"><%= p.lcp == null ? ' - ' : num(p.lcp) + 'ms' %></td>
+                <td class="num"><%= p.inp == null ? ' - ' : num(p.inp) + 'ms' %></td>
+                <td class="num"><%= p.cls == null ? ' - ' : Number(p.cls).toFixed(3) %></td>
+                <td class="num"><%= p.fcp == null ? ' - ' : num(p.fcp) + 'ms' %></td>
+                <td class="num"><%= p.ttfb == null ? ' - ' : num(p.ttfb) + 'ms' %></td>
                 <td><%= p.error ? 'error' : (p.source === 'crux-field' ? 'real users' : 'lab') %></td></tr>
             <% }) %>
           </tbody>
@@ -555,7 +555,7 @@ function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
             <% F.site.uptime.forEach(function(u){ %>
               <tr><td class="narrow"><%= fmtDateTime(u.checked_at) %></td>
                 <td><span class="badge <%= u.ok ? 'good' : 'critical' %>"><%= u.ok ? ('HTTP ' + u.status_code) : 'Down' %></span></td>
-                <td class="num"><%= u.response_ms == null ? '—' : num(u.response_ms) + 'ms' %></td>
+                <td class="num"><%= u.response_ms == null ? ' - ' : num(u.response_ms) + 'ms' %></td>
                 <td class="wrap"><%= u.error || 'OK' %></td></tr>
             <% }) %>
           </tbody>
@@ -566,6 +566,136 @@ function deltaArrow(abs) { return !abs ? '' : (abs > 0 ? '▲' : '▼'); }
   </div>
   <% } %>
 <% } %>
+
+
+<%/* Commentary and client sharing sit at the END of the report, not the top:
+     they are what you do once you have read it. */%>
+<div class="card">
+  <div class="card-head">
+    <h2>Commentary</h2>
+    <span class="sub">Your own words on this week. Appears on the print view and on every share link for this report.</span>
+  </div>
+  <div class="card-body">
+    <% if (perms.canWrite) { %>
+      <form method="POST" action="/reports/<%= row.id %>/commentary"><%- csrfField %>
+        <label for="commentary" class="sr-only">Commentary</label>
+        <textarea id="commentary" name="commentary" rows="7"
+          placeholder="What actually happened this week, in plain language - what moved, why, and what you are doing about it. Blank lines separate paragraphs."><%= row.commentary || '' %></textarea>
+        <div class="hint">Plain text. Blank lines become paragraphs; HTML is escaped, since this text is
+          rendered on a page served to people outside the team.</div>
+        <div class="btn-row">
+          <button type="submit" class="btn sm">Save commentary</button>
+          <% if (row.commentary_updated_at) { %>
+            <span class="muted">Last saved <%= fmtDateTime(row.commentary_updated_at) %></span>
+          <% } %>
+        </div>
+      </form>
+
+      <%
+      /* The AI draft is a SEPARATE form, deliberately outside the one above:
+         nesting it would make "Draft with AI" submit whatever half-typed text
+         is in the textarea, and an overwrite you did not intend is the one
+         failure mode this button must not have. */
+      %>
+      <div class="section-divider"></div>
+      <form method="POST" action="/reports/<%= row.id %>/commentary/draft"><%- csrfField %>
+        <% if (row.commentary) { %><input type="hidden" name="force" value="1"><% } %>
+        <div class="btn-row">
+          <button type="submit" class="btn secondary sm"
+            <% if (row.commentary) { %>onclick="return confirm('Replace the existing commentary with an AI draft? The current text will be lost.')"<% } %>>
+            <%= row.commentary ? 'Replace with AI draft' : 'Draft with AI' %>
+          </button>
+          <span class="hint" style="margin:0">
+            Writes a first draft from this week's measured figures only - it is given the totals, the change on
+            last week and the top queries and pages, and nothing else, so it cannot quote a number this report
+            does not contain. Read and edit it before you share it. Costs a call against the shared AI budget.
+          </span>
+        </div>
+      </form>
+    <% } else if (row.commentary) { %>
+      <p><%= row.commentary %></p>
+    <% } else { %>
+      <div class="empty">No commentary on this report.</div>
+    <% } %>
+  </div>
+</div>
+
+<div class="card share-panel">
+  <div class="card-head">
+    <h2>Share with the client</h2>
+    <span class="sub">A read-only link to this one report. No login, and nothing behind it but this page.</span>
+  </div>
+  <div class="card-body">
+    <% if (newShareUrl) { %>
+      <div class="notice good">
+        <div class="notice-body">
+          <strong>Copy this now - it is not shown again.</strong> Only a hash of it is stored, so a
+          lost link is replaced rather than recovered.
+          <div class="code-block"><code id="new-share"><%= newShareUrl %></code></div>
+          <button type="button" class="btn sm"
+            onclick="navigator.clipboard.writeText(document.getElementById('new-share').textContent.trim()).then(function(){ this.textContent='Copied'; }.bind(this))">Copy link</button>
+        </div>
+      </div>
+    <% } %>
+
+    <% if (shares.length) { %>
+      <div class="table-wrap"><table class="data compact">
+        <thead><tr><th>Label</th><th>Link</th><th>Created</th><th>Expires</th><th class="num">Views</th><th>Last opened</th><th></th></tr></thead>
+        <tbody>
+          <% shares.forEach(function(sh){ %>
+            <% var dead = sh.revoked_at || (sh.expires_on && sh.expires_on < new Date().toISOString().slice(0,10)); %>
+            <tr<%= dead ? ' class="muted"' : '' %>>
+              <td class="wrap"><%= sh.label || ' - ' %></td>
+              <td class="mono-sm">…<%= sh.token_hint %></td>
+              <td class="narrow"><%= fmtDate(sh.created_at) %></td>
+              <td class="narrow"><%= sh.expires_on || 'never' %></td>
+              <td class="num"><%= sh.views %></td>
+              <td class="narrow">
+                <%/* The field an agency actually checks: not what the report
+                     says, but whether the client opened it. */%>
+                <%= sh.last_viewed_at ? fmtDateTime(sh.last_viewed_at) : 'not yet' %>
+              </td>
+              <td class="num">
+                <% if (sh.revoked_at) { %>
+                  <span class="badge neutral">revoked</span>
+                <% } else if (perms.canWrite) { %>
+                  <form method="POST" action="/reports/<%= row.id %>/share/<%= sh.id %>/revoke" class="inline-form"
+                        onsubmit="return confirm('Revoke this link? Anyone who opens it will see a 'link turned off' page.')"><%- csrfField %>
+                    <button type="submit" class="btn danger-ghost sm">Revoke</button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table></div>
+    <% } else { %>
+      <div class="empty">No share links for this report yet.</div>
+    <% } %>
+
+    <% if (perms.canWrite) { %>
+      <div class="section-divider"></div>
+      <form method="POST" action="/reports/<%= row.id %>/share"><%- csrfField %>
+        <div class="form-row">
+          <div>
+            <label for="share_label">Label</label>
+            <input type="text" id="share_label" name="label" maxlength="120" placeholder="e.g. Sarah at the client">
+            <div class="hint">For your own reference only. The client never sees it.</div>
+          </div>
+          <div>
+            <label for="expires_on">Expires</label>
+            <input type="date" id="expires_on" name="expires_on">
+            <div class="hint">Optional. Leave blank for a link the client can keep referring back to.</div>
+          </div>
+        </div>
+        <button type="submit" class="btn sm">Create share link</button>
+      </form>
+      <p class="hint">The link carries the report's figures, your commentary and the lead totals for that
+        week. It carries no contact details for any lead, and nothing that identifies another client - 
+        a shared URL is a URL that gets forwarded.</p>
+    <% } %>
+  </div>
+</div>
 
 <%- include('partials/sidebar-end') %>
 <%- include('partials/foot') %>

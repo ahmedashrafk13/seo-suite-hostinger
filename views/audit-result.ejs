@@ -86,14 +86,14 @@ function n(v) { return fmtInt(v); }
           <span class="notice-icon">&#8646;</span>
           <div class="notice-body">
             Compared with the <a href="/audit/<%= previousReport.id %>">previous crawl</a> on <%= fmtDateTime(previousReport.created_at) %>:
-            health <%= previousReport.health == null ? '—' : previousReport.health %> &rarr; <%= report.health == null ? '—' : report.health %>.
+            health <%= previousReport.health == null ? ' - ' : previousReport.health %> &rarr; <%= report.health == null ? ' - ' : report.health %>.
           </div>
         </div>
       <% } %>
 
       <div class="stat-row">
         <div class="stat"><div class="label">Site health</div>
-          <div class="value"><span class="badge <%= report.health >= 90 ? 'good' : (report.health >= 70 ? 'medium' : 'critical') %> lg"><%= report.health == null ? '—' : report.health %>/100</span></div>
+          <div class="value"><span class="badge <%= report.health >= 90 ? 'good' : (report.health >= 70 ? 'medium' : 'critical') %> lg"><%= report.health == null ? ' - ' : report.health %>/100</span></div>
         </div>
         <div class="stat"><div class="label">Pages crawled</div><div class="value"><%= n(report.pagesCrawled) %></div></div>
         <div class="stat"><div class="label">Critical</div><div class="value"><%= report.bySeverity.critical || 0 %></div></div>
@@ -104,7 +104,7 @@ function n(v) { return fmtInt(v); }
       <div class="card">
         <div class="card-head"><h3>Failing checks (<%= report.failing.length %>)</h3></div>
         <% if (!report.failing.length) { %>
-          <div class="card-body"><div class="empty-state">No failing checks — every check passed.</div></div>
+          <div class="card-body"><div class="empty-state">No failing checks - every check passed.</div></div>
         <% } else { %>
           <div class="table-wrap"><table class="data">
             <thead><tr><th>Severity</th><th>Issue</th><th class="num">Affected</th><th>Recommended action</th></tr></thead>
@@ -118,7 +118,7 @@ function n(v) { return fmtInt(v); }
                     <% if (f.items && f.items.length) { %>
                       <ul style="margin:6px 0 0;padding-left:16px;font-size:12px;color:var(--text-2)">
                         <% f.items.slice(0, 8).forEach(function(it){ %>
-                          <li style="word-break:break-all"><%= it.url || it.note || '—' %><% if (it.url && it.note) { %> &mdash; <%= it.note %><% } %></li>
+                          <li style="word-break:break-all"><%= it.url || it.note || ' - ' %><% if (it.url && it.note) { %> &mdash; <%= it.note %><% } %></li>
                         <% }) %>
                       </ul>
                       <% if (f.items.length > 8) { %><div class="hint"><%= f.items.length - 8 %> more not shown &mdash; see the full <a href="/audit/<%= run.id %>/csv">Excel export</a>.</div><% } %>
@@ -163,7 +163,7 @@ function n(v) { return fmtInt(v); }
               <td><a href="/tasks/<%= t.id %>"><%= t.title %></a></td>
               <td><span class="badge <%= t.severity %>"><%= t.severity %></span></td>
               <td><%= String(t.status).replace('_',' ') %></td>
-              <td><%= t.assignee || '—' %></td>
+              <td><%= t.assignee || ' - ' %></td>
             </tr>
           <% }) %>
           </tbody>

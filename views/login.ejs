@@ -4,14 +4,29 @@
 <body>
 <div class="auth-wrap">
   <div class="auth-card">
-    <div class="brand-mark"><span class="dot"></span> SEO Automation Suite</div>
-    <p class="sub">Sign in to your workspace.</p>
+    <div class="brand-mark-row">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <rect x="3" y="13" width="3.4" height="7" rx="1"/>
+          <rect x="10.3" y="9" width="3.4" height="11" rx="1"/>
+          <rect x="17.6" y="4" width="3.4" height="16" rx="1"/>
+        </svg>
+      </span>
+      <span class="bm-text">SEO Suite</span>
+    </div>
+    <h1>Sign in</h1>
+    <p class="sub">Search Console and GA4 reporting for the brands you manage.</p>
 
     <% if (error) { %>
-      <div class="notice error"><span class="notice-icon">&#9888;</span><div class="notice-body"><%= error %></div></div>
+      <div class="notice error">
+        <span class="notice-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 7.5v5.5M12 16.6h.01"/><circle cx="12" cy="12" r="9"/></svg>
+        </span>
+        <div class="notice-body"><%= error %></div>
+      </div>
     <% } %>
 
-    <form method="POST" action="/login"><%- csrfField %>
+    <form method="POST" action="/login" data-busy><%- csrfField %>
       <div class="field">
         <label for="email">Email</label>
         <input type="email" id="email" name="email" required autofocus autocomplete="username">
@@ -20,10 +35,15 @@
         <label for="password">Password</label>
         <input type="password" id="password" name="password" required autocomplete="current-password">
       </div>
-      <button type="submit" class="btn block">Sign in</button>
+      <button type="submit" class="btn block lg">Sign in</button>
     </form>
 
-    <div class="auth-foot">No account yet? <a href="/signup">Create one</a></div>
+    <div class="auth-foot">
+      No account yet? <a href="/signup">Create one</a>
+      <div style="margin-top:10px;font-size:12px;color:var(--text-4)">
+        <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a>
+      </div>
+    </div>
   </div>
 </div>
 <%- include('partials/foot') %>

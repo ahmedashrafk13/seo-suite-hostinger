@@ -1,9 +1,9 @@
-// PageSpeed Insights — the full Lighthouse + CrUX report, in-app.
+// PageSpeed Insights - the full Lighthouse + CrUX report, in-app.
 //
 // Reports are run on demand, stored whole, and re-rendered from storage, so
 // opening an old report costs nothing and the numbers never silently change
 // under a client. Each run also writes the headline metrics into
-// psi_snapshots, which is what the Core Web Vitals alerts already read — so
+// psi_snapshots, which is what the Core Web Vitals alerts already read - so
 // running a report here keeps the alerting baseline fresh for free.
 const express = require('express');
 const db = require('../db');
@@ -38,6 +38,7 @@ function renderPage(req, res, extra) {
     hasApiKey: Boolean(process.env.PSI_API_KEY),
     report: null,
     row: null,
+    jsRender: null,
     url: '',
     strategy: 'mobile',
     flash: req.query.msg || null,
@@ -66,7 +67,13 @@ router.get('/', (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/:id(\\d+)', (req, res, next) => {
+// NOTE ON THE PATH. This used to read ':id(\d+)'. That inline-regex syntax was
+// removed by the path-to-regexp version this Express ships, so the route
+// silently stopped matching and every /pagespeed/<id> request fell through to
+// the 404 handler - reproduced against this exact express build. Plain ':id'
+// with an explicit numeric guard is what the rest of the app already does.
+router.get('/:id', (req, res, next) => {
+  if (!/^\d+$/.test(req.params.id)) return next();
   try {
     const row = db.prepare('SELECT * FROM psi_reports WHERE id=? AND user_id=?')
       .get(req.params.id, req.dataUserId);
@@ -80,6 +87,36 @@ router.get('/:id(\\d+)', (req, res, next) => {
       strategy: row.strategy,
       row,
       report: psi.normalise(JSON.parse(row.raw_json)),
+    });
+  } catch (err) { next(err); }
+});
+
+// JavaScript-rendering check.
+//
+// Deliberately a BUTTON, not something the report page does on load. The check
+// costs one live GET of the client's site, and a PageSpeed report is opened
+// repeatedly (comparing runs, showing a client, printing); re-fetching their
+// site every time anyone glances at a stored report would be rude to them and
+// slow for us. It is also pointless to repeat: the answer only changes when
+// the site is rebuilt.
+router.post('/:id/rendering', async (req, res, next) => {
+  if (!/^\d+$/.test(req.params.id)) return next();
+  try {
+    const row = db.prepare('SELECT * FROM psi_reports WHERE id=? AND user_id=?')
+      .get(req.params.id, req.dataUserId);
+    if (!row) {
+      return res.status(404).render('error', {
+        title: 'Not found', active: 'pagespeed', message: 'That PageSpeed report does not exist.',
+      });
+    }
+    const jsRendering = require('../lib/jsRendering');
+    const jsRender = await jsRendering.analyse(row.url, JSON.parse(row.raw_json));
+    renderPage(req, res, {
+      url: row.url,
+      strategy: row.strategy,
+      row,
+      report: psi.normalise(JSON.parse(row.raw_json)),
+      jsRender,
     });
   } catch (err) { next(err); }
 });
@@ -102,7 +139,7 @@ router.post('/run', async (req, res, next) => {
       result = await psi.fetchReport(userId, { url, strategy });
     } catch (err) {
       const hint = err.status === 429
-        ? ' Google\'s anonymous quota is shared and small — connect your Google account so the request uses your own project quota.'
+        ? ' Google\'s anonymous quota is shared and small - connect your Google account so the request uses your own project quota.'
         : (err.status === 401 || err.status === 403
           ? ' Enable the PageSpeed Insights API in the Google Cloud project behind your OAuth client, then reconnect.'
           : '');
@@ -152,7 +189,7 @@ router.post('/run', async (req, res, next) => {
 
       // Every PageSpeed run turns its own failing categories into tasks
       // automatically, the same way a technical audit or a linking crawl
-      // does — no "create tasks" button to click.
+      // does - no "create tasks" button to click.
       try {
         const savedRow = db.prepare('SELECT * FROM psi_reports WHERE id=?').get(info.lastInsertRowid);
         const brand = db.prepare('SELECT * FROM brands WHERE id=? AND user_id=?').get(brandId, userId);

@@ -6,28 +6,120 @@
 <%- include('partials/sidebar') %>
 <%- include('partials/topbar') %>
 
-    <div class="card">
-      <div class="card-body">
-        <h3 class="mt-0">Account</h3>
-        <p><strong>Name:</strong> <%= user.name || '—' %></p>
-        <p><strong>Email:</strong> <%= user.email %></p>
-        <p><strong>Member since:</strong> <%= user.created_at %></p>
-      </div>
-    </div>
+<%
+/* This page used to be two cards of "<strong>Name:</strong> value" paragraphs
+   with a Disconnect button floating under them. Same information, but a
+   definition list is what this actually is, and a destructive action needs to
+   look different from a link. */
+const _initials = String(user.name || user.email || '?').trim()
+  .split(/[\s@._-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+%>
 
-    <div class="card">
-      <div class="card-body">
-        <h3 class="mt-0">Google Connection</h3>
-        <% if (connection) { %>
-          <p>Connected as <strong><%= connection.connected_email || 'unknown' %></strong>.</p>
-          <form method="POST" action="/settings/disconnect"><%- csrfField %>
-            <button class="btn danger" type="submit">Disconnect Google Account</button>
-          </form>
-        <% } else { %>
-          <p class="muted">Not connected.</p>
-          <a class="btn" href="/connect">Go to Connect Accounts</a>
+<%- include('partials/pagehead', {
+      heading: 'Settings',
+      lede: 'Your account, and the Google connection that feeds data into every brand.'
+    }) %>
+
+<div class="card">
+  <div class="card-head"><h3>Account</h3></div>
+  <div class="card-body">
+    <div class="row" style="gap:var(--s-4);align-items:flex-start">
+      <span class="avatar lg" aria-hidden="true"><%= _initials %></span>
+      <dl class="meta-list" style="flex:1;min-width:220px">
+        <dt>Name</dt>
+        <dd><%= user.name || 'Not set' %></dd>
+        <dt>Email</dt>
+        <dd><%= user.email %></dd>
+        <dt>Role</dt>
+        <dd><span class="badge outline"><%= (user.role || 'member').replace(/_/g, ' ') %></span></dd>
+        <dt>Member since</dt>
+        <dd><%= fmtDate(user.created_at) %></dd>
+        <% if (typeof team !== 'undefined' && team) { %>
+          <dt>Team</dt>
+          <dd><%= team.name %></dd>
         <% } %>
+      </dl>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <div class="ch-main">
+      <h3>Google connection</h3>
+      <span class="sub">Search Console and GA4 are read through this account.</span>
+    </div>
+    <% if (connection) { %><span class="badge good">Connected</span><% } else { %><span class="badge neutral">Not connected</span><% } %>
+  </div>
+  <div class="card-body">
+    <% if (connection) { %>
+      <dl class="meta-list" style="margin-bottom:var(--s-4)">
+        <dt>Connected as</dt>
+        <dd><strong><%= connection.connected_email || 'Unknown account' %></strong></dd>
+      </dl>
+      <p class="hint" style="margin-bottom:var(--s-4)">
+        Disconnecting stops all syncing. Brands, tasks, alerts and past reports are kept,
+        but no new Search Console or GA4 data arrives until a Google account is reconnected.
+      </p>
+      <form method="POST" action="/settings/disconnect" data-busy
+            onsubmit="return confirm('Disconnect Google? Syncing stops until you reconnect.')"><%- csrfField %>
+        <button class="btn danger-ghost" type="submit">Disconnect Google account</button>
+      </form>
+    <% } else { %>
+      <div class="empty-state" style="padding-top:var(--s-3)">
+        <p style="margin-bottom:var(--s-4)">No Google account is linked, so nothing is syncing.</p>
+        <a class="btn" href="/connect">Connect Google</a>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<%
+/* Appearance is stored per browser, not per account, so it is set from the
+   account menu rather than posted to the server. Saying so here stops this
+   page looking like it is missing the controls. */
+%>
+<div class="card">
+  <div class="card-head"><h3>Appearance</h3></div>
+  <div class="card-body">
+    <p class="hint mt-0">
+      Theme and density are remembered by this browser rather than by your account, so they
+      can differ between your laptop and a shared machine. Set them from the account menu at
+      the top right, or here.
+    </p>
+    <div class="row" style="gap:var(--s-6);margin-top:var(--s-4)">
+      <div>
+        <label id="lbl-theme">Theme</label>
+        <div class="segmented" role="radiogroup" aria-labelledby="lbl-theme">
+          <button type="button" data-theme-set="light">Light</button>
+          <button type="button" data-theme-set="dark">Dark</button>
+          <button type="button" data-theme-set="system">System</button>
+        </div>
+      </div>
+      <div>
+        <label id="lbl-density">Density</label>
+        <div class="segmented" role="radiogroup" aria-labelledby="lbl-density">
+          <button type="button" data-density-set="comfortable">Comfortable</button>
+          <button type="button" data-density-set="compact">Compact</button>
+        </div>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>Keyboard</h3></div>
+  <div class="card-body">
+    <dl class="meta-list">
+      <dt><kbd>Ctrl</kbd> <kbd>K</kbd></dt>
+      <dd>Search every page and brand</dd>
+      <dt><kbd>/</kbd></dt>
+      <dd>Same, when you are not typing in a field</dd>
+      <dt><kbd>Esc</kbd></dt>
+      <dd>Close whatever is open</dd>
+    </dl>
+  </div>
+</div>
+
 <%- include('partials/sidebar-end') %>
 <%- include('partials/foot') %>

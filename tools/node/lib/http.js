@@ -70,6 +70,8 @@ let AUTH_SITE = '';
 // A credential scope must be at least as strict as the browser's, so the port
 // is kept. `www.` is still folded away, because a login cookie genuinely has
 // to work across www and non-www and the audit probes both host variants.
+const renderer = require('./renderer');
+
 function authSiteKey(url) {
   try {
     const u = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`);
@@ -362,9 +364,67 @@ async function mapLimit(items, limit, worker) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// ==========================================================================
+// Fetch, and render only if the raw HTML turns out to be a shell
+// ==========================================================================
+//
+// This is the crawlers' entry point for JavaScript-rendered sites, and the
+// order of operations is the whole design: the raw fetch happens FIRST and
+// costs nothing, and the paid render happens only once that free fetch has
+// proved the page is a shell. A server-rendered site never reaches the paid
+// path at all.
+//
+// `budget` is a per-run object from renderer.newBudget(). Passing none
+// disables rendering entirely, which is what every existing caller does by
+// simply not passing one - so this function is a no-op change for them.
+async function fetchMaybeRendered(url, options = {}, budget = null) {
+  const res = await fetchUrl(url, options);
+  res.rendered = false;
+
+  if (!budget) return res;
+  if (!res || res.status !== 200 || !res.body || !res.body.length) return res;
+  const ctype = String((res.headers || {})['content-type'] || '');
+  if (ctype && !/html/i.test(ctype)) return res;
+
+  // Credentials and third parties never mix. An authenticated crawl carries
+  // the client's own session; handing that to a rendering vendor is not a
+  // trade this app makes, so such a page stays on the raw fetch.
+  if (authFor(url)) return res;
+
+  let html;
+  try { html = decodeBody(res); } catch (e) { return res; }
+
+  // The free check. Almost every page stops here.
+  if (!renderer.looksLikeShell(html)) return res;
+
+  // It is a shell. Is there budget left to do anything about it?
+  if (!budget.canSpend()) { budget.deny(); return res; }
+
+  try {
+    const r = await renderer.renderPage(
+      url,
+      { timeout: options.timeout, maxBytes: options.maxBytes, ua: (options.headers || {})['User-Agent'] || UA },
+      { fetchUrl, decodeBody },
+    );
+    budget.spend();
+    // The crawler resolves links against res.url, so it must stay the target
+    // URL and not the provider's host. renderPage does not touch it, but the
+    // response object came from the provider, so it is set explicitly here.
+    r.res.url = res.url;
+    r.res.history = res.history || [];
+    r.res.rendered = true;
+    return r.res;
+  } catch (e) {
+    // A rendering failure leaves the crawl with the raw page it already had.
+    // An audit must not die because a rendering vendor did.
+    res.renderError = String(e.message).slice(0, 160);
+    return res;
+  }
+}
+
 module.exports = {
   UA, BROWSER_HEADERS, HttpError,
-  fetchUrl, requestOnce, decodeBody, mapLimit, sleep, classify,
+  fetchUrl, requestOnce, decodeBody, mapLimit, sleep, classify, fetchMaybeRendered,
   setAuthHeaders, authHeaderNames, takeAuthArgs, bindAuthSite, authFor,
   authSiteKey, scopedAuthFor,
 };

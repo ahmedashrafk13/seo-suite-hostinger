@@ -4,7 +4,7 @@
 // The original build scheduled everything in process: node-cron for alerts,
 // nightly sync and weekly reports, setInterval for backups and assignment
 // digests. That is correct on a server that runs continuously. Under Passenger
-// — which is how Hostinger runs a Node app — it silently does nothing. Passenger
+// - which is how Hostinger runs a Node app - it silently does nothing. Passenger
 // starts the app on the first HTTP request and *stops it again* once it has
 // been idle for a while (default ~5 minutes). A timer set for 03:20 belongs to
 // a process that was killed at 23:10. Nothing errors; the alerts simply never
@@ -17,8 +17,8 @@
 // what that request does, so the work runs in a process that is alive by
 // construction.
 //
-// External cron is coarse — hPanel's finest granularity is a minute, and most
-// people set it hourly — so the endpoint cannot just "run everything" on each
+// External cron is coarse - hPanel's finest granularity is a minute, and most
+// people set it hourly - so the endpoint cannot just "run everything" on each
 // hit. Instead every job records when it last completed, and each tick runs the
 // jobs whose own schedule came due since then. That decouples the two
 // cadences: an hourly cron still fires the weekly report exactly once, on
@@ -26,7 +26,7 @@
 // rather than skipping a week.
 //
 // Nothing about the jobs themselves changed. Each one calls the same function
-// the in-process scheduler called, so behaviour is identical either way — and
+// the in-process scheduler called, so behaviour is identical either way - and
 // INPROCESS_CRON=1 restores the timer-based mode for local development.
 const db = require('../db');
 const config = require('../config');
@@ -57,7 +57,7 @@ const setRun = db.prepare(
 
 // --- cron expressions -----------------------------------------------------
 // A five-field matcher (minute hour day-of-month month day-of-week) supporting
-// *, lists, ranges and steps — everything the app's schedules use.
+// *, lists, ranges and steps - everything the app's schedules use.
 //
 // Written here rather than pulled from a library because the question being
 // asked is not the one cron libraries answer. node-cron can *run* an
@@ -100,7 +100,7 @@ function parseCron(expr) {
   // Cron accepts both 0 and 7 for Sunday.
   if (dow.has(7)) dow.add(0);
   // A restriction on both day-of-month and day-of-week is a union in cron, not
-  // an intersection — the classic gotcha.
+  // an intersection - the classic gotcha.
   const domRestricted = fields[2] !== '*';
   const dowRestricted = fields[4] !== '*';
   return { minute, hour, dom, month, dow, domRestricted, dowRestricted };
@@ -121,7 +121,7 @@ function matches(cronSpec, date) {
 // Would `expr` have fired in (after, now]? Walked a minute at a time, which is
 // cheap for the windows involved and, unlike "compute the next fire time",
 // needs no calendar arithmetic to get right.
-const MAX_LOOKBACK_MINUTES = 60 * 24 * 40; // 40 days — long enough for monthly
+const MAX_LOOKBACK_MINUTES = 60 * 24 * 40; // 40 days - long enough for monthly
 function firedSince(expr, afterMs, nowMs) {
   const spec = parseCron(expr);
   if (!spec) return false;
@@ -222,7 +222,7 @@ const JOBS = [
       if (!brands.length) return 'no active brands with a site URL';
 
       // Oldest last-sweep first. A brand never swept has no row at all, and
-      // COALESCE puts it at the front — which is what makes a new brand get
+      // COALESCE puts it at the front - which is what makes a new brand get
       // its baseline on the next tick rather than after every other brand.
       const lastSweep = new Map(db.prepare(`SELECT brand_id, MAX(finished_at) last
         FROM aiseo_runs WHERE kind='tracking' AND status='completed' GROUP BY brand_id`)
@@ -248,20 +248,20 @@ const JOBS = [
           done.push(`${b.name}: FAILED ${String(err.message).slice(0, 120)}`);
         }
       }
-      return `${done.length} of ${brands.length} brand(s) swept (oldest first, starting with ${brand.name}) — ${done.join('; ')}`;
+      return `${done.length} of ${brands.length} brand(s) swept (oldest first, starting with ${brand.name}) - ${done.join('; ')}`;
     },
   },
   {
     // Reputation scanning. Separate from the tracking sweep because it calls
     // out to third-party public endpoints rather than to the brand's own site,
     // and because it is the one job here whose findings people want to see
-    // promptly — a damaging claim is worth knowing about the same day.
+    // promptly - a damaging claim is worth knowing about the same day.
     key: 'aiseo_reputation',
     label: 'AI SEO reputation scan',
     cron: () => process.env.AISEO_REPUTATION_CRON || '15 5 * * *',
     async run() {
       const providers = require('./aiseo/providers');
-      if (!providers.has('public')) return 'skipped — public sources are disabled';
+      if (!providers.has('public')) return 'skipped - public sources are disabled';
       const reputation = require('./aiseo/reputation');
       const tracking = require('./aiseo/tracking');
       const brands = tracking.brandsToSweep({ limit: 100 });
@@ -329,7 +329,7 @@ const JOBS = [
     //
     // WHY THIS JOB EXISTS
     // Difficulty without a paid credential costs one paced SERP fetch per
-    // keyword — about 1.4 seconds, enforced inside lib/aiseo/serpLite.js. That
+    // keyword - about 1.4 seconds, enforced inside lib/aiseo/serpLite.js. That
     // is far too slow to do for hundreds of keywords inside a run somebody is
     // watching, which is why the inline scorer is capped at a dozen. Here
     // nobody is waiting, so the cap is irrelevant and the queue simply drains.
@@ -346,7 +346,7 @@ const JOBS = [
       if (!providers.has('serp-lite')) return 'serp-lite unavailable; nothing to score';
 
       // Sized to the pacing, not guessed: serpLite allows roughly 43 requests
-      // a minute, so 120 keywords is about three minutes of work — short
+      // a minute, so 120 keywords is about three minutes of work - short
       // enough to finish well inside the hour, long enough to clear a typical
       // research run's overflow in a few ticks.
       const batchSize = Math.max(10, Number(process.env.AISEO_KD_BACKFILL_BATCH || 120));
@@ -366,14 +366,14 @@ const JOBS = [
           /* eslint-disable no-await-in-loop */
           const kd = await cache.scoreOne(row.keyword, row.market);
           /* eslint-enable no-await-in-loop */
-          // A null difficulty with a reason is a real answer — the SERP was
+          // A null difficulty with a reason is a real answer - the SERP was
           // read and had nothing scoreable in it. It is cached and dequeued so
           // it is not retried forever.
           if (kd.difficulty == null) unscoreable += 1; else scored += 1;
           cache.dequeue(row.id);
         } catch (err) {
           // A throttle is NOT a failure of the keyword, so it must not burn an
-          // attempt — otherwise a rate-limited hour would exhaust every row in
+          // attempt - otherwise a rate-limited hour would exhaust every row in
           // the batch and permanently abandon keywords that were never tried.
           if (err.throttled) {
             throttled += 1;
@@ -387,7 +387,7 @@ const JOBS = [
       const st = cache.queueStats();
       return `${scored} scored, ${unscoreable} unscoreable, ${failed} failed`
         + (throttled ? ', stopped early on rate limit' : '')
-        + ` — ${st.queued} still queued, ${st.cachedScores} in cache`;
+        + ` - ${st.queued} still queued, ${st.cachedScores} in cache`;
     },
   },
   {
@@ -425,7 +425,7 @@ async function runJob(job, { force = false } = {}) {
   } catch (err) {
     // The timestamp is still written on failure. Otherwise a job that throws
     // every time is "due" on every tick forever, and a broken nightly sync
-    // would run on every single cron hit — turning one failure into hundreds.
+    // would run on every single cron hit - turning one failure into hundreds.
     setRun.run(job.key, Date.now(), 'error', String(err && err.message || err), Date.now() - started);
     return { job: job.key, ok: false, error: String(err && err.message || err), ms: Date.now() - started, forced: force };
   }
@@ -433,7 +433,7 @@ async function runJob(job, { force = false } = {}) {
 
 // Runs every job that is due. Sequential on purpose: these jobs hit the same
 // Google API quotas and the same SQLite file, and shared hosting gives the app
-// a small memory allowance — running a sync and a report generation
+// a small memory allowance - running a sync and a report generation
 // concurrently is how you get killed by the memory limit.
 async function runDue({ only = null, force = false } = {}) {
   const now = Date.now();
@@ -452,7 +452,7 @@ async function runDue({ only = null, force = false } = {}) {
 
 // What the settings page shows: whether scheduled work is actually happening.
 // Worth surfacing because the failure mode this module exists to fix is
-// invisible — a cron that was never configured looks exactly like one that is
+// invisible - a cron that was never configured looks exactly like one that is
 // working until someone notices a missing report.
 function status() {
   const now = Date.now();
@@ -497,7 +497,7 @@ function startInProcess() {
     }
     const expr = job.cron();
     if (!cron.validate(expr)) {
-      console.error(`[cron] invalid schedule "${expr}" for ${job.key} — skipped.`);
+      console.error(`[cron] invalid schedule "${expr}" for ${job.key} - skipped.`);
       return;
     }
     cron.schedule(expr, () => {

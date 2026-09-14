@@ -28,8 +28,8 @@ const router = express.Router();
 // cannot keep spraying regardless of how many addresses it spreads across.
 const attempts = new Map();
 const WINDOW_MS = 15 * 60 * 1000;
-const MAX_ATTEMPTS = 8;        // per ip+email — one account under attack
-const MAX_PER_IP = 30;         // per ip — spraying across many accounts
+const MAX_ATTEMPTS = 8;        // per ip+email - one account under attack
+const MAX_PER_IP = 30;         // per ip - spraying across many accounts
 // A hard ceiling on tracked keys. The map was never pruned except when a key
 // was hit again, so a spray across a large address list left an entry per
 // address in memory until the process restarted.
@@ -68,7 +68,7 @@ function prune() {
     if (rec.first < cutoff) attempts.delete(k);
   }
   // Still oversized after pruning: a sustained spray. Clearing is the safe
-  // direction to fail — it costs one window of memory of attacker progress
+  // direction to fail - it costs one window of memory of attacker progress
   // rather than growing without bound.
   if (attempts.size > MAX_KEYS) attempts.clear();
 }
@@ -84,8 +84,8 @@ function clearFailures(req, email) {
 
 // SESSION FIXATION
 // Writing userId into the session that the visitor arrived with means a session
-// id planted beforehand — by anyone who could set a cookie for this host, which
-// on a shared domain includes a sibling subdomain — is still valid after the
+// id planted beforehand - by anyone who could set a cookie for this host, which
+// on a shared domain includes a sibling subdomain - is still valid after the
 // login and now carries the account. Issuing a fresh id at the moment of the
 // privilege change breaks that, and is why the token is rotated with it.
 //
@@ -108,7 +108,7 @@ function signIn(req, userId) {
 // Where to send someone after a successful login.
 //
 // returnTo comes from req.originalUrl so it is always a local path today, but
-// it is read back out of session state and turned into a redirect — the exact
+// it is read back out of session state and turned into a redirect - the exact
 // shape that becomes an open redirect the moment anything else ever writes to
 // it. Validated rather than trusted, and consumed so it cannot strand a later
 // login on a stale destination.
@@ -120,7 +120,7 @@ function consumeReturnTo(req) {
   // are both browser-honoured absolute destinations; "/\evil.com" is treated
   // as protocol-relative by some browsers.
   if (!raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return '/dashboard';
-  // Never bounce back to an auth page — that reads as a login that failed.
+  // Never bounce back to an auth page - that reads as a login that failed.
   if (/^\/(login|signup|logout|pending)(\/|$)/.test(raw)) return '/dashboard';
   return raw;
 }
@@ -256,7 +256,7 @@ router.post('/logout', (req, res) => {
   req.session.destroy((err) => {
     if (err) console.error('[logout] session destroy failed:', err);
     // The row is gone from the store, but the browser keeps presenting the old
-    // cookie on every request until it expires — each one costing a lookup and
+    // cookie on every request until it expires - each one costing a lookup and
     // leaving a signed id for a destroyed session in the logs. Clearing it
     // makes the sign-out complete on both sides.
     res.clearCookie('seosuite.sid');

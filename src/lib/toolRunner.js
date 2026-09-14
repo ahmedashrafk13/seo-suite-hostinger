@@ -7,7 +7,7 @@
 // Both are long-running crawls (minutes, not seconds), so a run is started in
 // the background and the HTTP request returns immediately with a run id. The
 // browser polls /status/:id. Progress lines are streamed into the run row so a
-// page reload — or a server restart — still shows where the crawl got to,
+// page reload - or a server restart - still shows where the crawl got to,
 // which the previous in-memory Map could not do.
 const { spawn } = require('child_process');
 const path = require('path');
@@ -35,7 +35,7 @@ const NL = String.fromCharCode(10);
 //
 // Both tools ship twice: as the original Python programs under tools/, and as
 // JavaScript ports under tools/node/ that need nothing but Node and packages
-// already in package.json. That is not redundancy for its own sake — shared
+// already in package.json. That is not redundancy for its own sake - shared
 // hosting has no guaranteed Python interpreter and no way to pip install
 // httpx/numpy/lxml/python-docx into one, so without the ports the audit and
 // internal-linking features would simply be dead on this host.
@@ -168,7 +168,7 @@ function makeLogger(table, runId) {
 // Spawns the vendored Python tool with an interpreter that has been PROVED to
 // import its dependencies (see lib/pythonEnv). Trusting `python` on PATH was
 // the cause of audits failing with "Install deps: pip install requests
-// beautifulsoup4" on a machine where the packages were installed — just into a
+// beautifulsoup4" on a machine where the packages were installed - just into a
 // different one of its four Python installs.
 // Spawns whichever implementation was selected for this tool.
 //
@@ -267,7 +267,7 @@ function fail(table, runId, message) {
 // pages anonymously that produced the worst available outcome: a crawl of the
 // login page, finishing successfully, scored as if it were the site.
 //
-// So every run now probes the seed URL first — one request, about a second —
+// So every run now probes the seed URL first - one request, about a second - 
 // and only spawns the crawler if the site will actually serve its content. A
 // run stopped here costs nothing and says exactly what it saw; a run allowed
 // through records how it got in, so a report months later still states whether
@@ -291,7 +291,7 @@ async function preflight({ table, runId, url, brandId, auth, force }) {
   try {
     probe = await crawlAuth.probe(url, resolved);
   } catch (err) {
-    // A probe that itself fails must not block a crawl — that would turn one
+    // A probe that itself fails must not block a crawl - that would turn one
     // flaky request into "this site cannot be audited".
     if (!stillWanted()) return { auth: resolved, blocked: true, cancelled: true };
     return { auth: resolved, blocked: false, note: `Access check could not run (${err.message}); the crawl was started anyway.` };
@@ -309,7 +309,7 @@ async function preflight({ table, runId, url, brandId, auth, force }) {
 
   const remedy = crawlAuth.remedyFor(probe.wall);
 
-  // Not proof of an auth wall — a 403 bot rule, a timed-out request, a bad seed
+  // Not proof of an auth wall - a 403 bot rule, a timed-out request, a bad seed
   // URL, a sparse homepage with a login box in the header. These describe real
   // public sites that crawled fine before, so the observation is recorded and
   // the crawl runs exactly as it used to. Only crawlAuth.BLOCKING_WALLS stop a
@@ -333,7 +333,7 @@ async function preflight({ table, runId, url, brandId, auth, force }) {
     };
   }
 
-  const seen = probe.reasons.map((r) => `  - ${r}`).join('\n');
+  const seen = probe.reasons.map((r) => ` - ${r}`).join('\n');
   fail(table, runId,
     [
       'Crawl stopped before it started: this site will not serve its pages to the crawler.',
@@ -353,7 +353,7 @@ async function preflight({ table, runId, url, brandId, auth, force }) {
       '',
     ].join('\n')
     + 'The crawl was not run, because a crawl of a login page produces a health '
-    + 'score for the login page — which is indistinguishable on screen from a '
+    + 'score for the login page - which is indistinguishable on screen from a '
     + 'score for the site. Tick "Scan anyway" to override if a public section '
     + 'sits below this URL.');
   return { auth: resolved, blocked: true, probe };
@@ -402,7 +402,7 @@ function startAudit({
   fs.mkdirSync(config.REPORTS_DIR, { recursive: true });
 
   // NOTE on --json vs --doc: main.py writes its Word document only in the
-  // `if not args.json:` branch, so the two flags are mutually exclusive — asking
+  // `if not args.json:` branch, so the two flags are mutually exclusive - asking
   // for both silently yields no document. We take --json, because the structured
   // findings are what drive the on-screen report, severity grouping, task
   // generation and the audit alert types. The downloadable report is rendered
@@ -449,7 +449,7 @@ function startAudit({
         .run(JSON.stringify(parsed), runId);
 
       // The second half of the guard. Getting past the seed does not prove the
-      // whole site was readable — a public homepage can sit in front of a gated
+      // whole site was readable - a public homepage can sit in front of a gated
       // application. Comparing the crawl against the sitemap catches that, and
       // is recorded as a note rather than a failure because a capped crawl
       // legitimately reads fewer pages than the sitemap lists.
@@ -495,7 +495,7 @@ function noteCoverage(table, runId, siteUrl, pagesCrawled, maxPages, auth, exist
 function extractJson(text) {
   const starts = [];
   for (let i = 0; i < text.length; i++) if (text[i] === '{') starts.push(i);
-  // Try the earliest candidates first — the result object is the big one.
+  // Try the earliest candidates first - the result object is the big one.
   for (const start of starts) {
     const candidate = text.slice(start);
     try {
@@ -629,7 +629,7 @@ function startLinking({
         args.push('--gsc-csv', csvPath);
       } else {
         db.prepare('UPDATE linking_runs SET used_gsc=0, log_tail=? WHERE id=?')
-          .run(`Note: Search Console blending was requested but skipped — ${csv.reason}.\n`, runId);
+          .run(`Note: Search Console blending was requested but skipped - ${csv.reason}.\n`, runId);
       }
     }
   }

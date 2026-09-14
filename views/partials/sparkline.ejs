@@ -6,7 +6,9 @@
    that day's date + value and highlights the nearest point with a dot. */
 const vals = (typeof points !== 'undefined' && points ? points : []).map((n) => Number(n) || 0);
 const sparkDates = (typeof dates !== 'undefined' && dates ? dates : []);
-const col = typeof sparkColor !== 'undefined' && sparkColor ? sparkColor : '#1e4d6b';
+/* Inline SVG, so it can simply reference the token and follow the theme
+   with no JavaScript at all. */
+const col = typeof sparkColor !== 'undefined' && sparkColor ? sparkColor : 'var(--viz-1)';
 const W = 100, H = 30;
 const uid = `spk${Math.random().toString(36).slice(2, 9)}`;
 if (vals.length >= 2) {
@@ -31,7 +33,7 @@ if (vals.length >= 2) {
     <rect class="spark-hitarea" x="0" y="0" width="<%= W %>" height="<%= H %>" fill="transparent"></rect>
   </svg>
   <div class="spark-tooltip" style="position:absolute;display:none;pointer-events:none;z-index:20;
-    background:var(--surface-2, #1f2937);color:var(--text, #fff);font-size:11px;line-height:1.35;
+    background:var(--surface);color:var(--text);border:1px solid var(--border);box-shadow:var(--sh-md);font-size:11px;line-height:1.35;
     padding:4px 7px;border-radius:5px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.18);
     transform:translate(-50%,-100%);top:0;left:0"></div>
 </div>

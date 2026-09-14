@@ -1,6 +1,6 @@
 <%
 /* Interactive ranked horizontal bar chart (ApexCharts) for "value by
-   category" data — countries, devices, search appearance, acquisition
+   category" data - countries, devices, search appearance, acquisition
    sources, events, etc. Same call signature as before: label (string),
    rows (array), nameKey (string), valueKey (string), color (hex),
    fmt (optional formatter: 'int'|'pct'), max (optional row cap). */
@@ -8,7 +8,7 @@ const _label = typeof label !== 'undefined' ? label : '';
 const _rows = (typeof rows !== 'undefined' ? rows : []).slice(0, typeof max !== 'undefined' ? max : 8);
 const _nameKey = typeof nameKey !== 'undefined' ? nameKey : 'entity';
 const _valueKey = typeof valueKey !== 'undefined' ? valueKey : 'clicks';
-const _color = typeof color !== 'undefined' ? color : '#1e4d6b';
+const _color = typeof color !== 'undefined' ? color : null;
 const _fmt = typeof fmt !== 'undefined' ? fmt : 'int';
 const _uid = `bc${Math.random().toString(36).slice(2, 9)}`;
 %>
@@ -29,6 +29,7 @@ const _uid = `bc${Math.random().toString(36).slice(2, 9)}`;
           return Math.round(v).toLocaleString('en-US');
         }
         function render() {
+          var _t = window.ChartTheme.get();
           // Headroom past the longest bar so its value label always lands on
           // the plot's empty space instead of overlapping the fill or being
           // clipped at the chart edge.
@@ -47,18 +48,18 @@ const _uid = `bc${Math.random().toString(36).slice(2, 9)}`;
             },
             xaxis: {
               categories: categories, max: peak * 1.28,
-              labels: { style: { fontSize: '11px', colors: '#9aa2b4' }, formatter: fmtV },
+              labels: { style: { fontSize: '11px', colors: _t.muted, fontFamily: _t.font }, formatter: fmtV },
               axisBorder: { show: false }, axisTicks: { show: false },
             },
-            yaxis: { labels: { style: { fontSize: '12px', colors: '#334155' } } },
-            grid: { borderColor: 'var(--border, #e5e9f0)', strokeDashArray: 3, xaxis: { lines: { show: true } }, yaxis: { lines: { show: false } }, padding: { right: 24 } },
-            colors: [color],
+            yaxis: { labels: { style: { fontSize: '12px', colors: _t.text2, fontFamily: _t.font } } },
+            grid: { borderColor: _t.border, strokeDashArray: 3, xaxis: { lines: { show: true } }, yaxis: { lines: { show: false } }, padding: { right: 24 } },
+            colors: [color || _t.series[0]],
             dataLabels: {
               enabled: true, offsetX: 10, textAnchor: 'start',
-              style: { fontSize: '11.5px', fontWeight: 700, colors: ['#334155'] },
+              style: { fontSize: '11.5px', fontWeight: 700, colors: [_t.text2], fontFamily: _t.font },
               formatter: fmtV, background: { enabled: false }, dropShadow: { enabled: false },
             },
-            tooltip: { theme: 'light', y: { formatter: fmtV } },
+            tooltip: { theme: _t.mode, y: { formatter: fmtV } },
           }).render();
         }
         window.ChartAssets.need('apex').then(render).catch(function () {

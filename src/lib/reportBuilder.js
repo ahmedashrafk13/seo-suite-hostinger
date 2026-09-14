@@ -21,7 +21,7 @@ function baseUrl() {
 
 function isoDate(d) { return d.toISOString().slice(0, 10); }
 
-// The reporting week: Monday–Sunday, defaulting to the most recent complete
+// The reporting week: Monday-Sunday, defaulting to the most recent complete
 // week for which Search Console actually has data.
 function weekWindow(anchorIso) {
   const anchor = new Date(`${anchorIso}T00:00:00Z`);
@@ -89,7 +89,7 @@ function joinEntities(recentRows, priorRows) {
 // The standard report is deliberately an interpretation: headline, movers,
 // what to do next. `full: true` additionally attaches every Search Console
 // and GA4 dimension the suite syncs, aggregated over the report week, so the
-// report can stand alone as the complete data hand-over for a client — no
+// report can stand alone as the complete data hand-over for a client - no
 // "log in and check GSC yourself" step. It is stored in the same data_json
 // snapshot, so it stays true to the week it was generated for.
 const FULL_LIMITS = { queries: 250, pages: 250, queryPage: 250, countries: 100, cities: 100, sources: 100, events: 100, inspections: 250 };
@@ -131,7 +131,7 @@ function buildFullData(brand, w) {
       appearance: gscDimension(brand.id, 'gsc_appearance_daily', 'appearance', w, 25),
       sitemaps: A.gscSitemaps(brand.id),
       // query × page is a whole-sync-window snapshot, not a daily table, so it
-      // cannot be clipped to the report week — labelled as such in the view.
+      // cannot be clipped to the report week - labelled as such in the view.
       queryPagePeriod: queryPage.period,
       queryPage: queryPage.rows,
       indexing: {
@@ -225,7 +225,7 @@ function build(brand, { weekEnd = null, full = false } = {}) {
     .filter((q) => q.clickDelta < 0)
     .sort((a, b) => a.clickDelta - b.clickDelta).slice(0, 10);
 
-  // When a week has almost no clicks, click deltas are meaningless — fall back
+  // When a week has almost no clicks, click deltas are meaningless - fall back
   // to impression movement so the report still says something useful.
   const impressionGainers = queries
     .filter((q) => q.impressionDelta > 0)
@@ -347,7 +347,7 @@ function build(brand, { weekEnd = null, full = false } = {}) {
   // rather than making the reader derive one from twelve tables.
   const headline = [];
   if (!search.hasData) {
-    headline.push('No Search Console data is available for this week — check the brand\'s connection and sync status before reading anything else here.');
+    headline.push('No Search Console data is available for this week - check the brand\'s connection and sync status before reading anything else here.');
   } else {
     const cd = search.clicks;
     const move = cd.abs === 0
@@ -435,7 +435,7 @@ async function generateAllWeekly({ full = scheduledFullData() } = {}) {
 }
 
 // Generates every brand's weekly report and emails it to the brand's
-// notify_email, falling back to the owning user's signup email — so a new
+// notify_email, falling back to the owning user's signup email - so a new
 // user who never set a per-brand notification address still gets their
 // weekly report at the address they signed up with.
 async function generateAndSendAllWeekly({ full = scheduledFullData() } = {}) {

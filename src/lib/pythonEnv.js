@@ -4,7 +4,7 @@
 // "python" is not one program. This machine has four (3.10, 3.11, 3.12, 3.14)
 // and only one has the crawler's dependencies installed. Which one `python`
 // resolves to depends on the PATH of whichever shell happened to launch the
-// server — so the audit worked from one terminal and failed from another with
+// server - so the audit worked from one terminal and failed from another with
 // "Install deps: pip install requests beautifulsoup4", which reads like a bug
 // in the tool rather than the environment problem it is.
 //
@@ -19,7 +19,7 @@ const os = require('os');
 const { execFileSync } = require('child_process');
 const config = require('../config');
 
-// Import names, not package names — these are what the scripts `import`.
+// Import names, not package names - these are what the scripts `import`.
 const REQUIREMENTS = {
   audit: {
     modules: ['requests', 'bs4'],
@@ -45,7 +45,7 @@ function uniq(list) {
 
 // Ordered best-guess list. A venv inside the repo wins if present, then the
 // configured binary, then whatever is on PATH, then every interpreter found in
-// the usual install locations — because on Windows the one on PATH is
+// the usual install locations - because on Windows the one on PATH is
 // frequently not the one with the packages.
 function candidates() {
   const out = [];
@@ -148,8 +148,8 @@ function resolve(toolKey, { force = false } = {}) {
   return result;
 }
 
-// Installs the missing packages into the best candidate. Explicitly invoked —
-// never automatic — because it changes the machine's Python environment.
+// Installs the missing packages into the best candidate. Explicitly invoked - 
+// never automatic - because it changes the machine's Python environment.
 function install(toolKey) {
   const req = REQUIREMENTS[toolKey];
   if (!req) return { ok: false, error: `Unknown tool "${toolKey}".` };

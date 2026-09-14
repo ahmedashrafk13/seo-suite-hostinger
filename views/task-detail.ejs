@@ -23,7 +23,7 @@
           </div>
         <% } else { %>
           <div>
-            <strong>This task requires SEO-team approval</strong> before it can be marked done — it touches a restricted action (publishing, URL/redirect changes, canonical, robots.txt, sitemap, bulk internal links, or titles on high-performing pages).
+            <strong>This task requires SEO-team approval</strong> before it can be marked done - it touches a restricted action (publishing, URL/redirect changes, canonical, robots.txt, sitemap, bulk internal links, or titles on high-performing pages).
             <form method="POST" action="/tasks/<%= task.id %>/approve" style="margin-top:8px"><%- csrfField %>
               <input type="hidden" name="back" value="/tasks/<%= task.id %>">
               <div class="form-row">
@@ -55,7 +55,7 @@
 
           <%
             // evidence.items (audit findings, linking broken/orphans) carries the
-            // FULL per-URL detail — the same "url — broken link → target (HTTP 404)"
+            // FULL per-URL detail - the same "url - broken link → target (HTTP 404)"
             // information shown in the Technical audit / Internal linking sections,
             // not a bare list of "example" URLs with no explanation.
             var evItems = (task.evidence && task.evidence.items) || null;
@@ -76,15 +76,15 @@
                 <tbody>
                   <% evItems.forEach(function(it){ %>
                     <tr>
-                      <td class="wrap"><% if (it.url) { %><a href="<%= it.url %>" target="_blank" rel="noopener"><%= it.url %></a><% } else { %>—<% } %></td>
-                      <td class="wrap"><%= it.note || '—' %></td>
+                      <td class="wrap"><% if (it.url) { %><a href="<%= it.url %>" target="_blank" rel="noopener"><%= it.url %></a><% } else { %> - <% } %></td>
+                      <td class="wrap"><%= it.note || ' - ' %></td>
                     </tr>
                   <% }) %>
                 </tbody>
               </table>
             </div>
             <% if (evTotal > evItems.length) { %>
-              <p class="hint"><%= evTotal - evItems.length %> more not shown — see the full
+              <p class="hint"><%= evTotal - evItems.length %> more not shown - see the full
                 <a href="/tasks/export/csv">Excel export</a>.</p>
             <% } %>
           <% } %>
@@ -121,7 +121,7 @@
               <div>
                 <label for="e-brand">Brand</label>
                 <select id="e-brand" name="brand_id">
-                  <option value="">— none —</option>
+                  <option value="">None</option>
                   <% brands.forEach(function(b){ %>
                     <option value="<%= b.id %>" <%= task.brand_id === b.id ? 'selected' : '' %>><%= b.name %></option>
                   <% }) %>
@@ -184,7 +184,7 @@
               <% } else { %>
                 Nobody is assigned to this task yet.
               <% } %>
-              You do not have permission to change assignments — a team admin can grant it.
+              You do not have permission to change assignments - a team admin can grant it.
             </p>
           <% } else { %>
             <form method="POST" action="/tasks/<%= task.id %>/assign" id="assign-form"><%- csrfField %>
@@ -193,12 +193,12 @@
                 <div>
                   <label for="a-person">Assign to</label>
                   <select id="a-person" name="person_id" onchange="assignPersonChanged()">
-                    <option value="">— choose someone —</option>
+                    <option value="">Choose someone</option>
                     <% people.forEach(function(p){ %>
                       <option value="<%= p.id %>"
                               data-email="<%= p.email || '' %>"
                               <%= task.assignee_person_id === p.id ? 'selected' : '' %>>
-                        <%= p.name %><%= p.email ? '' : ' (no email yet)' %> — <%= p.role %>
+                        <%= p.name %><%= p.email ? '' : ' (no email yet)' %> - <%= p.role %>
                       </option>
                     <% }) %>
                     <option value="new">+ Someone new…</option>
@@ -216,7 +216,7 @@
                   </select>
                 </div>
                 <div>
-                  <label for="a-email">Email <span class="hint" style="display:inline">— saved for next time</span></label>
+                  <label for="a-email">Email <span class="hint" style="display:inline"> - saved for next time</span></label>
                   <input type="text" id="a-email" name="new_email" placeholder="name@example.com">
                 </div>
               </div>
@@ -225,7 +225,7 @@
               <label class="check">
                 <input type="checkbox" name="notify" value="on" checked>
                 <span>Email the task to them
-                  <span class="check-hint">Sends the full task — title, site, severity, detail and the affected URL —
+                  <span class="check-hint">Sends the full task - title, site, severity, detail and the affected URL - 
                     so a developer or writer with no account can act on it. Several tasks assigned to the same person
                     are combined into a single email.</span>
                 </span>
@@ -255,7 +255,7 @@
                         <% if (n.sent) { %><span class="badge good">sent</span>
                         <% } else { %><span class="badge critical" title="<%= n.error %>">failed</span><% } %>
                       </td>
-                      <td class="wrap"><%= n.sent_by_name || n.sent_by_email || '—' %></td>
+                      <td class="wrap"><%= n.sent_by_name || n.sent_by_email || ' - ' %></td>
                       <td class="narrow"><%= fmtDateTime(n.created_at) %></td>
                     </tr>
                   <% }) %>
@@ -281,7 +281,7 @@
           var opt = sel.options[sel.selectedIndex];
           var known = opt ? (opt.dataset.email || '') : '';
           email.value = known;
-          email.placeholder = known ? known : 'No email on file — add one to notify them';
+          email.placeholder = known ? known : 'No email on file - add one to notify them';
         }
         if (document.getElementById('a-person')) assignPersonChanged();
       </script>

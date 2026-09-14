@@ -7,6 +7,7 @@ const {
   canonUrl, sameSite, hostKey, joinUrl, isCrawlableHtml,
 } = require('../lib/urls');
 const { fetchPage } = require('./page');
+const renderer = require('../lib/renderer');
 
 // A link is BROKEN only on these (definitively gone) statuses. Everything else
 // (401/403/405/429/5xx/999/520-530 …) is treated as bot-blocked / transient =
@@ -26,6 +27,9 @@ async function crawl(startUrl, maxPages, workers, delay, onProgress) {
   // homepage would look identical to links to the canonical www one.
   const rawLinkSources = new Map();
   const frontier = [startUrl];
+  // One spending cap for the whole crawl, sized from the page budget. Shared
+  // across every wave so the limit applies to the run, not to each wave.
+  const renderBudget = renderer.newBudget(maxPages);
 
   const addSource = (map, key, src) => {
     let set = map.get(key);
@@ -39,7 +43,7 @@ async function crawl(startUrl, maxPages, workers, delay, onProgress) {
       wave.push(frontier.shift());
     }
 
-    const fetched = await mapLimit(wave, workers, (u) => fetchPage(u));
+    const fetched = await mapLimit(wave, workers, (u) => fetchPage(u, renderBudget));
     for (const page of fetched) {
       if (!page || page.__error) continue;
       pages.set(canonUrl(page.requested_url), page);
@@ -61,7 +65,18 @@ async function crawl(startUrl, maxPages, workers, delay, onProgress) {
     if (delay) await sleep(delay * 1000);
   }
 
-  return { pages, linkSources, rawLinkSources, crawlComplete: frontier.length === 0 };
+  return {
+    pages, linkSources, rawLinkSources,
+    crawlComplete: frontier.length === 0,
+    // What rendering cost this run, so a report can state it rather than
+    // leaving the spend invisible.
+    render: {
+      used: renderBudget.used,
+      limit: renderBudget.limit,
+      skippedForBudget: renderBudget.skippedForBudget,
+      siteNeedsRendering: renderBudget.siteNeedsRendering,
+    },
+  };
 }
 
 // --- robots.txt -----------------------------------------------------------

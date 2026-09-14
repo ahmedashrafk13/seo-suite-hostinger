@@ -68,7 +68,7 @@ function gaugeDash(score) {
     <div class="notice-body">
       <strong>Not authenticated for PageSpeed.</strong>
       The PageSpeed Insights API rejects API keys and expects an OAuth principal, so this uses the same Google
-      connection as Search Console and GA4 — no extra scope required. Without it, requests fall back to Google's
+      connection as Search Console and GA4 - no extra scope required. Without it, requests fall back to Google's
       shared anonymous pool, which is small and usually exhausted.
       <div style="margin-top:9px"><a class="btn sm" href="/connect">Connect Google</a></div>
     </div>
@@ -81,8 +81,8 @@ function gaugeDash(score) {
       <div class="empty">
         <div class="empty-icon">&#9673;</div>
         <h3>Analyse a page</h3>
-        <p>Runs the real PageSpeed Insights API — the same Lighthouse audit and Chrome UX Report field data that
-          pagespeed.web.dev shows, for mobile and desktop. A run takes 20–60 seconds.</p>
+        <p>Runs the real PageSpeed Insights API - the same Lighthouse audit and Chrome UX Report field data that
+          pagespeed.web.dev shows, for mobile and desktop. A run takes 20-60 seconds.</p>
       </div>
     </div>
   </div>
@@ -105,7 +105,7 @@ function gaugeDash(score) {
           <% if (R.originField.available) { %>
             Origin-level data is shown below instead.
           <% } else { %>
-            This is normal for lower-traffic pages — the lab results below still apply.
+            This is normal for lower-traffic pages - the lab results below still apply.
           <% } %>
         </p>
       <% } %>
@@ -113,7 +113,7 @@ function gaugeDash(score) {
       <% ['field','originField'].forEach(function(scope){ var F = R[scope]; if (!F.available) return; %>
         <div class="psi-field-scope">
           <div class="psi-field-label">
-            <%= scope === 'field' ? 'This URL' : 'Origin — all pages on this domain' %>
+            <%= scope === 'field' ? 'This URL' : 'Origin - all pages on this domain' %>
             <span class="hint" style="display:inline;margin-left:6px">75th percentile, last 28 days of real Chrome traffic</span>
           </div>
           <div class="psi-field-grid">
@@ -156,15 +156,15 @@ function gaugeDash(score) {
                       stroke-dasharray="<%= gaugeDash(c.score) %>" stroke-linecap="round"
                       transform="rotate(-90 32 32)"/>
             </svg>
-            <span class="g-num"><%= c.score == null ? '—' : c.score %></span>
+            <span class="g-num"><%= c.score == null ? ' - ' : c.score %></span>
             <span class="g-label"><%= c.title %></span>
           </a>
         <% }) %>
       </div>
       <div class="psi-scale">
-        <span><i class="tri poor"></i>0–49</span>
-        <span><i class="sq avg"></i>50–89</span>
-        <span><i class="dot good"></i>90–100</span>
+        <span><i class="tri poor"></i>0-49</span>
+        <span><i class="sq avg"></i>50-89</span>
+        <span><i class="dot good"></i>90-100</span>
         <span class="hint" style="margin:0 0 0 auto">Values are estimated and may vary. The
           <a href="https://developer.chrome.com/docs/lighthouse/performance/performance-scoring/" target="_blank" rel="noopener">performance score is calculated</a>
           directly from these metrics.</span>
@@ -176,7 +176,7 @@ function gaugeDash(score) {
   <div class="card">
     <div class="card-head">
       <h3>Metrics</h3>
-      <span class="sub">Lab data — a single simulated load, not real users</span>
+      <span class="sub">Lab data - a single simulated load, not real users</span>
     </div>
     <div class="card-body">
       <div class="psi-metrics">
@@ -278,7 +278,7 @@ function gaugeDash(score) {
     </div>
     <div class="card-body">
       <% if (!R.insights.length) { %>
-        <div class="empty-state">No failing performance insights — everything Lighthouse checks here passed.</div>
+        <div class="empty-state">No failing performance insights - everything Lighthouse checks here passed.</div>
       <% } %>
       <% R.insights.forEach(function(a){ auditBlock(a); }) %>
     </div>
@@ -313,7 +313,7 @@ function gaugeDash(score) {
       <div class="card-head">
         <h3><%= c.title %></h3>
         <span class="badge <%= c.band === 'good' ? 'good' : (c.band === 'average' ? 'medium' : 'critical') %> lg">
-          <%= c.score == null ? '—' : Math.round(c.score * 100) %>
+          <%= c.score == null ? ' - ' : Math.round(c.score * 100) %>
         </span>
         <span class="sub"><%= c.passedCount %> audit<%= c.passedCount === 1 ? '' : 's' %> passed</span>
       </div>
@@ -325,6 +325,126 @@ function gaugeDash(score) {
       </div>
     </div>
   <% }) %>
+
+  <%
+  /* ---------------------------------------------- JavaScript rendering ----
+     Answers the one question a PageSpeed report can answer for free that
+     nothing else in this app can: Chrome rendered this page, so how much of
+     what Chrome saw is actually in the HTML our crawlers read? */
+  %>
+  <% if (row) { %>
+    <div class="card">
+      <div class="card-head">
+        <h3>JavaScript rendering</h3>
+        <span class="sub">Whether this app's crawlers can read this page without a browser</span>
+      </div>
+      <div class="card-body">
+        <% if (!jsRender) { %>
+          <p class="hint mt-0">
+            Chrome already rendered this page to produce the report above. Comparing that rendered page against
+            the raw HTML shows whether the technical audit, internal linking and content scores are reading the
+            real page or an empty shell. Costs one request to the site and no API quota.
+          </p>
+          <form method="POST" action="/pagespeed/<%= row.id %>/rendering"><%- csrfField %>
+            <button class="btn secondary sm" type="submit">Check JavaScript rendering</button>
+          </form>
+        <% } else { %>
+          <%
+            var _lvl = jsRender.verdict.level;
+            var _badge = _lvl === 'ok' ? 'good' : (_lvl === 'shell' ? 'critical' : (_lvl === 'partial' ? 'medium' : 'neutral'));
+          %>
+          <p class="mt-0">
+            <span class="badge <%= _badge %> lg"><%= jsRender.verdict.label %></span>
+          </p>
+          <p><%= jsRender.verdict.summary %></p>
+
+          <% if (jsRender.ok) { %>
+            <div class="stat-row" style="margin-bottom:0">
+              <div class="stat">
+                <div class="label"><span>Chrome rendered</span></div>
+                <span class="value sm"><%= jsRender.rendered == null ? '-' : fmtInt(jsRender.rendered) %></span>
+                <div class="meta">DOM elements</div>
+              </div>
+              <div class="stat">
+                <div class="label"><span>Raw HTML has</span></div>
+                <span class="value sm"><%= fmtInt(jsRender.raw.domSize) %></span>
+                <div class="meta"><%= jsRender.ratio == null ? '' : jsRender.ratio + '% of rendered' %></div>
+              </div>
+              <div class="stat">
+                <div class="label"><span>Words without JS</span></div>
+                <span class="value sm"><%= fmtInt(jsRender.raw.words) %></span>
+                <div class="meta"><%= jsRender.raw.headings %> headings, <%= jsRender.raw.links %> links</div>
+              </div>
+              <% if (jsRender.raw.framework) { %>
+                <div class="stat">
+                  <div class="label"><span>Framework</span></div>
+                  <span class="value sm"><%= jsRender.raw.framework %></span>
+                  <div class="meta">mount point found in the HTML</div>
+                </div>
+              <% } %>
+            </div>
+          <% } %>
+
+          <% if (jsRender.google) { %>
+            <p class="hint">
+              <strong>Google's own verdict</strong> (Search Console URL inspection):
+              <%= jsRender.google.verdict || 'unknown' %><%= jsRender.google.coverage_state ? ' - ' + jsRender.google.coverage_state : '' %>.
+              Google runs its own renderer, so it can index a page this app cannot read. The two are not in
+              conflict: this card is about what the crawlers HERE can see.
+            </p>
+          <% } %>
+
+          <% if (_lvl === 'shell' || _lvl === 'partial') { %>
+            <% if (jsRender.recovered && jsRender.recovered.ok) { %>
+              <div class="callout ok" style="margin-top:var(--s-3)">
+                <strong>Recovered with the rendering service.</strong>
+                The page was fetched again through a real browser. These are the numbers the crawlers
+                read once rendering is on, beside the raw HTML they read without it:
+                <div class="stat-row" style="margin-top:var(--s-2)">
+                  <div class="stat">
+                    <span class="label">Words</span>
+                    <span class="value sm"><%= fmtInt(jsRender.recovered.words) %></span>
+                    <div class="meta">raw HTML: <%= fmtInt(jsRender.raw.words) %></div>
+                  </div>
+                  <div class="stat">
+                    <span class="label">Headings</span>
+                    <span class="value sm"><%= fmtInt(jsRender.recovered.headings) %></span>
+                    <div class="meta">raw HTML: <%= fmtInt(jsRender.raw.headings) %></div>
+                  </div>
+                  <div class="stat">
+                    <span class="label">Internal links</span>
+                    <span class="value sm"><%= fmtInt(jsRender.recovered.links) %></span>
+                    <div class="meta">raw HTML: <%= fmtInt(jsRender.raw.links) %></div>
+                  </div>
+                  <div class="stat">
+                    <span class="label">Elements</span>
+                    <span class="value sm"><%= fmtInt(jsRender.recovered.domSize) %></span>
+                    <div class="meta">raw HTML: <%= fmtInt(jsRender.raw.domSize) %></div>
+                  </div>
+                </div>
+              </div>
+            <% } else if (jsRender.recovered && !jsRender.recovered.ok) { %>
+              <p class="hint">
+                Rendering is configured but this page could not be recovered: <%= jsRender.recovered.error %>.
+                Treat word counts, heading and internal-link findings for this URL as understated.
+              </p>
+            <% } else if (!jsRender.renderingAvailable) { %>
+              <p class="hint">
+                Fixing this needs a renderer. Set <code>ZENROWS_API_KEY</code> in the environment and this card
+                will fetch the page through a real browser and show what the crawlers are missing. Until then,
+                treat word counts, heading and internal-link findings for this URL as understated rather than
+                wrong about the site.
+              </p>
+            <% } %>
+          <% } %>
+
+          <form method="POST" action="/pagespeed/<%= row.id %>/rendering" style="margin-top:var(--s-3)"><%- csrfField %>
+            <button class="btn ghost xs" type="submit">Re-check</button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+  <% } %>
 
   <div class="card">
     <div class="card-body" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -358,17 +478,17 @@ function gaugeDash(score) {
           <% history.forEach(function(h){ %>
             <tr>
               <%
-                // The full URL, not shortUrl() — that strips the origin, and
+                // The full URL, not shortUrl() - that strips the origin, and
                 // "/" tells you nothing when reports span several sites.
                 var shown = h.url.replace(/^https?:\/\//, '');
                 if (shown.length > 58) shown = shown.slice(0, 58) + '…';
               %>
               <td class="url wrap"><a href="/pagespeed/<%= h.id %>" title="<%= h.url %>"><%= shown %></a></td>
               <td class="narrow" style="text-transform:capitalize"><%= h.strategy %></td>
-              <td class="wrap"><%= h.brand_name || '—' %></td>
+              <td class="wrap"><%= h.brand_name || ' - ' %></td>
               <% ['performance','accessibility','best_practices','seo'].forEach(function(k){ var v = h[k]; %>
                 <td class="num">
-                  <% if (v == null) { %>—<% } else { %>
+                  <% if (v == null) { %> - <% } else { %>
                     <span class="score-pill <%= v >= 90 ? 'good' : (v >= 50 ? 'average' : 'poor') %>"><%= v %></span>
                   <% } %>
                 </td>
@@ -384,7 +504,7 @@ function gaugeDash(score) {
 
 <script>
   // Device tabs re-submit the form for that strategy when a URL is present,
-  // and otherwise just switch which strategy the next run will use — the same
+  // and otherwise just switch which strategy the next run will use - the same
   // behaviour as PSI's own Mobile/Desktop toggle.
   (function () {
     var form = document.getElementById('psi-form');

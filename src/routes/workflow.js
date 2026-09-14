@@ -51,7 +51,7 @@ router.get('/export.md', (req, res) => {
   });
 
   L.push('## 2. Approval boundary', '');
-  L.push('The automation identifies, analyses, recommends, reports and creates tasks. The following changes remain subject to SEO-team approval and are enforced in code — a task touching any of them cannot be marked done until it is explicitly approved.', '');
+  L.push('The automation identifies, analyses, recommends, reports and creates tasks. The following changes remain subject to SEO-team approval and are enforced in code - a task touching any of them cannot be marked done until it is explicitly approved.', '');
   L.push('| Change | Why it stays manual |', '|---|---|');
   wf.APPROVAL_BOUNDARY.forEach((a) => L.push(`| ${a.action} | ${a.why} |`));
   L.push('');

@@ -6,137 +6,202 @@
 <%- include('partials/sidebar') %>
 <%- include('partials/topbar') %>
 
-    <% if (!tool.exists) { %>
-      <div class="error-box">Audit tool not found at <%= tool.script %>. Set WEBTECHSTACK_DETECTOR_PATH in .env — audits will fail until the sibling project is present.</div>
-    <% } %>
+<%
+/* The crawler is a separate program and can run as either a Python or a
+   JavaScript build. Which one this host uses decides whether a missing Python
+   package is a real problem or noise, so the state is resolved once here
+   rather than being discovered as a failed crawl.
 
-    <%
-    // The crawler is a Python program. A machine can have several Python
-    // installs and only one of them carry its packages — so the state is
-    // checked and shown here rather than discovered as a failed crawl.
-    %>
-    <%
-    // Only a deployment that will ACTUALLY run the Python crawler can be
-    // blocked by a missing Python package. Where the JavaScript port is
-    // selected instead — every container build, and any host without a Python
-    // interpreter — the audit runs perfectly well and this banner was pure
-    // false alarm: it claimed audits would fail immediately, and offered an
-    // install button whose only possible outcome was `spawnSync python ENOENT`.
-    const usingPython = typeof tool !== 'undefined' && tool && tool.runtime === 'python';
-    %>
-    <% if (usingPython && typeof pythonStatus !== 'undefined' && pythonStatus && !pythonStatus.ok) { %>
-      <div class="notice error">
-        <span class="notice-icon">&#9888;</span>
-        <div class="notice-body">
-          <strong>The audit crawler cannot run yet.</strong>
-          No Python on this machine has <%= pythonStatus.missing.join(', ') %>, which the crawler imports.
-          Audits will fail immediately until this is fixed.
-          <% if (perms.isAdmin) { %>
-            <div style="margin-top:10px" class="btn-row">
-              <form method="POST" action="/audit/install-deps" style="display:inline"
-                    onsubmit="this.querySelector('button').classList.add('is-loading')"><%- csrfField %>
-                <button class="btn sm" type="submit">Install them now</button>
-              </form>
-              <span class="hint" style="margin:0">or run: <code><%= pythonStatus.command %></code></span>
-            </div>
-          <% } else { %>
-            <div class="hint" style="margin-top:8px">Ask an admin to install them: <code><%= pythonStatus.command %></code></div>
-          <% } %>
+   Only a deployment that will actually run the Python crawler can be blocked
+   by a missing Python package. Where the JavaScript port is selected instead
+   (every container build, and any host without a Python interpreter) the
+   audit runs fine, and the old banner was a false alarm: it claimed audits
+   would fail immediately and offered an install button whose only possible
+   outcome was `spawnSync python ENOENT`. */
+const usingPython = typeof tool !== 'undefined' && tool && tool.runtime === 'python';
+const pythonBlocked = usingPython && typeof pythonStatus !== 'undefined' && pythonStatus && !pythonStatus.ok;
+%>
+
+<%- include('partials/pagehead', {
+      heading: 'Technical audit',
+      lede: 'Crawl a domain, score its health, and group what it finds by severity with the affected URLs and a recommended fix.',
+      actions: runs.length ? '<a class="btn secondary" href="/audit/' + runs[0].id + '">Latest report</a>' : ''
+    }) %>
+
+<% if (!tool.exists) { %>
+  <div class="error-box">
+    <strong>Audit tool not found</strong> at <code><%= tool.script %></code>.
+    Set <code>WEBTECHSTACK_DETECTOR_PATH</code> in <code>.env</code>. Audits cannot run until the sibling project is present.
+  </div>
+<% } %>
+
+<% if (pythonBlocked) { %>
+  <div class="notice error">
+    <span class="notice-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 7.5v5.5M12 16.6h.01"/><circle cx="12" cy="12" r="9"/></svg>
+    </span>
+    <div class="notice-body">
+      <strong>The crawler cannot run yet.</strong>
+      No Python on this machine has <%= pythonStatus.missing.join(', ') %>, which the crawler imports.
+      <% if (perms.isAdmin) { %>
+        <div class="btn-row" style="margin-top:var(--s-3)">
+          <form method="POST" action="/audit/install-deps" data-busy style="display:inline"><%- csrfField %>
+            <button class="btn sm" type="submit">Install them now</button>
+          </form>
+          <span class="hint" style="margin:0">or run <code><%= pythonStatus.command %></code></span>
+        </div>
+      <% } else { %>
+        <div class="hint" style="margin-top:var(--s-2)">Ask an admin to run <code><%= pythonStatus.command %></code></div>
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
+<%
+/* Form on top, history as a full-width table underneath.
+
+   This page was a two-column split with the run history in a narrow rail. Two
+   things were wrong with that: a short form beside a long rail left most of
+   the page blank, and a list of runs with a domain, a brand, a date, a score
+   and an issue count is tabular data being forced into a stack of cards where
+   nothing lines up and nothing can be compared down a column. */
+%>
+
+<div class="card">
+  <div class="card-head"><h3>New audit</h3></div>
+  <form method="POST" action="/audit/start" data-busy><%- csrfField %>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="field">
+          <label for="brand_id">Brand</label>
+          <select id="brand_id" name="brand_id">
+            <option value="">No brand, use the domain below</option>
+            <% brands.forEach(function (b) { %>
+              <option value="<%= b.id %>"><%= b.name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="domain">Domain</label>
+          <input type="text" id="domain" name="domain" placeholder="example.com" autocomplete="off" spellcheck="false">
+          <p class="hint">Optional if a brand is selected.</p>
+        </div>
+        <div class="field" style="max-width:160px">
+          <label for="max_pages">Pages to crawl</label>
+          <input type="number" id="max_pages" name="max_pages" value="100" min="5" max="2000">
+        </div>
+        <div class="field" style="max-width:230px">
+          <label for="render">JavaScript rendering</label>
+          <select id="render" name="render">
+            <option value="auto" selected>Detect automatically</option>
+            <%
+            /* Rendering runs a headless browser, which only the Python
+               crawler has. On a host without one the option is shown as
+               unavailable rather than silently ignored: the crawl still
+               runs, it just reads the served HTML. */
+            %>
+            <option value="always" <%= tool.canRender ? '' : 'disabled' %>>
+              Always render<%= tool.canRender ? '' : ' (unavailable here)' %>
+            </option>
+            <option value="never">Never render</option>
+          </select>
         </div>
       </div>
-    <% } else if (!usingPython) { %>
-      <p class="hint mt-0">
-        Audits run on the <strong>JavaScript port</strong> of the crawler
-        <% if (typeof tool !== 'undefined' && tool && tool.choice && tool.choice.reason) { %>
-          <span class="muted">(<%= tool.choice.reason %>)</span>
-        <% } %>
-        — no Python required, and nothing to install.
-      </p>
-    <% } %>
 
-    <div class="card">
-      <div class="card-body">
-      <h2 class="mt-0">Run a technical SEO audit</h2>
-      <p class="muted">Crawls the domain, scores site health, and groups findings by severity with the affected URLs and a recommended action for each.</p>
-      <form method="POST" action="/audit/start"><%- csrfField %>
-        <div class="form-row">
-          <div class="field">
-            <label for="brand_id">Brand</label>
-            <select id="brand_id" name="brand_id">
-              <option value="">— none, use domain below —</option>
-              <% brands.forEach(function(b){ %>
-                <option value="<%= b.id %>"><%= b.name %></option>
-              <% }) %>
-            </select>
-          </div>
-          <div class="field">
-            <label for="domain">Domain (optional if brand chosen)</label>
-            <input type="text" id="domain" name="domain" placeholder="example.com">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="field">
-            <label for="max_pages">Max pages</label>
-            <input type="number" id="max_pages" name="max_pages" value="100" min="5" max="2000">
-          </div>
-          <div class="field">
-            <label for="render">Rendering</label>
-            <select id="render" name="render">
-              <option value="auto" selected>Auto-detect</option>
-              <%# Rendering runs a headless browser, which only the Python
-                  crawler can do. On a host without it the option is shown as
-                  unavailable rather than silently ignored — the crawl still
-                  runs, it just reads the served HTML. %>
-              <option value="always" <%= tool.canRender ? '' : 'disabled' %>>
-                Always render JS<%= tool.canRender ? '' : ' — unavailable on this server' %>
-              </option>
-              <option value="never">Never render JS</option>
-            </select>
-            <% if (!tool.canRender) { %>
-              <p class="hint">This server has no headless browser, so pages are audited as
-                served. If a site turns out to be rendered entirely by JavaScript, the report
-                says so instead of scoring an empty page as healthy.</p>
-            <% } %>
-          </div>
-        </div>
-        <div class="checkbox-row">
-          <label class="check" for="create_tasks">
-            <input type="checkbox" id="create_tasks" name="create_tasks" checked>
-            <span>Create tasks from failing checks automatically</span>
-          </label>
-        </div>
-        <%- include('partials/crawl-access', { authByBrand: authByBrand }) %>
-        <button class="btn" type="submit" <%= tool.exists ? '' : 'disabled' %>>Start audit</button>
-      </form>
-      </div>
+      <label class="check" for="create_tasks">
+        <input type="checkbox" id="create_tasks" name="create_tasks" checked>
+        <span>
+          Create tasks from failing checks
+          <span class="check-hint">Each failing check becomes a task, assigned to nobody, in the backlog.</span>
+        </span>
+      </label>
+
+      <% if (!tool.canRender) { %>
+        <details class="disclosure" style="margin-top:var(--s-3)">
+          <summary>What happens without a headless browser</summary>
+          <p class="hint mt-0">
+            Pages are audited as served. If a site turns out to be rendered entirely by
+            JavaScript, the report says so rather than scoring an empty page as healthy.
+          </p>
+        </details>
+      <% } %>
+
+      <%- include('partials/crawl-access', { authByBrand: authByBrand }) %>
     </div>
 
-    <div class="card">
-      <div class="card-body">
-      <h3 class="mt-0">Recent runs</h3>
-      <% if (runs.length === 0) { %>
-        <div class="empty-state"><div class="icon">&#9878;</div>No audits run yet.</div>
-      <% } else { %>
-        <div class="table-wrap"><table class="data">
-          <thead><tr><th>Domain</th><th>Brand</th><th>Status</th><th>Health</th><th>Issues</th><th>Started</th></tr></thead>
-          <tbody>
-          <% runs.forEach(function(r){ %>
-            <tr>
-              <td><a href="/audit/<%= r.id %>"><%= r.domain %></a></td>
-              <td><%= r.brand_name || '—' %></td>
-              <td><span class="badge <%= statusBadge(r.status) %>"><%= r.status %></span></td>
-              <td><% if (r.health == null) { %>—<% } else { %><span class="badge <%= r.health >= 90 ? 'good' : (r.health >= 70 ? 'medium' : 'critical') %>"><%= r.health %>/100</span><% } %></td>
-              <td><%= r.issues == null ? '—' : r.issues %></td>
-              <td><%= fmtDateTime(r.created_at) %></td>
-            </tr>
-            <% if (r.status === 'error' && r.error) { %>
-              <tr><td colspan="6"><div class="error-box" style="margin:6px 0"><%= r.error %></div></td></tr>
-            <% } %>
-          <% }) %>
-          </tbody>
-        </table></div>
-      <% } %>
-      </div>
+    <div class="card-foot row between">
+      <span>
+        <% if (!usingPython) { %>
+          Runs on the JavaScript crawler<% if (tool && tool.choice && tool.choice.reason) { %>
+            <span class="dim">(<%= tool.choice.reason %>)</span>
+          <% } %>. Nothing to install.
+        <% } else { %>
+          Runs on the Python crawler.
+        <% } %>
+      </span>
+      <button class="btn" type="submit" <%= tool.exists && !pythonBlocked ? '' : 'disabled' %>>Start audit</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <div class="ch-main"><h3>Audit history</h3><span class="sub">Most recent first</span></div>
+    <% if (runs.length) { %><span class="badge outline"><%= runs.length %> run<%= runs.length === 1 ? '' : 's' %></span><% } %>
   </div>
+
+  <% if (!runs.length) { %>
+    <div class="empty">
+      <span class="empty-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M19.5 19.5 15.6 15.6"/></svg>
+      </span>
+      <h3>No audits yet</h3>
+      <p>Pick a brand or type a domain above and start the first crawl. A hundred pages takes a few minutes.</p>
+    </div>
+  <% } else { %>
+    <div class="card-body tight">
+      <div class="table-wrap">
+        <table class="data">
+          <thead>
+            <tr>
+              <th class="wrap">Domain</th>
+              <th>Brand</th>
+              <th>Status</th>
+              <th class="num">Health</th>
+              <th class="num">Issues</th>
+              <th class="narrow">Started</th>
+              <th class="narrow"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% runs.forEach(function (r) { %>
+              <tr>
+                <td class="wrap emphasis">
+                  <a href="/audit/<%= r.id %>"><%= r.domain %></a>
+                  <% if (r.status === 'error' && r.error) { %>
+                    <div class="sub-line" style="color:var(--critical-text)"><%= r.error %></div>
+                  <% } %>
+                </td>
+                <td><% if (r.brand_name) { %><%= r.brand_name %><% } else { %><span class="dim">None</span><% } %></td>
+                <td><span class="badge <%= statusBadge(r.status) %>"><%= r.status %></span></td>
+                <td class="num">
+                  <% if (r.health == null) { %>
+                    <span class="dim">-</span>
+                  <% } else { %>
+                    <span class="badge <%= r.health >= 90 ? 'good' : (r.health >= 70 ? 'medium' : 'critical') %>"><%= r.health %></span>
+                  <% } %>
+                </td>
+                <td class="num"><%= r.issues == null ? '-' : fmtInt(r.issues) %></td>
+                <td class="narrow dim"><%= fmtDateTime(r.created_at) %></td>
+                <td class="narrow"><a class="btn ghost xs" href="/audit/<%= r.id %>">Open</a></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% } %>
+</div>
+
 <%- include('partials/sidebar-end') %>
 <%- include('partials/foot') %>

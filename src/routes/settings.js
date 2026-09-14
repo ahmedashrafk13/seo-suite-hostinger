@@ -90,7 +90,7 @@ router.post('/test-email', async (req, res) => {
     message: 'If you are reading this, email delivery is configured correctly and alerts will reach you.',
     severity: 'info',
     brandName: 'Configuration test',
-    siteUrl: '—',
+    siteUrl: ' - ',
     alertLabel: 'Test',
     suggestedAction: 'No action needed.',
   });

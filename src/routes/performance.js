@@ -1,4 +1,4 @@
-// Performance: a GSC/GA4-mirroring dashboard — the same numbers an SEO would
+// Performance: a GSC/GA4-mirroring dashboard - the same numbers an SEO would
 // pull from Search Console's Performance report and GA4's Reports, joined
 // into one screen per brand, with the recent-vs-prior comparisons the rest
 // of the suite already relies on (src/lib/analytics.js).
@@ -74,7 +74,7 @@ router.get('/', (req, res, next) => {
 
       const channels = A.ga4Channels(brand.id, days);
 
-      // query × page from the latest sync window — which URL actually ranks
+      // query × page from the latest sync window - which URL actually ranks
       // for each keyword.
       const queryPagePairs = A.queryPagePairs(brand.id, { limit: 5000 });
       let queryPageRows = queryPagePairs.rows;
@@ -93,7 +93,7 @@ router.get('/', (req, res, next) => {
       }
       const ga4PagePage = paginate(ga4Pages, page);
 
-      // GSC extra dimensions — mirrors Search Console's Countries / Devices /
+      // GSC extra dimensions - mirrors Search Console's Countries / Devices /
       // Search appearance tabs and the Sitemaps report.
       let countries = A.gscCountries(brand.id, days, 2000);
       const devices = A.gscDevices(brand.id, days);
@@ -103,7 +103,7 @@ router.get('/', (req, res, next) => {
       if (q) countries = countries.filter((r) => r.entity.toLowerCase().includes(q));
       const countryPage = paginate(countries, page);
 
-      // GA4 extra dimensions — mirrors GA4's Tech, Demographics, Acquisition
+      // GA4 extra dimensions - mirrors GA4's Tech, Demographics, Acquisition
       // and Engagement > Events reports.
       const ga4DeviceRows = A.ga4Devices(brand.id, days);
       const ga4BrowserRows = A.ga4Browsers(brand.id, days);
@@ -124,17 +124,17 @@ router.get('/', (req, res, next) => {
       const predictive = A.ga4Predictive(brand.id, days);
       const customDimensions = A.ga4CustomDimensions(brand.id, days);
 
-      // Page indexing — sampled via URL Inspection (see sync.inspectSample);
+      // Page indexing - sampled via URL Inspection (see sync.inspectSample);
       // Google exposes no bulk coverage API, so this reflects only the pages
       // actually checked so far, not every URL on the site.
       const indexing = A.indexingSummary(brand.id);
       const indexingPage = A.indexingRows(brand.id, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
       // Rich results and crawler split ride along on the same URL Inspection
-      // rows — no extra API quota is spent to show them.
+      // rows - no extra API quota is spent to show them.
       const richResults = A.richResultsSummary(brand.id);
       const crawlers = A.crawlerSummary(brand.id);
 
-      // Broken links straight from the linking crawl — no URL Inspection
+      // Broken links straight from the linking crawl - no URL Inspection
       // quota needed, and the direct answer to "which links are dead".
       let brokenLinks = [];
       let brokenLinksTotal = 0;
@@ -198,7 +198,7 @@ router.post('/inspect', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Live "active users right now" widget, polled from the page — the in-app
+// Live "active users right now" widget, polled from the page - the in-app
 // equivalent of GA4 Home's realtime card. Best-effort: GA4 realtime has its
 // own quota and occasional latency, so failures degrade to "unavailable"
 // rather than breaking the page.

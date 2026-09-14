@@ -3,12 +3,12 @@
 // THE RULE
 // One person gets ONE email, however many tasks were assigned to them. A
 // developer handed six fixes should receive a single message listing six
-// items, not six messages — six is how an inbox filter gets written and how a
+// items, not six messages - six is how an inbox filter gets written and how a
 // team stops reading your email.
 //
 // HOW
 // Assigning queues a row instead of sending. A sweep runs on a timer and, for
-// each person with queued rows, sends a single digest — but only once their
+// each person with queued rows, sends a single digest - but only once their
 // queue has been quiet for QUIET_SECONDS. That quiet period is what collapses
 // "assign, assign, assign" across separate clicks into one message, and it is
 // short enough that a lone assignment still lands promptly.
@@ -65,7 +65,7 @@ function queuedFor(email) {
 }
 
 // Pulls the recommended action and per-URL detail out of a task's evidence so
-// the assignment email carries the same substance as the task page — not
+// the assignment email carries the same substance as the task page - not
 // just a title and a due date. Handles every evidence shape the task
 // generators produce: audit findings (items + action), broken/orphan links
 // (items), link recommendations (recommendations), and cannibalisation pairs.
@@ -82,7 +82,7 @@ function evidenceExtras(evidenceJson) {
       action: ev.action || null,
       items: ev.recommendations.slice(0, 10).map((r) => ({
         url: r.source_url || null,
-        note: `→ ${r.target_url || ''} — anchor "${r.anchor_text || ''}"${r.reason ? ` (${r.reason})` : ''}`,
+        note: `→ ${r.target_url || ''} - anchor "${r.anchor_text || ''}"${r.reason ? ` (${r.reason})` : ''}`,
       })),
       itemsTotal: ev.recommendations.length,
     };
@@ -92,7 +92,7 @@ function evidenceExtras(evidenceJson) {
       action: ev.action || null,
       items: ev.cannibalization.slice(0, 10).map((c) => ({
         url: c.page_a || null,
-        note: `vs ${c.page_b || ''} — keyword "${c.shared_keyword || ''}"${c.recommendation ? `: ${c.recommendation}` : ''}`,
+        note: `vs ${c.page_b || ''} - keyword "${c.shared_keyword || ''}"${c.recommendation ? `: ${c.recommendation}` : ''}`,
       })),
       itemsTotal: ev.cannibalization.length,
     };
@@ -121,7 +121,7 @@ async function flushRecipient(email) {
   if (!rows.length) return { email, sent: false, reason: 'nothing queued', tasks: 0 };
 
   // A row whose task was deleted between queueing and sending has nothing to
-  // say — drop it rather than emailing a blank line.
+  // say - drop it rather than emailing a blank line.
   const live = rows.filter((r) => r.title);
   const dead = rows.filter((r) => !r.title).map((r) => r.id);
   if (dead.length) markSent(dead, { sent: true });

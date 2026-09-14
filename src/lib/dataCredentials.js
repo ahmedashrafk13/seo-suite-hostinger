@@ -4,7 +4,7 @@
 // charge for API access. Holding one set of keys in .env means the agency pays
 // for every client's data. This module lets a client's own subscription be used
 // for that client's brand instead, falling back to the agency's keys when the
-// brand has none — the same shape as the Google Ads account resolution in
+// brand has none - the same shape as the Google Ads account resolution in
 // lib/google.js, for the same reason.
 //
 // WHY OAUTH IS NOT USED HERE, since it is the obvious question. Of the vendors
@@ -19,7 +19,7 @@
 // attacker a client's Semrush subscription, so every value is encrypted with
 // AES-256-GCM before it is written, and the key is NOT derived from anything
 // else the app already stores. Without CREDENTIAL_SECRET set, saving is refused
-// outright rather than silently falling back to plaintext — an encryption
+// outright rather than silently falling back to plaintext - an encryption
 // feature that quietly stops encrypting is worse than not having it.
 const crypto = require('crypto');
 const db = require('../db');
@@ -57,7 +57,7 @@ const VENDORS = [
   {
     key: 'bing',
     label: 'Bing Webmaster Tools',
-    help: 'Free measured search volume — Bing demand, not Google. Key from bing.com/webmasters, Settings > API access.',
+    help: 'Free measured search volume - Bing demand, not Google. Key from bing.com/webmasters, Settings > API access.',
     fields: [
       { name: 'key', label: 'API key', env: 'BING_WEBMASTER_API_KEY', secret: true },
     ],
@@ -82,7 +82,7 @@ function secretConfigured() {
 }
 
 // scrypt with a per-record salt rather than a single derived key, so two brands
-// storing the same Semrush key do not produce identical ciphertext — otherwise
+// storing the same Semrush key do not produce identical ciphertext - otherwise
 // the database would leak which brands share a subscription.
 function deriveKey(salt) {
   if (!secretConfigured()) {
@@ -179,7 +179,7 @@ function readEnvFields(vendorKey) {
 }
 
 // The agency credential ONLY when it is complete. A half-set agency credential
-// is not usable on its own and must not be presented as configured — this is
+// is not usable on its own and must not be presented as configured - this is
 // deliberately stricter than readEnvFields above, which exists to patch a
 // brand's missing field.
 function readEnv(vendorKey) {
@@ -193,7 +193,7 @@ function readEnv(vendorKey) {
 
 // The brand's own credential first, the agency's .env second, nothing third.
 // `source` is returned so every view and every provenance line can say WHOSE
-// subscription produced a number — a client on their own units is entitled to
+// subscription produced a number - a client on their own units is entitled to
 // know, and so is the agency paying for the ones who are not.
 function resolve(vendorKey, { brandId = null } = {}) {
   const vendor = BY_KEY.get(vendorKey);

@@ -3,7 +3,7 @@
 // The connection belongs to the TEAM, not to whoever happened to click
 // Connect: tokens are stored against the team's data owner, so every member
 // works from one Search Console / GA4 connection. Only an admin may connect
-// or disconnect it — a member re-authorising with their own Google account
+// or disconnect it - a member re-authorising with their own Google account
 // would otherwise silently repoint the whole team's data.
 const express = require('express');
 const google = require('../lib/google');
@@ -60,7 +60,7 @@ router.post('/connect/disconnect', (req, res) => {
 // from accounts the connected login can actually reach rather than typing a
 // ten-digit id and finding out it was wrong three screens later.
 //
-// The value posted is "<customerId>" or "<customerId>:<loginCustomerId>" — the
+// The value posted is "<customerId>" or "<customerId>:<loginCustomerId>" - the
 // second form is used when the account is reached through a manager (MCC),
 // which needs the manager id in the login-customer-id header.
 router.post('/connect/ads-account', (req, res) => {

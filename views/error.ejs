@@ -2,29 +2,82 @@
 <html lang="en">
 <head><%- include('partials/head') %></head>
 <body>
+<%
+/* Two shapes from one template.
+
+   Signed in, this is a normal page inside the app shell, so the nav is still
+   there and the error is a dead end for one route rather than for the whole
+   product. Signed out, there is no nav to show, so it borrows the auth-page
+   treatment instead of rendering an empty sidebar.
+
+   The old version hand-rolled its own top bar, which stopped matching the
+   real one the moment the real one gained a breadcrumb and an account menu. */
+const _status = typeof status !== 'undefined' && status ? status : null;
+const _isMissing = _status === 404;
+%>
+
+<% if (currentUser) { %>
 <div class="app">
-<% if (currentUser) { %><%- include('partials/sidebar') %><% } else { %><main class="main"><% } %>
-  <div class="topbar"><h1><%= title %></h1></div>
-  <div class="content narrow">
-    <div class="card">
-      <div class="card-body">
-        <div class="empty">
-          <div class="empty-icon">&#9888;</div>
-          <h3><%= title %></h3>
-          <p><%= message %></p>
-          <a class="btn secondary" href="<%= currentUser ? '/dashboard' : '/login' %>">
-            <%= currentUser ? 'Back to dashboard' : 'Go to sign in' %>
-          </a>
-        </div>
-        <% if (typeof stack !== 'undefined' && stack) { %>
-          <details class="plain" style="margin-top:16px">
-            <summary>Technical detail</summary>
-            <pre class="pre"><%= stack %></pre>
-          </details>
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+  <div class="card" style="max-width:640px;margin-inline:auto">
+    <div class="empty">
+      <span class="empty-icon" aria-hidden="true">
+        <% if (_isMissing) { %>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m19.5 19.5-4-4"/><path d="M8.6 11h4.8"/></svg>
+        <% } else { %>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5M12 16.4h.01"/><circle cx="12" cy="12" r="9"/></svg>
+        <% } %>
+      </span>
+      <h3><%= title %></h3>
+      <p><%= message %></p>
+      <div class="btn-row" style="justify-content:center">
+        <a class="btn" href="/dashboard">Back to dashboard</a>
+        <% if (_isMissing) { %>
+          <button type="button" class="btn secondary" data-cmdk-open>Search for a page</button>
         <% } %>
       </div>
     </div>
+    <% if (typeof stack !== 'undefined' && stack) { %>
+      <div class="card-foot">
+        <details class="disclosure" style="margin:0">
+          <summary>Technical detail</summary>
+          <pre class="pre"><%= stack %></pre>
+        </details>
+      </div>
+    <% } %>
   </div>
-</main>
+
+<%- include('partials/sidebar-end') %>
+
+<% } else { %>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="brand-mark-row">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <rect x="3" y="13" width="3.4" height="7" rx="1"/>
+          <rect x="10.3" y="9" width="3.4" height="11" rx="1"/>
+          <rect x="17.6" y="4" width="3.4" height="16" rx="1"/>
+        </svg>
+      </span>
+      <span class="bm-text">SEO Suite</span>
+    </div>
+    <h1><%= title %></h1>
+    <p class="sub"><%= message %></p>
+    <a class="btn block lg" href="/login">Go to sign in</a>
+    <% if (typeof stack !== 'undefined' && stack) { %>
+      <details class="disclosure" style="margin-top:var(--s-4)">
+        <summary>Technical detail</summary>
+        <pre class="pre"><%= stack %></pre>
+      </details>
+    <% } %>
+    <div class="auth-foot">
+      <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a>
+    </div>
+  </div>
 </div>
+<% } %>
+
 <%- include('partials/foot') %>

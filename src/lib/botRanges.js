@@ -1,4 +1,4 @@
-// PUBLISHED CRAWLER IP RANGES — the only way to know a bot was really the bot.
+// PUBLISHED CRAWLER IP RANGES - the only way to know a bot was really the bot.
 //
 // WHY THIS FILE EXISTS
 // A user agent is a claim, not a credential. In a typical access log a large
@@ -12,7 +12,7 @@
 //
 // THREE THINGS THIS DELIBERATELY DOES NOT DO
 //   1. It does not fetch on demand during an import. A log import must work
-//      offline and must not block on a network call — so the ranges are
+//      offline and must not block on a network call - so the ranges are
 //      fetched explicitly (a button, or the cron job) and cached on disk. An
 //      import with no cache present says "UA-only, not verified" rather than
 //      pretending.
@@ -21,7 +21,7 @@
 //      loaded and how old they are.
 //   3. It does not invent ranges for crawlers that publish none. Applebot,
 //      Yandex and Baidu document reverse-DNS verification instead, and those
-//      are marked `rdns` in logAnalysis.js and verified by sampling — not
+//      are marked `rdns` in logAnalysis.js and verified by sampling - not
 //      quietly counted as verified.
 const fs = require('fs');
 const path = require('path');
@@ -77,8 +77,8 @@ const SOURCES = [
   },
 ];
 
-// All four publishers use the same envelope — {"prefixes":[{"ipv4Prefix":...}]}
-// — but OpenAI omits `creationTime` and Bing has used `ipv6Prefix` only
+// All four publishers use the same envelope - {"prefixes":[{"ipv4Prefix":...}]}
+// - but OpenAI omits `creationTime` and Bing has used `ipv6Prefix` only
 // sporadically. Reading defensively costs three lines and means a publisher
 // tweaking their format degrades one source rather than throwing.
 function extractPrefixes(json, owner) {
@@ -131,7 +131,7 @@ async function refresh() {
     fs.writeFileSync(CACHE_FILE, JSON.stringify(payload));
   } catch (err) {
     // A read-only data directory should not lose the ranges that were just
-    // fetched — they are still returned and usable for this request.
+    // fetched - they are still returned and usable for this request.
     console.error('[botRanges] could not write the cache:', err.message);
   }
   return payload;
@@ -148,8 +148,8 @@ function load() {
 }
 
 // Age is surfaced rather than enforced. A range list a month old is still
-// overwhelmingly correct — publishers add ranges, they rarely reuse them for
-// something else — so a stale cache is reported, not rejected.
+// overwhelmingly correct - publishers add ranges, they rarely reuse them for
+// something else - so a stale cache is reported, not rejected.
 function status() {
   const cached = load();
   if (!cached) {

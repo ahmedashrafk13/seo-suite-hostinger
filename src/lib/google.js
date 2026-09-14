@@ -11,7 +11,7 @@ const ADS_SCOPE = 'https://www.googleapis.com/auth/adwords';
 
 // Google Ads API version.
 //
-// MEASURED against the live API, not assumed — and the first measurement was
+// MEASURED against the live API, not assumed - and the first measurement was
 // wrong in an instructive way.
 //
 // Google routes the URL BEFORE it authenticates: an unknown method returns an
@@ -28,7 +28,7 @@ const ADS_SCOPE = 'https://www.googleapis.com/auth/adwords';
 //
 // v25 is therefore the newest version that actually serves
 // KeywordPlanIdeaService here. When it sunsets, do not infer the replacement
-// from an unauthenticated probe — press "Test Keyword Planner" on /connect,
+// from an unauthenticated probe - press "Test Keyword Planner" on /connect,
 // which retries each live version with real credentials and names the one
 // that works.
 const ADS_API_VERSION = process.env.GOOGLE_ADS_API_VERSION || 'v25';
@@ -41,7 +41,7 @@ const SCOPES = [
   // Google Ads / Keyword Planner. There is no narrower scope: `adwords` is
   // the only one the Google Ads API accepts, and it is read-write, so the
   // consent screen asks for more than this app uses. The app only ever calls
-  // generateKeywordIdeas and listAccessibleCustomers — both read-only — and
+  // generateKeywordIdeas and listAccessibleCustomers - both read-only - and
   // the consent copy on /connect says so, because a user who reads
   // "Manage your AdWords campaigns" and is not told why will not click it.
   ADS_SCOPE,
@@ -51,8 +51,8 @@ const SCOPES = [
 //
 // This defers to config.js rather than deriving its own, because the two had
 // drifted: config.GOOGLE_REDIRECT_URI honours BASE_URL, this did not. On any
-// deployment that sets BASE_URL and not GOOGLE_REDIRECT_URI — which is exactly
-// what DEPLOY-FLY.md instructs — the OAuth client sent
+// deployment that sets BASE_URL and not GOOGLE_REDIRECT_URI - which is exactly
+// what DEPLOY-FLY.md instructs - the OAuth client sent
 // http://localhost:8080/api/auth/google/callback and sign-in died with
 // redirect_uri_mismatch, while `node src/doctor.js` read the config value and
 // reported the CORRECT uri. A disagreement between the checker and the thing
@@ -132,13 +132,13 @@ async function getValidAccessToken(userId) {
     //
     // The access token is refreshed here automatically and indefinitely. The
     // REFRESH token is the credential doing the refreshing, and when Google
-    // revokes that, there is nothing left to recover with — the only fix is a
+    // revokes that, there is nothing left to recover with - the only fix is a
     // human reconnecting on /connect.
     //
     // By far the most common cause is an OAuth app still in "Testing" status:
     // Google expires refresh tokens issued by such an app after seven days.
-    // That produces a weekly failure in jobs nobody is watching — the nightly
-    // sync, hourly alerts, the difficulty backfill — so the message names the
+    // That produces a weekly failure in jobs nobody is watching - the nightly
+    // sync, hourly alerts, the difficulty backfill - so the message names the
     // cause and the permanent fix rather than surfacing a bare invalid_grant.
     const raw = String((err && err.response && err.response.data
       && err.response.data.error) || err.message || '');
@@ -148,7 +148,7 @@ async function getValidAccessToken(userId) {
         + (conn.connected_email || 'this workspace')
         + ' has been revoked by Google and must be reconnected on /connect. '
         + 'The usual cause is the OAuth app still being in "Testing" status, which expires '
-        + 'refresh tokens after 7 days — publishing the app to "In production" in the Google '
+        + 'refresh tokens after 7 days - publishing the app to "In production" in the Google '
         + 'Cloud console stops it recurring. Other causes: the user revoked access, or the '
         + 'password was changed.'
       );
@@ -266,7 +266,7 @@ async function ga4RunReport(userId, propertyId, { startDate, endDate, dimensions
 }
 
 // GA4 cohort/retention report. Unlike ga4RunReport, a cohort request has no
-// dateRanges — the date range lives inside each cohort's dateRange, and the
+// dateRanges - the date range lives inside each cohort's dateRange, and the
 // dimension/metric set is fixed to firstSessionDate/cohort + cohortActiveUsers
 // by the caller. Returned rows are normalised the same way as ga4RunReport.
 async function ga4RunCohortReport(userId, propertyId, { cohorts, cohortsRange, dimensions = ['cohort', 'cohortNthWeek'], metrics = ['cohortActiveUsers'], limit = 1000 }) {
@@ -297,7 +297,7 @@ async function ga4RunCohortReport(userId, propertyId, { cohorts, cohortsRange, d
   });
 }
 
-// GA4 Realtime Data API — active users right now, mirroring the "Active users
+// GA4 Realtime Data API - active users right now, mirroring the "Active users
 // in last 30 minutes" widget on the GA4 Home report. No date range: this API
 // only ever answers "right now."
 async function ga4RunRealtimeReport(userId, propertyId, { dimensions = [], metrics = ['activeUsers'], limit = 25 } = {}) {
@@ -324,7 +324,7 @@ async function ga4RunRealtimeReport(userId, propertyId, { dimensions = [], metri
   });
 }
 
-// GA4 Metadata API — lists every dimension/metric available for a property,
+// GA4 Metadata API - lists every dimension/metric available for a property,
 // including custom dimensions/metrics (customDefinition: true). Verified
 // against node_modules/googleapis@144.0.0: analyticsdata.properties.getMetadata
 // exists (src/apis/analyticsdata/v1beta.d.ts, Params$Resource$Properties$Getmetadata)
@@ -368,7 +368,7 @@ async function listSitemaps(userId, siteUrl) {
   return res.data.sitemap || [];
 }
 
-// URL Inspection API — the only way to read real indexation state, and the
+// URL Inspection API - the only way to read real indexation state, and the
 // source for the "page deindexed" and "manual action" alert types.
 // Quota is 2 000 calls/day/property, so callers must sample rather than sweep.
 async function inspectUrl(userId, siteUrl, inspectionUrl) {
@@ -385,12 +385,12 @@ async function inspectUrl(userId, siteUrl, inspectionUrl) {
 // requests) is served by a separate "Removals API" that Google has never
 // published in the discovery documents googleapis' code generator reads
 // from. Checked node_modules/googleapis@144.0.0 (the version installed
-// here): src/apis/searchconsole/v1.js only registers five resources —
-// searchanalytics, sitemaps, sites, urlInspection, urlTestingTools — there
+// here): src/apis/searchconsole/v1.js only registers five resources - 
+// searchanalytics, sitemaps, sites, urlInspection, urlTestingTools - there
 // is no urlNotifications/removals resource shipped anywhere in the package.
 // (The Indexing API's urlNotifications.publish is a different, unrelated
 // endpoint for a different product and cannot submit/list removal requests.)
-// So there is no real client method to wrap here — inventing one would just
+// So there is no real client method to wrap here - inventing one would just
 // 404. Leaving this stub so the intent is documented and callers get a
 // clear, typed error instead of a crash if anyone wires it up later.
 async function listRemovals() {
@@ -418,7 +418,7 @@ async function pageSpeed(url, strategy = 'mobile') {
   const categories = (data.lighthouseResult && data.lighthouseResult.categories) || {};
   const num = (id) => (audits[id] && typeof audits[id].numericValue === 'number' ? audits[id].numericValue : null);
 
-  // Field data (CrUX) is preferred for Core Web Vitals — it is what Google
+  // Field data (CrUX) is preferred for Core Web Vitals - it is what Google
   // actually ranks on. Fall back to lab numbers when the origin has no field data.
   const loading = data.loadingExperience || {};
   const fm = loading.metrics || {};
@@ -586,7 +586,7 @@ function resolveAdsPrincipal(requestingUserId) {
     // The team picked an account, then lost (or never had) the Ads scope on
     // its connection. Erroring here would break keyword volumes for a
     // workspace that a working shared account could serve perfectly, so this
-    // degrades to the shared account and FLAGS the dead selection instead —
+    // degrades to the shared account and FLAGS the dead selection instead - 
     // the same "narrower basis, named on the page" rule the rest of the suite
     // follows. What it must never do is fall back silently.
     const viaShared = resolveSharedAdsPrincipal();
@@ -716,7 +716,7 @@ async function adsRequest(userId, path, { method = 'POST', body, loginCustomerId
     // Attached rather than folded into the message: the probe below decides
     // what a 404 MEANS by re-testing, instead of printing a guess about
     // sunset versions next to every unrelated failure. That guess was wrong
-    // once already — the path existed and the version was fine.
+    // once already - the path existed and the version was fine.
     e.httpStatus = res.status;
     e.apiStatus = code;
     e.rawBody = text.slice(0, 600);
@@ -818,7 +818,7 @@ async function probeKeywordPlanner(userId) {
     // method returns an HTML 404, not a JSON one), so "Method not found" on a
     // JSON error usually means THIS version does not serve THIS method for
     // this account. Rather than print a guess, retry the live versions and
-    // report which one works — that turns a dead end into a one-line fix.
+    // report which one works - that turns a dead end into a one-line fix.
     if (err.httpStatus === 404) {
       const tried = [];
       for (const v of ['v25', 'v24', 'v23', 'v22', 'v26']) {
@@ -844,7 +844,7 @@ async function probeKeywordPlanner(userId) {
         } catch (e2) {
           tried.push(`${v}=${e2.httpStatus || '?'}${e2.apiStatus ? ' ' + e2.apiStatus : ''}`);
           // A non-404 from another version means the method exists there and
-          // the real problem is elsewhere (auth, developer token, account) —
+          // the real problem is elsewhere (auth, developer token, account) - 
           // report THAT, since it is the actionable error.
           if (e2.httpStatus && e2.httpStatus !== 404) {
             return {

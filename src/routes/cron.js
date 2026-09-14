@@ -1,6 +1,6 @@
 // The endpoint hPanel's cron job calls.
 //
-// Mounted before the authentication middleware, because cron has no session —
+// Mounted before the authentication middleware, because cron has no session - 
 // so it authenticates with a shared secret instead, and the whole route is
 // disabled unless one is configured. Without that, anyone who guessed the URL
 // could trigger a full Google API sync and a round of alert emails on demand.
@@ -12,7 +12,7 @@ const config = require('../config');
 const router = express.Router();
 
 // Compared in constant time. The token travels in a URL that sits in a control
-// panel field and in server logs, so it is not a high-value secret — but a
+// panel field and in server logs, so it is not a high-value secret - but a
 // timing-safe compare costs nothing and removes the question.
 function tokenOk(supplied) {
   if (!config.CRON_TOKEN) return false;
@@ -60,9 +60,9 @@ router.all('/', authenticate, async (req, res) => {
     // Plain text, because that is what lands in the cron email a control panel
     // sends on failure, and JSON in that email is unreadable.
     const lines = results.map((r) => {
-      if (r.skipped) return `  - ${r.job}: skipped (${r.skipped})`;
-      if (r.ok) return `  - ${r.job}: ok — ${r.detail} (${r.ms}ms)`;
-      return `  - ${r.job}: FAILED — ${r.error} (${r.ms}ms)`;
+      if (r.skipped) return ` - ${r.job}: skipped (${r.skipped})`;
+      if (r.ok) return ` - ${r.job}: ok - ${r.detail} (${r.ms}ms)`;
+      return ` - ${r.job}: FAILED - ${r.error} (${r.ms}ms)`;
     });
     const summary = `cron: ${ran.length} job(s) ran, ${failed.length} failed, ${Date.now() - started}ms`;
     if (ran.length) console.log(`[cron] ${summary}\n${lines.join('\n')}`);

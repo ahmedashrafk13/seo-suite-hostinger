@@ -25,7 +25,7 @@
           <div class="empty">
             <div class="empty-icon">&#8646;</div>
             <h3>No linking runs yet</h3>
-            <p>Start one from the panel on the right — it crawls the site, scores semantic relatedness between pages,
+            <p>Start one from the panel on the right - it crawls the site, scores semantic relatedness between pages,
               and recommends source/target/anchor links plus orphan pages.</p>
           </div>
         </div>
@@ -41,13 +41,13 @@
               <% runs.forEach(function(r){ %>
                 <tr>
                   <td class="url"><a href="/linking/<%= r.id %>"><%= shortUrl(r.site_url, 44) === '/' ? r.site_url : r.site_url %></a></td>
-                  <td><%= r.brand_name || '—' %></td>
+                  <td><%= r.brand_name || ' - ' %></td>
                   <td>
                     <span class="badge <%= r.status === 'completed' ? 'good' : (r.status === 'error' ? 'critical' : 'medium') %>"><%= r.status %></span>
                   </td>
-                  <td class="num"><%= r.summary ? fmtInt(r.summary.pages_crawled) : '—' %></td>
-                  <td class="num"><%= r.summary ? fmtInt(r.summary.recommendations_total) : '—' %></td>
-                  <td class="num"><%= r.summary ? fmtInt(r.summary.orphan_pages) : '—' %></td>
+                  <td class="num"><%= r.summary ? fmtInt(r.summary.pages_crawled) : ' - ' %></td>
+                  <td class="num"><%= r.summary ? fmtInt(r.summary.recommendations_total) : ' - ' %></td>
+                  <td class="num"><%= r.summary ? fmtInt(r.summary.orphan_pages) : ' - ' %></td>
                   <td><%= fmtDateTime(r.created_at) %></td>
                   <td><a class="btn ghost sm" href="/linking/<%= r.id %>">Open</a></td>
                 </tr>
@@ -67,7 +67,7 @@
           <div class="field">
             <label for="brand_id">Brand <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>
             <select id="brand_id" name="brand_id">
-              <option value="">— none, use the URL below —</option>
+              <option value="">None, use the URL below</option>
               <% brands.forEach(function(b){ %>
                 <option value="<%= b.id %>"><%= b.name %><%= b.hasGsc ? '' : ' (no GSC data synced)' %></option>
               <% }) %>
@@ -97,7 +97,7 @@
             <input type="checkbox" id="render" name="render" <%= tool.canRender ? '' : 'disabled' %>>
             <label for="render">
               Render pages with JS (slower, needed for JS-heavy sites)<%
-                %><%= tool.canRender ? '' : ' — unavailable on this server' %>
+                %><%= tool.canRender ? '' : ' - unavailable on this server' %>
             </label>
           </div>
           <div class="check">

@@ -13,7 +13,7 @@ const team = require('../lib/team');
 const router = express.Router();
 
 // Each step is derived from data, so it cannot claim to be complete when it is
-// not — and it self-heals if something is later removed.
+// not - and it self-heals if something is later removed.
 function steps(req, res) {
   const userId = req.dataUserId;
   const t = res.locals.team;
@@ -46,7 +46,7 @@ function steps(req, res) {
       key: 'sites',
       title: 'Add your client sites',
       done: brands > 0,
-      detail: brands > 0 ? `${brands} site${brands === 1 ? '' : 's'} added${synced ? '' : ' — first sync still running'}` : null,
+      detail: brands > 0 ? `${brands} site${brands === 1 ? '' : 's'} added${synced ? '' : ' - first sync still running'}` : null,
       body: 'Import every property from your Google account in one pass, rather than typing them in one at a time.',
       cta: 'Import from Google',
       href: '/brands/import',
@@ -57,7 +57,7 @@ function steps(req, res) {
       title: 'Invite your SEO team, add your devs and writers',
       done: members > 1 || contacts > 0,
       detail: `${members} with portal access · ${contacts} email-only contact${contacts === 1 ? '' : 's'}`,
-      body: 'SEO staff get accounts. Developers and writers do not — they receive tasks by email.',
+      body: 'SEO staff get accounts. Developers and writers do not - they receive tasks by email.',
       cta: 'Open the team page',
       href: '/team',
     },

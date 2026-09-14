@@ -1,23 +1,246 @@
-  <div class="topbar">
-    <h1><%= typeof pageTitle !== 'undefined' && pageTitle ? pageTitle : title %></h1>
-    <div class="user-chip">
-      <span><%= currentUser ? (currentUser.name || currentUser.email) : '' %></span>
-      <form method="POST" action="/logout" style="display:inline"><%- csrfField %>
-        <button type="submit" class="btn ghost sm">Log out</button>
-      </form>
-    </div>
-  </div>
-  <div class="content<%= typeof narrow !== 'undefined' && narrow ? ' narrow' : '' %>">
+<%
+/* ============================================================================
+   Top bar.
 
-  <% if (typeof flash !== 'undefined' && flash) { %>
-    <div class="notice success">
-      <span class="notice-icon">&#10003;</span>
-      <div class="notice-body"><%= flash %></div>
+   The old one held a page title and a Log out button, which meant the things
+   a person needs on every page (which brand am I looking at, what is new,
+   where am I) were re-implemented inside individual page bodies or missing
+   entirely. This version owns them:
+
+     nav toggle | breadcrumb | search | brand switcher | alerts | account
+
+   The brand switcher is global because nearly every route is scoped to a
+   brand; it preserves the current path and only swaps ?brand=, so switching
+   keeps you on the page you were reading. navBrands / navCounts / perms are
+   set for every request in src/app.js, so none of this needs route changes.
+   ============================================================================ */
+
+const SECTIONS = {
+  dashboard:     ['Overview', '/dashboard'],
+  performance:   ['Overview', '/dashboard'],
+  onboarding:    ['Overview', '/dashboard'],
+  audit:         ['Analyse', null],
+  research:      ['Analyse', null],
+  pagespeed:     ['Analyse', null],
+  linking:       ['Analyse', null],
+  keywords:      ['Analyse', null],
+  briefs:        ['Analyse', null],
+  aiseo:         ['AI search', '/ai-seo'],
+  'ai-assist':   ['AI search', '/ai-seo'],
+  alerts:        ['Act', null],
+  opportunities: ['Act', null],
+  tasks:         ['Act', null],
+  reports:       ['Deliver', null],
+  leads:         ['Deliver', null],
+  brands:        ['Setup', null],
+  team:          ['Setup', null],
+  connect:       ['Setup', null],
+  settings:      ['Setup', null],
+  workflow:      ['Setup', null],
+};
+
+const _active = typeof active !== 'undefined' ? active : '';
+const _section = SECTIONS[_active] || [null, null];
+const _here = (typeof pageTitle !== 'undefined' && pageTitle) ? pageTitle : (typeof title !== 'undefined' ? title : '');
+
+const _brands = (typeof navBrands !== 'undefined' && navBrands) ? navBrands : [];
+/* Which brand is in scope: whatever ?brand= says, else the one the page
+   resolved to, else nothing. Read-only - this never changes the selection. */
+const _brandId = (query && query.brand) ? String(query.brand)
+               : (typeof selectedId !== 'undefined' && selectedId != null) ? String(selectedId) : '';
+const _current = _brands.filter((b) => String(b.id) === _brandId)[0] || null;
+
+function brandHref(id) {
+  const base = typeof path !== 'undefined' ? path : '/dashboard';
+  const q = Object.assign({}, query || {});
+  if (id) { q.brand = id; } else { delete q.brand; }
+  delete q.page;
+  const qs = Object.keys(q)
+    .filter((k) => q[k] !== '' && q[k] != null)
+    .map((k) => encodeURIComponent(k) + '=' + encodeURIComponent(q[k]))
+    .join('&');
+  return base + (qs ? '?' + qs : '');
+}
+function initials(s) {
+  return String(s || '?').trim().split(/[\s@._-]+/).filter(Boolean).slice(0, 2)
+    .map((w) => w[0]).join('').toUpperCase() || '?';
+}
+
+const _u = currentUser || {};
+const _uname = _u.name || _u.email || 'Account';
+%>
+
+  <header class="topbar">
+
+    <button type="button" class="nav-open-btn" aria-controls="sidebar" aria-expanded="false" aria-label="Open navigation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <path d="M4 7h16M4 12h16M4 17h16"/>
+      </svg>
+    </button>
+
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <% if (_section[0]) { %>
+        <% if (_section[1]) { %>
+          <a class="crumb-parent" href="<%= _section[1] %>"><%= _section[0] %></a>
+        <% } else { %>
+          <span class="crumb-parent"><%= _section[0] %></span>
+        <% } %>
+        <span class="sep crumb-parent" aria-hidden="true">/</span>
+      <% } %>
+      <span class="here"><%= _here %></span>
+    </nav>
+
+    <div class="topbar-actions">
+
+      <button type="button" class="icon-btn" data-cmdk-open aria-label="Search and jump to a page (Control K)" title="Search  Ctrl K">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.5"/><path d="m19.5 19.5-4-4"/>
+        </svg>
+      </button>
+
+      <% if (_brands.length) { %>
+        <details class="menu">
+          <summary class="brand-switch" title="Switch brand" aria-haspopup="menu">
+            <% if (_current) { %>
+              <span class="bs-avatar" aria-hidden="true"><%= initials(_current.name) %></span>
+            <% } else { %>
+              <%/* No initials to show, and a placeholder character here rendered
+                   as a tofu box in Plex. A stack glyph says "more than one". */%>
+              <span class="bs-avatar all" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m12 3 9 4.6-9 4.6-9-4.6L12 3Z"/><path d="m3 16.4 9 4.6 9-4.6"/><path d="m3 11.9 9 4.6 9-4.6"/>
+                </svg>
+              </span>
+            <% } %>
+            <span class="bs-name"><%= _current ? _current.name : 'All brands' %></span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6"/>
+            </svg>
+          </summary>
+          <div class="menu-pop" role="menu">
+            <div class="menu-label">Brand in scope</div>
+            <a class="menu-item <%= !_current ? 'is-current' : '' %>" role="menuitem" href="<%= brandHref('') %>">
+              <span class="mi-main">All brands</span>
+            </a>
+            <% _brands.forEach(function (b) { %>
+              <a class="menu-item <%= _current && _current.id === b.id ? 'is-current' : '' %>" role="menuitem" href="<%= brandHref(b.id) %>">
+                <span class="avatar sm" aria-hidden="true"><%= initials(b.name) %></span>
+                <span class="mi-main"><%= b.name %></span>
+              </a>
+            <% }) %>
+            <div class="menu-sep"></div>
+            <a class="menu-item" role="menuitem" href="/brands">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              <span class="mi-main">Add or manage brands</span>
+            </a>
+          </div>
+        </details>
+      <% } %>
+
+      <a class="icon-btn <%= navCounts && navCounts.openAlerts ? 'has-dot' : '' %>" href="/alerts"
+         aria-label="Alerts<%= navCounts && navCounts.openAlerts ? ' (' + navCounts.openAlerts + ' unread)' : '' %>"
+         title="<%= navCounts && navCounts.openAlerts ? navCounts.openAlerts + ' unread alerts' : 'Alerts' %>">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M18 9.4a6 6 0 1 0-12 0c0 5.2-2 6.7-2 6.7h16s-2-1.5-2-6.7Z"/><path d="M13.7 19.4a2 2 0 0 1-3.4 0"/>
+        </svg>
+      </a>
+
+      <div class="topbar-sep" aria-hidden="true"></div>
+
+      <details class="menu">
+        <summary class="icon-btn" aria-label="Account and preferences" aria-haspopup="menu" style="width:auto;padding:0 3px">
+          <span class="avatar" aria-hidden="true"><%= initials(_uname) %></span>
+        </summary>
+        <div class="menu-pop" role="menu">
+          <div class="menu-head">
+            <span class="avatar lg" aria-hidden="true"><%= initials(_uname) %></span>
+            <span class="mi-main">
+              <span class="mh-name"><%= _uname %></span>
+              <% if (_u.email && _u.email !== _uname) { %><span class="mh-mail"><%= _u.email %></span><% } %>
+            </span>
+          </div>
+          <div class="menu-sep"></div>
+
+          <%
+          /* Appearance is a three-way choice, not a sun/moon flip. "System"
+             is the default and is a real, selectable state, so the OS keeps
+             control until someone deliberately takes it. */
+          %>
+          <div class="menu-label">Appearance</div>
+          <button type="button" class="menu-item" role="menuitemradio" data-theme-set="light">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.6v2M12 19.4v2M21.4 12h-2M5 12H3M18.4 5.6 17 7M7 17l-1.4 1.4M18.4 18.4 17 17M7 7 5.6 5.6"/></svg>
+            <span class="mi-main">Light</span>
+          </button>
+          <button type="button" class="menu-item" role="menuitemradio" data-theme-set="dark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.3A8.5 8.5 0 1 1 9.7 3.5a6.8 6.8 0 0 0 10.8 10.8Z"/></svg>
+            <span class="mi-main">Dark</span>
+          </button>
+          <button type="button" class="menu-item" role="menuitemradio" data-theme-set="system">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/></svg>
+            <span class="mi-main">System</span>
+          </button>
+
+          <div class="menu-sep"></div>
+          <div class="menu-label">Density</div>
+          <button type="button" class="menu-item" role="menuitemradio" data-density-set="comfortable">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            <span class="mi-main">Comfortable</span>
+          </button>
+          <button type="button" class="menu-item" role="menuitemradio" data-density-set="compact">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 9.7h16M4 13.4h16M4 17h16"/></svg>
+            <span class="mi-main">Compact</span>
+          </button>
+
+          <div class="menu-sep"></div>
+          <a class="menu-item" role="menuitem" href="/settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3.6v2.2M12 18.2v2.2M20.4 12h-2.2M5.8 12H3.6M17.9 6.1l-1.6 1.6M7.7 16.3l-1.6 1.6M17.9 17.9l-1.6-1.6M7.7 7.7 6.1 6.1"/></svg>
+            <span class="mi-main">Settings</span>
+          </a>
+          <% if (perms && perms.isAdmin) { %>
+            <a class="menu-item" role="menuitem" href="/team">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9.2" cy="8" r="3.2"/><path d="M3.2 19.6a6 6 0 0 1 12 0"/><path d="M16.4 5.5a3.2 3.2 0 0 1 0 5"/></svg>
+              <span class="mi-main">Team</span>
+            </a>
+          <% } %>
+          <div class="menu-sep"></div>
+          <form method="POST" action="/logout"><%- csrfField %>
+            <button type="submit" class="menu-item danger" role="menuitem">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 17v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v2"/><path d="M19.5 12H9.5m10 0-3-3m3 3-3 3"/></svg>
+              <span class="mi-main">Log out</span>
+            </button>
+          </form>
+        </div>
+      </details>
+
+    </div>
+  </header>
+
+  <%
+  /* Flashes float over the page rather than pushing the first card down. A
+     banner that shifts layout on every redirect is what makes an app feel
+     jumpy, and these are transient by nature. */
+  %>
+  <% if ((typeof flash !== 'undefined' && flash) || (typeof flashError !== 'undefined' && flashError)) { %>
+    <div class="flash-stack" role="status" aria-live="polite">
+      <% if (typeof flash !== 'undefined' && flash) { %>
+        <div class="notice success">
+          <span class="notice-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+          </span>
+          <div class="notice-body"><%= flash %></div>
+          <button type="button" class="flash-close" aria-label="Dismiss">&times;</button>
+        </div>
+      <% } %>
+      <% if (typeof flashError !== 'undefined' && flashError) { %>
+        <div class="notice error">
+          <span class="notice-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 7.5v5.5M12 16.6h.01"/><circle cx="12" cy="12" r="9"/></svg>
+          </span>
+          <div class="notice-body"><%= flashError %></div>
+          <button type="button" class="flash-close" aria-label="Dismiss">&times;</button>
+        </div>
+      <% } %>
     </div>
   <% } %>
-  <% if (typeof flashError !== 'undefined' && flashError) { %>
-    <div class="notice error">
-      <span class="notice-icon">&#9888;</span>
-      <div class="notice-body"><%= flashError %></div>
-    </div>
-  <% } %>
+
+  <div class="content<%= typeof narrow !== 'undefined' && narrow ? ' narrow' : '' %>">

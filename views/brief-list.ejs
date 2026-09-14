@@ -31,7 +31,7 @@
           <% briefs.forEach(function(b){ %>
             <tr>
               <td><strong><%= b.primary_keyword %></strong></td>
-              <td><%= b.brand_name || '—' %></td>
+              <td><%= b.brand_name || ' - ' %></td>
               <td><%= fmtDateTime(b.created_at) %></td>
               <td><a class="btn secondary sm" href="/keywords/brief/<%= b.id %>">View</a></td>
             </tr>

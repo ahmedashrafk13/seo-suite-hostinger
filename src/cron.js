@@ -7,7 +7,7 @@
 //
 //   */15 * * * * cd ~/seo-suite && /usr/bin/node src/cron.js >> ~/cron.log 2>&1
 //
-// Both paths call the same scheduler.runDue(), so the two are interchangeable —
+// Both paths call the same scheduler.runDue(), so the two are interchangeable - 
 // and safe to have both, since a job that has just run is no longer due.
 const scheduler = require('./lib/scheduler');
 
@@ -19,7 +19,7 @@ const listOnly = args.includes('--status');
 (async () => {
   if (listOnly) {
     const rows = scheduler.status();
-    const pad = (s, n) => String(s == null ? '—' : s).padEnd(n);
+    const pad = (s, n) => String(s == null ? ' - ' : s).padEnd(n);
     console.log(`${pad('JOB', 14)}${pad('SCHEDULE', 18)}${pad('LAST RUN', 26)}${pad('STATUS', 8)}DUE`);
     rows.forEach((r) => {
       console.log(

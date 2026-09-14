@@ -11,7 +11,7 @@ function qs(overrides) {
 }
 function fmtCell(row, col) {
   var v = row[col.key];
-  if (v === undefined || v === null || v === '') return '—';
+  if (v === undefined || v === null || v === '') return ' - ';
   return v;
 }
 %>
@@ -99,12 +99,16 @@ function fmtCell(row, col) {
       </div></div>
     <% } else { %>
       <div class="card">
-        <div class="tabs">
-          <% inv.files.forEach(function(f){ %>
-            <a class="tab <%= tabKey === f.key ? 'active' : '' %>" href="?<%= qs({ tab: f.key, page: 1 }) %>">
-              <%= f.label %> <span class="count"><%= f.rowCount %></span>
-            </a>
-          <% }) %>
+        <div class="tabbar in-card">
+          <div class="tabs" role="tablist">
+            <% inv.files.forEach(function(f){ %>
+              <a class="tab <%= tabKey === f.key ? 'active' : '' %>" role="tab"
+                 aria-selected="<%= tabKey === f.key ? 'true' : 'false' %>"
+                 href="?<%= qs({ tab: f.key, page: 1 }) %>">
+                <%= f.label %> <span class="count"><%= f.rowCount %></span>
+              </a>
+            <% }) %>
+          </div>
         </div>
 
         <div class="card-body">
@@ -150,9 +154,9 @@ function fmtCell(row, col) {
                     <% table.def.columns.forEach(function(col){ %>
                       <% var val = fmtCell(row, col); %>
                       <td class="<%= col.number != null ? 'num' : '' %> <%= col.wide ? 'wide' : '' %> <%= col.url ? 'url' : '' %> <%= col.emphasis ? 'emphasis' : '' %> <%= col.width === 'narrow' ? 'narrow' : '' %>">
-                        <% if (col.url && val !== '—') { %>
+                        <% if (col.url && val !== ' - ') { %>
                           <a href="<%= val %>" target="_blank" rel="noopener"><%= shortUrl(val, 70) %></a>
-                        <% } else if (col.badge && val !== '—') { %>
+                        <% } else if (col.badge && val !== ' - ') { %>
                           <span class="badge <%= String(val).toLowerCase() %>"><%= val %></span>
                         <% } else { %>
                           <%= val %>
@@ -188,7 +192,7 @@ function fmtCell(row, col) {
               <td><a href="/tasks/<%= t.id %>"><%= t.title %></a></td>
               <td><span class="badge <%= t.severity %>"><%= t.severity %></span></td>
               <td><%= String(t.status).replace('_',' ') %></td>
-              <td><%= t.assignee || '—' %></td>
+              <td><%= t.assignee || ' - ' %></td>
             </tr>
           <% }) %>
           </tbody>

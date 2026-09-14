@@ -9,7 +9,7 @@ const assignmentQueue = require('../lib/assignmentQueue');
 const router = express.Router();
 
 // Applied to the WHOLE router, including the read-only view. The page exposes
-// every member's email, the live invite code and the assignment history —
+// every member's email, the live invite code and the assignment history - 
 // none of which a developer or an unprivileged member should see, and a
 // leaked invite code lets anyone request access to the client's data.
 function adminOnly(req, res, next) {
@@ -92,7 +92,7 @@ router.post('/members/:id/assign-rights', adminOnly, (req, res) => {
 
 router.post('/members/:id/suspend', adminOnly, (req, res) => {
   const r = team.setStatus(teamIdOf(res), Number(req.params.id), 'suspended');
-  res.redirect(r.ok ? '/team?msg=' + encodeURIComponent('Member suspended — they can no longer sign in.')
+  res.redirect(r.ok ? '/team?msg=' + encodeURIComponent('Member suspended - they can no longer sign in.')
     : '/team?error=' + encodeURIComponent(r.error));
 });
 
@@ -114,7 +114,7 @@ router.post('/invite/rotate', adminOnly, (req, res) => {
 });
 
 // ----------------------------------------------------------------- people
-// A person can be added without a login — the normal case for a developer who
+// A person can be added without a login - the normal case for a developer who
 // only ever receives tasks by email.
 router.post('/people', adminOnly, (req, res) => {
   const r = team.upsertPerson(teamIdOf(res), {

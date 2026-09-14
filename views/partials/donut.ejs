@@ -1,13 +1,27 @@
 <%
-/* Interactive donut chart (ApexCharts) for share-of-total data — task
+/* Interactive donut chart (ApexCharts) for share-of-total data - task
    severity mix, traffic channel mix, etc. Expects: label (string),
    rows (array), nameKey (string), valueKey (string), colors (array of hex,
-   matched to rows in order — falls back to a default categorical palette). */
+   matched to rows in order - falls back to a default categorical palette).
+
+   THE LEGEND IS OURS, NOT APEX'S.
+   Apex's built-in legend lays items out as a centred wrapping flow, so seven
+   channels became three ragged lines of different lengths under a chart that
+   was itself off-centre - the single ugliest thing on the dashboard. It also
+   had no room for the actual value, so a reader could see "Referral 4%" and
+   never learn it meant 74 sessions.
+
+   The replacement is a two-column HTML grid: swatch, name, value, percent,
+   aligned on a baseline with tabular numerals. It is populated from the
+   chart's own resolved colours after render, so it still follows the theme
+   ramp and still re-colours on a theme flip - nothing is hard-coded here that
+   the chart does not already know. */
 const _label = typeof label !== 'undefined' ? label : '';
 const _rows = (typeof rows !== 'undefined' ? rows : []).filter((r) => Number(r[typeof valueKey !== 'undefined' ? valueKey : 'value']) > 0);
 const _nameKey = typeof nameKey !== 'undefined' ? nameKey : 'name';
 const _valueKey = typeof valueKey !== 'undefined' ? valueKey : 'value';
-const _palette = typeof colors !== 'undefined' ? colors : ['#1e4d6b', '#0f766e', '#0f766e', '#c2620c', '#816200', '#9aa2b4'];
+/* null means 'use the themed categorical ramp resolved at draw time'. */
+const _palette = typeof colors !== 'undefined' ? colors : null;
 const _uid = `dn${Math.random().toString(36).slice(2, 9)}`;
 %>
 <div class="donut-card">
@@ -16,44 +30,92 @@ const _uid = `dn${Math.random().toString(36).slice(2, 9)}`;
     <div class="empty" style="padding:18px 0;font-size:12.5px;color:var(--text-3)">Not enough data yet</div>
   <% } else { %>
     <div id="<%= _uid %>" class="donut-mount"></div>
+    <ul id="<%= _uid %>-lg" class="dn-legend" aria-label="Chart breakdown"></ul>
     <script>
       (function () {
         var labels = <%- JSON.stringify(_rows.map((r) => String(r[_nameKey]))) %>;
         var values = <%- JSON.stringify(_rows.map((r) => Number(r[_valueKey]) || 0)) %>;
         var colors = <%- JSON.stringify(_palette) %>;
-        function render() {
-          var total = values.reduce(function (a, b) { return a + b; }, 0);
-          new ApexCharts(document.querySelector('#<%= _uid %>'), {
+        var total = values.reduce(function (a, b) { return a + b; }, 0);
+        var chart = null;
+
+        function options() {
+          var t = window.ChartTheme.get();
+          return {
             chart: {
-              type: 'donut', height: 240, fontFamily: 'inherit', animations: { easing: 'easeinout', speed: 400 },
-              parentHeightOffset: 0,
+              type: 'donut', height: 216, fontFamily: t.font, foreColor: t.text3,
+              animations: { easing: 'easeinout', speed: 400 }, parentHeightOffset: 0,
             },
             series: values,
             labels: labels,
-            colors: colors,
-            // Percentages live in the legend and the hover tooltip instead of
-            // inside the slices — in-slice labels clip against the card's
-            // rounded corners on thin/edge segments and read poorly on light
-            // fill colors.
-            legend: {
-              position: 'bottom', fontSize: '12px', labels: { colors: '#475569' },
-              markers: { width: 9, height: 9, radius: 3 }, itemMargin: { horizontal: 8, vertical: 4 },
-              formatter: function (seriesName, opts) {
-                var v = opts.w.globals.series[opts.seriesIndex];
-                var pct = total > 0 ? Math.round((v / total) * 100) : 0;
-                return seriesName + ' — ' + pct + '%';
-              },
-            },
+            colors: colors || t.series,
+            legend: { show: false },
             dataLabels: { enabled: false },
-            stroke: { width: 2, colors: ['var(--surface, #fff)'] },
-            plotOptions: { pie: { donut: { size: '68%', labels: {
-              show: true,
-              value: { fontSize: '22px', fontWeight: 700, color: '#0f172a', offsetY: -4 },
-              total: { show: true, label: 'Total', fontSize: '11px', color: '#9aa2b4',
-                formatter: function () { return total.toLocaleString('en-US'); } },
-            } } } },
-            tooltip: { theme: 'light', y: { formatter: function (v) { return v.toLocaleString('en-US') + ' (' + (total > 0 ? Math.round((v / total) * 100) : 0) + '%)'; } } },
-          }).render();
+            /* A gap in the page's own background, not a grey outline: the ring
+               reads as separated slices rather than as slices with borders. */
+            stroke: { width: 2, colors: [t.surface] },
+            plotOptions: { pie: { expandOnClick: false, donut: {
+              size: '76%',
+              labels: {
+                show: true,
+                value: { fontSize: '26px', fontWeight: 660, color: t.text, fontFamily: t.font, offsetY: -2 },
+                total: {
+                  show: true, label: 'Total', fontSize: '10.5px', fontWeight: 600,
+                  color: t.text3, fontFamily: t.font,
+                  formatter: function () { return total.toLocaleString('en-US'); },
+                },
+              },
+            } } },
+            states: { hover: { filter: { type: 'lighten', value: .06 } } },
+            tooltip: {
+              theme: t.mode,
+              y: { formatter: function (v) { return v.toLocaleString('en-US') + ' (' + (total > 0 ? Math.round((v / total) * 100) : 0) + '%)'; } },
+            },
+          };
+        }
+
+        /* Built from the chart's resolved colours so the swatches can never
+           disagree with the ring they describe. */
+        function paintLegend() {
+          var host = document.getElementById('<%= _uid %>-lg');
+          if (!host || !chart) return;
+          var used = (chart.w && chart.w.globals && chart.w.globals.colors) || colors || [];
+          host.innerHTML = '';
+          labels.forEach(function (name, i) {
+            var pct = total > 0 ? Math.round((values[i] / total) * 100) : 0;
+            var li = document.createElement('li');
+            li.className = 'dn-item';
+            var sw = document.createElement('span');
+            sw.className = 'dn-swatch';
+            sw.style.background = used[i % used.length] || 'currentColor';
+            var nm = document.createElement('span');
+            nm.className = 'dn-name';
+            nm.textContent = name;
+            nm.title = name;
+            var vl = document.createElement('span');
+            vl.className = 'dn-val';
+            vl.textContent = values[i].toLocaleString('en-US');
+            var pc = document.createElement('span');
+            pc.className = 'dn-pct';
+            pc.textContent = pct + '%';
+            li.appendChild(sw); li.appendChild(nm); li.appendChild(vl); li.appendChild(pc);
+            /* Hovering a legend row highlights its slice, which is the one
+               thing Apex's legend did well and worth keeping. */
+            li.addEventListener('mouseenter', function () {
+              try { chart.toggleDataPointSelection(i); } catch (e) {}
+            });
+            host.appendChild(li);
+          });
+        }
+
+        function render() {
+          chart = new ApexCharts(document.querySelector('#<%= _uid %>'), options());
+          chart.render().then(paintLegend);
+          // Redraw on a theme flip so the tooltip, labels and ramp follow.
+          window.ChartTheme.onThemeChange(function () {
+            if (!chart) return;
+            chart.updateOptions(options(), true, false).then(paintLegend);
+          });
         }
         window.ChartAssets.need('apex').then(render).catch(function () {
           window.ChartAssets.unavailable('#<%= _uid %>', 'This breakdown chart');

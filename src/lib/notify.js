@@ -1,9 +1,9 @@
 // Notification fan-out for alert events.
 //
 // Three channels, each independently optional:
-//   email   — SMTP via nodemailer (falls back to console logging)
-//   slack   — Slack Incoming Webhook URL
-//   webhook — any HTTPS endpoint receiving JSON. This is the WhatsApp path:
+//   email  - SMTP via nodemailer (falls back to console logging)
+//   slack  - Slack Incoming Webhook URL
+//   webhook - any HTTPS endpoint receiving JSON. This is the WhatsApp path:
 //             point it at a WhatsApp Business API relay (Twilio, 360dialog,
 //             Meta Cloud API, or an n8n/Zapier hook) and the payload below is
 //             delivered as-is. No WhatsApp provider is hard-coded, because
@@ -47,7 +47,7 @@ function escapeHtml(s) {
 function renderText(alert) {
   const m = severityMeta(alert.severity);
   const lines = [
-    `${m.emoji}  ${m.label.toUpperCase()} — ${alert.title}`,
+    `${m.emoji}  ${m.label.toUpperCase()} - ${alert.title}`,
     '',
     `Brand:     ${alert.brandName || '(unassigned)'}`,
     `Website:   ${alert.siteUrl || '-'}`,
@@ -58,7 +58,7 @@ function renderText(alert) {
   ];
   if (alert.affected && alert.affected.length) {
     lines.push('', 'Affected:');
-    alert.affected.slice(0, 15).forEach((a) => lines.push(`  - ${a}`));
+    alert.affected.slice(0, 15).forEach((a) => lines.push(` - ${a}`));
     if (alert.affected.length > 15) {
       lines.push(`  ... and ${alert.affected.length - 15} more`);
     }
@@ -105,7 +105,7 @@ async function sendEmail(recipients, alert) {
   const transport = getTransport();
 
   if (!transport) {
-    console.log(`[notify:email] SMTP not configured — alert logged instead of sent.\n  To: ${to.join(', ')}\n  Subject: ${subject}\n${renderText(alert)}\n`);
+    console.log(`[notify:email] SMTP not configured - alert logged instead of sent.\n  To: ${to.join(', ')}\n  Subject: ${subject}\n${renderText(alert)}\n`);
     return { channel: 'email', sent: false, reason: 'SMTP not configured (logged to console)' };
   }
   try {
@@ -173,7 +173,7 @@ async function sendSlack(webhookUrl, alert) {
   }
 }
 
-// Generic JSON webhook — the integration point for WhatsApp or anything else.
+// Generic JSON webhook - the integration point for WhatsApp or anything else.
 async function sendWebhook(webhookUrl, alert) {
   const url = webhookUrl || process.env.ALERT_WEBHOOK_URL || '';
   if (!url) return { channel: 'webhook', sent: false, reason: 'no webhook URL configured' };
@@ -255,11 +255,11 @@ async function sendDigest(recipients, subject, alerts, dashboardUrl) {
   ${dashboardUrl ? `<p style="margin-top:22px"><a href="${escapeHtml(dashboardUrl)}" style="background:#1c7ed6;color:#fff;text-decoration:none;padding:9px 16px;border-radius:6px;font-size:14px;display:inline-block">Open dashboard</a></p>` : ''}
 </div>`;
 
-  const text = sorted.map((a) => `[${severityMeta(a.severity).label}] ${a.brandName || '-'} — ${a.title}\n  ${a.message || ''}${a.suggestedAction ? `\n  -> ${a.suggestedAction}` : ''}`).join('\n\n');
+  const text = sorted.map((a) => `[${severityMeta(a.severity).label}] ${a.brandName || '-'} - ${a.title}\n  ${a.message || ''}${a.suggestedAction ? `\n  -> ${a.suggestedAction}` : ''}`).join('\n\n');
 
   const transport = getTransport();
   if (!transport) {
-    console.log(`[notify:digest] SMTP not configured — digest logged instead.\n  To: ${to.join(', ')}\n  Subject: ${subject}\n${text}\n`);
+    console.log(`[notify:digest] SMTP not configured - digest logged instead.\n  To: ${to.join(', ')}\n  Subject: ${subject}\n${text}\n`);
     return { channel: 'email', sent: false, reason: 'SMTP not configured (logged to console)' };
   }
   try {
@@ -278,12 +278,12 @@ function smtpConfigured() {
 }
 
 function fmtNum(n) {
-  if (n == null || Number.isNaN(n)) return '—';
+  if (n == null || Number.isNaN(n)) return ' - ';
   return Math.round(n).toLocaleString('en-US');
 }
 
 function fmtPct(n, digits = 1) {
-  if (n == null || Number.isNaN(n)) return '—';
+  if (n == null || Number.isNaN(n)) return ' - ';
   return `${n > 0 ? '+' : ''}${n.toFixed(digits)}%`;
 }
 
@@ -345,7 +345,7 @@ function taskRows(rows, dateField) {
   </tr>`).join('');
 }
 
-// Full weekly SEO performance report — the email counterpart of
+// Full weekly SEO performance report - the email counterpart of
 // reportBuilder's build() output, rendered as one self-contained HTML email
 // with organic traffic, keyword and page movement, conversions, technical
 // health, work completed, and next actions.
@@ -367,17 +367,17 @@ function renderReportHtml(report, dashboardUrl) {
     if (!v) return '';
     return `<tr>
       <td style="padding:6px 10px;border-bottom:1px solid #f1f3f5;font-size:13px;text-transform:capitalize">${k}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #f1f3f5;font-size:13px;text-align:right">${v.score != null ? Math.round(v.score) : '—'}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #f1f3f5;font-size:13px;text-align:right">${v.lcp != null ? `${(v.lcp / 1000).toFixed(2)}s` : '—'}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #f1f3f5;font-size:13px;text-align:right">${v.inp != null ? `${v.inp}ms` : '—'}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #f1f3f5;font-size:13px;text-align:right">${v.cls != null ? v.cls.toFixed(3) : '—'}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #f1f3f5;font-size:13px;text-align:right">${v.score != null ? Math.round(v.score) : ' - '}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #f1f3f5;font-size:13px;text-align:right">${v.lcp != null ? `${(v.lcp / 1000).toFixed(2)}s` : ' - '}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #f1f3f5;font-size:13px;text-align:right">${v.inp != null ? `${v.inp}ms` : ' - '}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #f1f3f5;font-size:13px;text-align:right">${v.cls != null ? v.cls.toFixed(3) : ' - '}</td>
     </tr>`;
   }).join('');
 
   const techSection = report.technical ? `
   <h2 style="font-size:16px;margin:28px 0 10px">Technical health</h2>
   <table style="border-collapse:collapse;width:100%;margin-bottom:6px">
-    <tr><td style="padding:4px 0;font-size:13px;color:#868e96">Health score</td><td style="padding:4px 0;font-size:13px;text-align:right;font-weight:700">${report.technical.health != null ? Math.round(report.technical.health) : '—'}/100</td></tr>
+    <tr><td style="padding:4px 0;font-size:13px;color:#868e96">Health score</td><td style="padding:4px 0;font-size:13px;text-align:right;font-weight:700">${report.technical.health != null ? Math.round(report.technical.health) : ' - '}/100</td></tr>
     <tr><td style="padding:4px 0;font-size:13px;color:#868e96">Pages crawled</td><td style="padding:4px 0;font-size:13px;text-align:right">${fmtNum(report.technical.pagesCrawled)}</td></tr>
     <tr><td style="padding:4px 0;font-size:13px;color:#868e96">Critical / high issues</td><td style="padding:4px 0;font-size:13px;text-align:right;font-weight:700;color:${((report.technical.bySeverity && (report.technical.bySeverity.critical || 0) + (report.technical.bySeverity.high || 0)) || 0) ? '#e03131' : '#2f9e44'}">${fmtNum((report.technical.bySeverity && (report.technical.bySeverity.critical || 0)) + (report.technical.bySeverity && (report.technical.bySeverity.high || 0)))}</td></tr>
   </table>
@@ -462,7 +462,7 @@ function renderReportText(report) {
   const b = report.brand;
   const s = report.search;
   const lines = [
-    `WEEKLY SEO REPORT — ${b.name}`,
+    `WEEKLY SEO REPORT - ${b.name}`,
     `${b.site_url || ''}  (${report.period.startDate} to ${report.period.endDate})`,
     '',
     ...(report.headline || []).map((h) => `- ${h}`),
@@ -470,7 +470,7 @@ function renderReportText(report) {
     `Clicks: ${fmtNum(s.clicks.recent)} (${fmtPct(s.clicks.pct)})`,
     `Impressions: ${fmtNum(s.impressions.recent)} (${fmtPct(s.impressions.pct)})`,
     `Avg CTR: ${s.ctr.recent.toFixed(2)}%`,
-    `Avg position: ${s.position.recent != null ? s.position.recent.toFixed(1) : '—'}`,
+    `Avg position: ${s.position.recent != null ? s.position.recent.toFixed(1) : ' - '}`,
   ];
   if (report.analytics.hasData) {
     lines.push('', `Sessions: ${fmtNum(report.analytics.sessions.recent)}`, `Conversions: ${fmtNum(report.analytics.conversions.recent)}`);
@@ -484,10 +484,10 @@ async function sendWeeklyReport(recipients, report, dashboardUrl) {
     .map((s) => s.trim()).filter(Boolean);
   if (!to.length) return { channel: 'email', sent: false, reason: 'no recipients configured' };
 
-  const subject = `Weekly SEO Report — ${report.brand.name} (${report.period.startDate} to ${report.period.endDate})`;
+  const subject = `Weekly SEO Report - ${report.brand.name} (${report.period.startDate} to ${report.period.endDate})`;
   const transport = getTransport();
   if (!transport) {
-    console.log(`[notify:report] SMTP not configured — report logged instead of sent.\n  To: ${to.join(', ')}\n  Subject: ${subject}\n`);
+    console.log(`[notify:report] SMTP not configured - report logged instead of sent.\n  To: ${to.join(', ')}\n  Subject: ${subject}\n`);
     return { channel: 'email', sent: false, reason: 'SMTP not configured (logged to console)' };
   }
   try {
@@ -515,7 +515,7 @@ async function deliver(to, subject, text, html) {
 
   const transport = getTransport();
   if (!transport) {
-    console.log(`[notify:email] SMTP not configured — message logged instead of sent.\n  To: ${recipients.join(', ')}\n  Subject: ${subject}\n${text}\n`);
+    console.log(`[notify:email] SMTP not configured - message logged instead of sent.\n  To: ${recipients.join(', ')}\n  Subject: ${subject}\n${text}\n`);
     return { sent: false, reason: 'SMTP not configured (logged to console)', to: recipients };
   }
   try {
@@ -534,7 +534,7 @@ async function deliver(to, subject, text, html) {
 }
 
 // ------------------------------------------------------- task assignment
-// Sent to whoever a task is assigned to — usually a developer who does not
+// Sent to whoever a task is assigned to - usually a developer who does not
 // have an account here, so the email has to carry enough of the task to be
 // actionable on its own, not just a link into an app they cannot open.
 async function sendTaskAssignment(recipient, { task, assignedBy, brandName, url, note }) {
@@ -543,13 +543,13 @@ async function sendTaskAssignment(recipient, { task, assignedBy, brandName, url,
 
   const m = severityMeta(task.severity);
   const rows = [
-    ['Brand', brandName || '—'],
+    ['Brand', brandName || ' - '],
     ['Severity', String(task.severity || 'medium')],
     ['Source', String(task.source || 'manual')],
     ['Due', task.due_date || 'not set'],
     ['Effort', task.effort || 'not estimated'],
-    ['Affected URL', task.affected_url || '—'],
-  ].filter(([, v]) => v && v !== '—' || true);
+    ['Affected URL', task.affected_url || ' - '],
+  ].filter(([, v]) => v && v !== ' - ' || true);
 
   const text = [
     `You have been assigned an SEO task${assignedBy ? ` by ${assignedBy}` : ''}.`,
@@ -578,7 +578,7 @@ async function sendTaskAssignment(recipient, { task, assignedBy, brandName, url,
   ${url ? `<p style="margin-top:20px"><a href="${escapeHtml(url)}" style="background:#1c7ed6;color:#fff;text-decoration:none;padding:9px 16px;border-radius:6px;font-size:14px;display:inline-block">Open the task</a></p>` : ''}
 </div>`;
 
-  const subject = `[${String(task.severity || 'medium').toUpperCase()}] ${task.title}${brandName ? ` — ${brandName}` : ''}`;
+  const subject = `[${String(task.severity || 'medium').toUpperCase()}] ${task.title}${brandName ? ` - ${brandName}` : ''}`;
   return deliver(to, subject, text, html);
 }
 
@@ -587,7 +587,7 @@ async function sendTaskAssignment(recipient, { task, assignedBy, brandName, url,
 // here, so the email has to carry the work, not merely announce it.
 // Full task cards (title, detail, recommended action, up to 10 affected
 // items each) are the right amount of detail for a normal handful of tasks,
-// but bulk-assign can queue dozens of tasks to one person at once — and
+// but bulk-assign can queue dozens of tasks to one person at once - and
 // rendering every one as a full card would produce a multi-hundred-KB email.
 // That's past Gmail's ~102KB clip threshold (breaks the layout AND the
 // "open this task" links past the clip point) and a spam-filter red flag in
@@ -604,7 +604,7 @@ async function sendAssignmentDigest(recipient, { tasks = [], personName, assigne
   const shown = tasks.slice(0, DIGEST_FULL_CARD_LIMIT);
   const overflow = tasks.slice(DIGEST_FULL_CARD_LIMIT);
   const subject = one
-    ? `[${String(tasks[0].severity || 'medium').toUpperCase()}] ${tasks[0].title}${tasks[0].brandName ? ` — ${tasks[0].brandName}` : ''}`
+    ? `[${String(tasks[0].severity || 'medium').toUpperCase()}] ${tasks[0].title}${tasks[0].brandName ? ` - ${tasks[0].brandName}` : ''}`
     : `${tasks.length} tasks assigned to you${assignedBy ? ` by ${assignedBy}` : ''}`;
 
   const line = (t) => {
@@ -619,8 +619,8 @@ async function sendAssignmentDigest(recipient, { tasks = [], personName, assigne
       t.action ? `  Recommended action: ${t.action}` : null,
       ...(items.length ? [
         '  Affected:',
-        ...items.map((i) => `    - ${i.url || ''}${i.note ? ` — ${i.note}` : ''}`),
-        ...(t.itemsTotal > items.length ? [`    … and ${t.itemsTotal - items.length} more — see the full task or the Excel export.`] : []),
+        ...items.map((i) => `   - ${i.url || ''}${i.note ? ` - ${i.note}` : ''}`),
+        ...(t.itemsTotal > items.length ? [`    … and ${t.itemsTotal - items.length} more - see the full task or the Excel export.`] : []),
       ] : []),
       t.note ? `  Note: ${t.note}` : null,
       t.requiresApproval ? '  Needs SEO sign-off before it goes live.' : null,
@@ -629,7 +629,7 @@ async function sendAssignmentDigest(recipient, { tasks = [], personName, assigne
     return bits.join('\n');
   };
 
-  const overflowLine = (t) => `• ${t.title} (${t.severity || 'medium'})${baseUrl ? ` — ${baseUrl}/tasks/${t.id}` : ''}`;
+  const overflowLine = (t) => `• ${t.title} (${t.severity || 'medium'})${baseUrl ? ` - ${baseUrl}/tasks/${t.id}` : ''}`;
 
   const text = [
     personName ? `Hi ${personName},` : 'Hi,',
@@ -661,9 +661,9 @@ async function sendAssignmentDigest(recipient, { tasks = [], personName, assigne
       ${(t.items || []).length ? `<div style="margin-top:8px">
         <div style="font-size:12px;color:#868e96;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Affected (${t.itemsTotal})</div>
         <ul style="margin:0;padding-left:16px;font-size:12.5px;color:#495057">
-          ${t.items.map((i) => `<li style="word-break:break-all;margin-bottom:2px">${escapeHtml(i.url || '')}${i.note ? ` — ${escapeHtml(i.note)}` : ''}</li>`).join('')}
+          ${t.items.map((i) => `<li style="word-break:break-all;margin-bottom:2px">${escapeHtml(i.url || '')}${i.note ? ` - ${escapeHtml(i.note)}` : ''}</li>`).join('')}
         </ul>
-        ${t.itemsTotal > t.items.length ? `<div style="font-size:12px;color:#868e96;margin-top:2px">…and ${t.itemsTotal - t.items.length} more — see the full task or the Excel export.</div>` : ''}
+        ${t.itemsTotal > t.items.length ? `<div style="font-size:12px;color:#868e96;margin-top:2px">…and ${t.itemsTotal - t.items.length} more - see the full task or the Excel export.</div>` : ''}
       </div>` : ''}
       ${t.note ? `<div style="background:#f8f9fa;border-radius:5px;padding:9px 11px;font-size:13px;margin-top:9px"><strong>Note:</strong> ${escapeHtml(t.note)}</div>` : ''}
       ${t.requiresApproval ? '<div style="font-size:12.5px;color:#8a5a00;margin-top:8px">Needs SEO sign-off before it goes live.</div>' : ''}
@@ -677,9 +677,9 @@ async function sendAssignmentDigest(recipient, { tasks = [], personName, assigne
     </p>
     ${shown.map(card).join('')}
     ${overflow.length ? `<div style="font-size:13px;color:#495057;margin-top:6px">
-      <strong>+ ${overflow.length} more task${overflow.length === 1 ? '' : 's'}</strong> — full detail in-app or in the Excel export:
+      <strong>+ ${overflow.length} more task${overflow.length === 1 ? '' : 's'}</strong> - full detail in-app or in the Excel export:
       <ul style="margin:6px 0 0;padding-left:18px">
-        ${overflow.map((t) => `<li style="margin-bottom:3px">${escapeHtml(t.title)} (${escapeHtml(String(t.severity || 'medium'))})${baseUrl ? ` — <a href="${escapeHtml(`${baseUrl}/tasks/${t.id}`)}" style="color:#1c7ed6">open</a>` : ''}</li>`).join('')}
+        ${overflow.map((t) => `<li style="margin-bottom:3px">${escapeHtml(t.title)} (${escapeHtml(String(t.severity || 'medium'))})${baseUrl ? ` - <a href="${escapeHtml(`${baseUrl}/tasks/${t.id}`)}" style="color:#1c7ed6">open</a>` : ''}</li>`).join('')}
       </ul>
     </div>` : ''}
     <p style="font-size:12px;color:#868e96;margin-top:18px">

@@ -2,6 +2,8 @@
 const express = require('express');
 const db = require('../db');
 const reportBuilder = require('../lib/reportBuilder');
+const shares = require('../lib/reportShares');
+const leads = require('../lib/leads');
 const { buildWorkbook, sendWorkbook } = require('../lib/xlsxExport');
 
 const router = express.Router();
@@ -75,10 +77,118 @@ router.get('/:id', (req, res, next) => {
       pageTitle: 'Weekly report',
       row,
       d: row.data,
+      shares: shares.listFor(row.id, req.dataUserId),
+      // Shown once, straight after creation, and never again - only the hash is
+      // stored. Held in the session across the redirect rather than in the
+      // query string, because a capability URL in a query string is a
+      // capability URL in the browser history and in every proxy log on the
+      // way.
+      newShareUrl: (() => { const u = req.session.newShareUrl; delete req.session.newShareUrl; return u || null; })(),
       flash: req.query.msg || null,
       flashError: req.query.error || null,
     });
   } catch (err) { next(err); }
+});
+
+// The specialist's narrative on this report. One field, stored on the report,
+// rendered by the report page, the print view and every share link - see the
+// column comment in src/db.js.
+router.post('/:id/commentary', (req, res, next) => {
+  try {
+    if (!res.locals.perms.canWrite) {
+      return res.status(403).redirect(`/reports/${req.params.id}?error=` + encodeURIComponent('You do not have permission to edit this.'));
+    }
+    const row = reportBuilder.get(req.params.id, req.dataUserId);
+    if (!row) return res.redirect('/reports?error=' + encodeURIComponent('Report not found.'));
+    shares.setCommentary(row.id, req.dataUserId, req.body.commentary);
+    return res.redirect(`/reports/${row.id}?msg=` + encodeURIComponent('Commentary saved. It now appears on the print view and on every share link for this report.'));
+  } catch (err) { return next(err); }
+});
+
+// Drafts the commentary with AI. Explicit button only - see the header of
+// lib/ai/aiCommentary.js for why this must never be wired into the scheduled
+// report job.
+router.post('/:id/commentary/draft', async (req, res, next) => {
+  const back = (q) => res.redirect(`/reports/${req.params.id}?${q}`);
+  try {
+    if (!res.locals.perms.canWrite) {
+      return res.status(403).redirect(`/reports/${req.params.id}?error=` + encodeURIComponent('You do not have permission to edit this.'));
+    }
+    const row = reportBuilder.get(req.params.id, req.dataUserId);
+    if (!row) return res.redirect('/reports?error=' + encodeURIComponent('Report not found.'));
+
+    // Never silently overwrite something a person wrote. The button says
+    // "Replace with AI draft" once commentary exists, and that posts force=1.
+    if (row.commentary && req.body.force !== '1') {
+      return back('error=' + encodeURIComponent('This report already has commentary. Use "Replace with AI draft" if you want to overwrite it.'));
+    }
+
+    const aiCommentary = require('../lib/ai/aiCommentary');
+    const brand = db.prepare('SELECT * FROM brands WHERE id=?').get(row.brand_id);
+    const out = await aiCommentary.draft(brand, row);
+    shares.setCommentary(row.id, req.dataUserId, out.text);
+    return back('msg=' + encodeURIComponent(
+      `AI draft written ($${out.costUsd.toFixed(4)}). Read it, edit it and save before sharing - it is a draft, not a sign-off.`
+    ));
+  } catch (err) {
+    // A budget block or a missing Azure key is an answer for the page, not a
+    // 500: the report itself is fine and the box is still editable by hand.
+    if (err.budgetBlocked || /Azure OpenAI is not configured|no stored figures|empty commentary/.test(err.message || '')) {
+      return back('error=' + encodeURIComponent(err.message));
+    }
+    return next(err);
+  }
+});
+
+// --------------------------------------------------------------- share links
+router.post('/:id/share', (req, res, next) => {
+  try {
+    if (!res.locals.perms.canWrite) {
+      return res.status(403).redirect(`/reports/${req.params.id}?error=` + encodeURIComponent('You do not have permission to share this.'));
+    }
+    const row = reportBuilder.get(req.params.id, req.dataUserId);
+    if (!row) return res.redirect('/reports?error=' + encodeURIComponent('Report not found.'));
+    // An expiry is offered but not forced. A link with no expiry is the right
+    // default for a report a client refers back to, and an expiry that arrives
+    // unannounced turns a working link into a support call months later.
+    // The backslashes in this shape test were lost at some point, leaving a
+    // pattern that matches the literal text "dddd-dd-dd" - which no date input
+    // can produce. Every share link was therefore created as "never expires",
+    // including the ones somebody deliberately set an expiry on, and nothing
+    // said so. For a URL that serves a client's report with no login, that is
+    // the wrong direction to fail in.
+    const requestedExpiry = String(req.body.expires_on || '').trim();
+    const validShape = /^\d{4}-\d{2}-\d{2}$/.test(requestedExpiry);
+    if (requestedExpiry && !validShape) {
+      return res.redirect(`/reports/${row.id}?error=`
+        + encodeURIComponent('That expiry date was not a valid YYYY-MM-DD date, so no share link was created.'));
+    }
+    // A date already past would mint a link that is dead on arrival, which
+    // reads to the person sharing it as "sharing is broken" rather than "that
+    // date has gone".
+    if (validShape && requestedExpiry < new Date().toISOString().slice(0, 10)) {
+      return res.redirect(`/reports/${row.id}?error=`
+        + encodeURIComponent('That expiry date has already passed, so no share link was created.'));
+    }
+    const expiresOn = validShape ? requestedExpiry : null;
+    const created = shares.create(row.id, req.dataUserId, {
+      label: (req.body.label || '').trim().slice(0, 120) || null,
+      expiresOn,
+      createdBy: req.actorId,
+    });
+    req.session.newShareUrl = `${req.protocol}://${req.get('host')}/r/${created.token}`;
+    return res.redirect(`/reports/${row.id}?msg=` + encodeURIComponent('Share link created. Copy it now - it is not shown again.'));
+  } catch (err) { return next(err); }
+});
+
+router.post('/:id/share/:shareId/revoke', (req, res, next) => {
+  try {
+    if (!res.locals.perms.canWrite) {
+      return res.status(403).redirect(`/reports/${req.params.id}?error=` + encodeURIComponent('You do not have permission to change this.'));
+    }
+    shares.revoke(Number(req.params.shareId), req.dataUserId);
+    return res.redirect(`/reports/${req.params.id}?msg=` + encodeURIComponent('Share link revoked. Anyone opening it now sees a "link turned off" page.'));
+  } catch (err) { return next(err); }
 });
 
 // Print-optimised standalone version.
@@ -86,11 +196,32 @@ router.get('/:id/print', (req, res, next) => {
   try {
     const row = reportBuilder.get(req.params.id, req.dataUserId);
     if (!row || !row.data) return res.status(404).send('Not found');
-    res.render('report-print', { row, d: row.data, layout: false });
+    const brand = db.prepare(`SELECT report_company, report_logo_url, report_accent, report_footer,
+        report_contact FROM brands WHERE id=?`).get(row.brand_id) || {};
+    let leadSummary = null;
+    try {
+      if (leads.hasAny(row.brand_id)) {
+        leadSummary = leads.summary(row.brand_id, { from: row.period_start, to: row.period_end });
+      }
+    } catch (e) { console.error('[reports] lead summary failed:', e.message); }
+    res.render('report-print', {
+      row,
+      d: row.data,
+      layout: false,
+      brand: {
+        company: brand.report_company,
+        logoUrl: brand.report_logo_url,
+        accent: brand.report_accent,
+        footer: brand.report_footer,
+        contact: brand.report_contact,
+      },
+      commentary: row.commentary || null,
+      leadSummary,
+    });
   } catch (err) { next(err); }
 });
 
-// Excel export — one sheet per dataset. With the full appendix attached this
+// Excel export - one sheet per dataset. With the full appendix attached this
 // is the complete GSC + GA4 hand-over; without it, the standard report's
 // tables. Column sets are declared per sheet so the workbook keeps the styled
 // header/frozen-row treatment the rest of the app's exports use.
@@ -110,7 +241,7 @@ const COLS = {
   ],
 };
 
-// GSC stores CTR as a 0–1 ratio; a spreadsheet reader expects a percentage.
+// GSC stores CTR as a 0-1 ratio; a spreadsheet reader expects a percentage.
 function asPct(v) { return v == null ? '' : Number((Number(v) * 100).toFixed(2)); }
 function round(v, dp = 1) { return v == null ? '' : Number(Number(v).toFixed(dp)); }
 

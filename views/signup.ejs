@@ -4,13 +4,26 @@
 <body>
 <div class="auth-wrap">
   <div class="auth-card">
-    <div class="brand-mark"><span class="dot"></span> SEO Automation Suite</div>
-    <p class="sub">
-      <% if (inviteCode) { %>Join your team.<% } else { %>Create your workspace.<% } %>
-    </p>
+    <div class="brand-mark-row">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <rect x="3" y="13" width="3.4" height="7" rx="1"/>
+          <rect x="10.3" y="9" width="3.4" height="11" rx="1"/>
+          <rect x="17.6" y="4" width="3.4" height="16" rx="1"/>
+        </svg>
+      </span>
+      <span class="bm-text">SEO Suite</span>
+    </div>
+    <h1><% if (inviteCode) { %>Join your team<% } else { %>Create your workspace<% } %></h1>
+    <p class="sub"><% if (inviteCode) { %>An admin approves your account before you see any data.<% } else { %>Connect Google once, then add the brands you manage.<% } %></p>
 
     <% if (error) { %>
-      <div class="notice error"><span class="notice-icon">&#9888;</span><div class="notice-body"><%= error %></div></div>
+      <div class="notice error">
+        <span class="notice-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 7.5v5.5M12 16.6h.01"/><circle cx="12" cy="12" r="9"/></svg>
+        </span>
+        <div class="notice-body"><%= error %></div>
+      </div>
     <% } %>
 
     <% if (inviteCode) { %>
@@ -22,7 +35,7 @@
       </div>
     <% } %>
 
-    <form method="POST" action="/signup"><%- csrfField %>
+    <form method="POST" action="/signup" data-busy><%- csrfField %>
       <div class="field">
         <label for="name">Your name</label>
         <input type="text" id="name" name="name" autocomplete="name">
@@ -43,13 +56,13 @@
                style="font-family:var(--mono)">
         <div class="hint">
           <% if (requiresInvite) { %>
-            Ask your team admin for the code — it is on their Team page.
+            Ask your team admin for the code - it is on their Team page.
           <% } else { %>
             Have one from your team admin? Enter it to join their workspace. Leave blank to start your own.
           <% } %>
         </div>
       </div>
-      <button type="submit" class="btn block">Create account</button>
+      <button type="submit" class="btn block lg">Create account</button>
     </form>
 
     <div class="auth-foot">Already have an account? <a href="/login">Sign in</a></div>

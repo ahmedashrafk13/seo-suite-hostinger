@@ -16,16 +16,16 @@ const config = require('./config');
 let problems = 0;
 let warnings = 0;
 
-const ok = (label, detail) => console.log(`  ok      ${label}${detail ? ` — ${detail}` : ''}`);
-const warn = (label, detail) => { warnings += 1; console.log(`  WARN    ${label}${detail ? ` — ${detail}` : ''}`); };
-const bad = (label, detail) => { problems += 1; console.log(`  PROBLEM ${label}${detail ? ` — ${detail}` : ''}`); };
+const ok = (label, detail) => console.log(`  ok      ${label}${detail ? ` - ${detail}` : ''}`);
+const warn = (label, detail) => { warnings += 1; console.log(`  WARN    ${label}${detail ? ` - ${detail}` : ''}`); };
+const bad = (label, detail) => { problems += 1; console.log(`  PROBLEM ${label}${detail ? ` - ${detail}` : ''}`); };
 
-console.log('\nSEO Automation Suite — deployment check\n');
+console.log('\nSEO Automation Suite - deployment check\n');
 
 // --- runtime --------------------------------------------------------------
 const major = Number(process.versions.node.split('.')[0]);
 if (major >= 18) ok('Node version', process.version);
-else bad('Node version', `${process.version} — this app needs Node 18 or newer`);
+else bad('Node version', `${process.version} - this app needs Node 18 or newer`);
 
 // --- database -------------------------------------------------------------
 let db;
@@ -47,7 +47,7 @@ try {
 const insideApp = (p) => path.resolve(p).startsWith(path.resolve(config.ROOT) + path.sep);
 if (insideApp(config.DATA_DIR)) {
   warn('DATA_DIR is inside the application folder',
-    `${config.DATA_DIR} — a redeploy will DELETE the database. Set DATA_DIR to a `
+    `${config.DATA_DIR} - a redeploy will DELETE the database. Set DATA_DIR to a `
     + 'directory outside the app (e.g. ~/seo-suite-data) and move data/ there.');
 } else {
   ok('DATA_DIR is outside the application folder', config.DATA_DIR);
@@ -61,7 +61,7 @@ for (const [label, dir] of [['DATA_DIR', config.DATA_DIR], ['REPORTS_DIR', confi
     fs.unlinkSync(probe);
     ok(`${label} writable`, dir);
   } catch (err) {
-    bad(`${label} not writable`, `${dir} — ${err.message}`);
+    bad(`${label} not writable`, `${dir} - ${err.message}`);
   }
 }
 
@@ -82,7 +82,7 @@ if (process.env.SIGNUP_REQUIRES_INVITE === '1') ok('Sign-up requires an invite')
 else warn('Sign-up is open', 'anyone who finds the URL can create a workspace. Set SIGNUP_REQUIRES_INVITE=1.');
 
 // Report-only is a tuning mode: the browser reports what a policy WOULD block
-// and enforces nothing. Left on, the app looks protected and is not — which is
+// and enforces nothing. Left on, the app looks protected and is not - which is
 // exactly the failure that would go unnoticed, so it is called out here.
 if (process.env.CSP_REPORT_ONLY === '1') {
   warn('Content-Security-Policy is in report-only mode',
@@ -159,7 +159,7 @@ if (config.SMTP_HOST) ok('SMTP configured', config.SMTP_HOST);
 else warn('SMTP not configured', 'alert and report emails are written to the log instead of sent');
 
 // --- native modules -------------------------------------------------------
-// Not a problem — the whole point of this build is that it works without them.
+// Not a problem - the whole point of this build is that it works without them.
 // Reported so the performance difference is not a mystery.
 try {
   require.resolve('better-sqlite3');
@@ -183,7 +183,7 @@ try {
   require.resolve('bcrypt');
   ok('Native bcrypt available');
 } catch {
-  console.log('  note    bcrypt (native) is not installed — bcryptjs is in use. Same hashes, slower logins.');
+  console.log('  note    bcrypt (native) is not installed - bcryptjs is in use. Same hashes, slower logins.');
 }
 
 // --- AI SEO suite ---------------------------------------------------------
@@ -209,15 +209,15 @@ try {
     ok('AI SEO: Azure OpenAI configured', 'prompt research, edit suggestions, schema drafting and mention triage are available');
   } else {
     warn('AI SEO: no Azure OpenAI credential',
-      'every score, measurement and finding still works — it is computed locally. Only the AI-written half (prompts, edit suggestions, schema drafts, mention triage) is unavailable.');
+      'every score, measurement and finding still works - it is computed locally. Only the AI-written half (prompts, edit suggestions, schema drafts, mention triage) is unavailable.');
   }
 
   if (!providers.has('public')) {
     warn('AI SEO: keyless public sources disabled (AISEO_DISABLE_PUBLIC_SOURCES=1)',
       'keyword expansion via Google autocomplete and all reputation scanning report themselves as disabled');
   } else if (providers.isEnhanced('reddit') === false) {
-    console.log('  note    AI SEO: no Reddit credential. Reddit is still scraped successfully — the RSS tier');
-    console.log('          answers where the JSON endpoint 403s — but it is rate-limited, carries no post');
+    console.log('  note    AI SEO: no Reddit credential. Reddit is still scraped successfully - the RSS tier');
+    console.log('          answers where the JSON endpoint 403s - but it is rate-limited, carries no post');
     console.log('          scores, and returns post bodies without their comment threads. A free script app');
     console.log('          at reddit.com/prefs/apps removes all three limits. Raise REDDIT_DELAY_MS if scans');
     console.log('          report rate limits.');
@@ -230,7 +230,7 @@ try {
   } else {
     console.log('  note    AI SEO: no Semrush/Ahrefs/Moz/DataForSEO credential. Search volume, keyword');
     console.log('          difficulty, backlink counts, competitor traffic and AI citation share are NOT');
-    console.log('          shown anywhere — they are not knowable here, and every affected page says so');
+    console.log('          shown anywhere - they are not knowable here, and every affected page says so');
     console.log('          rather than estimating them. See .env.example to enable an adapter.');
   }
 } catch (err) {

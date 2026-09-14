@@ -3,7 +3,7 @@
 // Everything this app knows lives in one SQLite file: every client site, 90+
 // days of Search Console and GA4 history, the task backlog, approvals, reports
 // and the team. Losing it means re-syncing what Google still has and losing
-// outright what it does not — tasks, approvals, assignment history, reports.
+// outright what it does not - tasks, approvals, assignment history, reports.
 //
 // better-sqlite3's online backup is used rather than copying the file: a plain
 // copy of a live WAL database can capture a torn state, whereas .backup()
@@ -16,7 +16,7 @@ const config = require('../config');
 const BACKUP_DIR = process.env.BACKUP_DIR || path.join(path.dirname(config.DB_PATH), 'backups');
 const KEEP = Math.max(1, Number(process.env.BACKUP_KEEP || 14));
 
-// YYYYMMDDHHmm — sorts chronologically as a plain string.
+// YYYYMMDDHHmm - sorts chronologically as a plain string.
 function stamp(d = new Date()) {
   const iso = d.toISOString(); // 2026-08-15T03:12:07.403Z
   return `${iso.slice(0, 4)}${iso.slice(5, 7)}${iso.slice(8, 10)}${iso.slice(11, 13)}${iso.slice(14, 16)}`;

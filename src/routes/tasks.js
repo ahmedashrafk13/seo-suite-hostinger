@@ -20,7 +20,12 @@ router.get('/', (req, res, next) => {
     const userId = req.dataUserId;
     const brands = brandsFor(userId);
     const filters = {
-      brandId: req.query.brand ? Number(req.query.brand) : null,
+      // 'none' is a real filter value, not a missing one. Audit and internal
+      // linking runs can be started against a URL that belongs to no brand, and
+      // the tasks they raise carry brand_id NULL. Without this the board counts
+      // those tasks in its totals while no brand selection can ever show them,
+      // so they sit there permanently unread.
+      brandId: tasksLib.parseBrandFilter(req.query.brand),
       status: req.query.status || null,
       source: req.query.source || null,
       severity: req.query.severity || null,
@@ -72,7 +77,12 @@ router.get('/export/csv', async (req, res, next) => {
   try {
     const userId = req.dataUserId;
     const filters = {
-      brandId: req.query.brand ? Number(req.query.brand) : null,
+      // 'none' is a real filter value, not a missing one. Audit and internal
+      // linking runs can be started against a URL that belongs to no brand, and
+      // the tasks they raise carry brand_id NULL. Without this the board counts
+      // those tasks in its totals while no brand selection can ever show them,
+      // so they sit there permanently unread.
+      brandId: tasksLib.parseBrandFilter(req.query.brand),
       status: req.query.status || null,
       source: req.query.source || null,
       severity: req.query.severity || null,
@@ -90,7 +100,7 @@ router.get('/export/csv', async (req, res, next) => {
       try { return t.evidence_json ? JSON.parse(t.evidence_json) : null; } catch { return null; }
     };
     // Prefer the rich {url, note} shape (same detail shown in the Technical
-    // audit / Internal linking sections — status, HTTP code, referring page,
+    // audit / Internal linking sections - status, HTTP code, referring page,
     // etc.) over a bare url list, which exists only as a fallback for tasks
     // created before evidence.items carried that detail.
     const itemsFor = (ev) => {
@@ -183,7 +193,7 @@ router.get('/export/csv', async (req, res, next) => {
           rows: taskRows,
         },
         // Every URL a task's finding actually affects, one row each, with the
-        // same "what's wrong with it" detail shown on the task page — not a
+        // same "what's wrong with it" detail shown on the task page - not a
         // semicolon-joined "Example URLs" cell and not capped to a sample.
         {
           name: 'Affected URLs',
@@ -197,7 +207,7 @@ router.get('/export/csv', async (req, res, next) => {
           rows: affectedRows,
         },
         // Internal-linking recommendations exploded to one row per suggested
-        // link — source, target, exact anchor text and why — instead of
+        // link - source, target, exact anchor text and why - instead of
         // living only inside a task's detail paragraph.
         {
           name: 'Link Recommendations',
@@ -247,7 +257,7 @@ router.get('/opportunities/:brandId', (req, res, next) => {
     res.render('opportunities', {
       title: `Opportunities · ${brand.name}`,
       active: 'opportunities',
-      pageTitle: `Content opportunities — ${brand.name}`,
+      pageTitle: `Content opportunities - ${brand.name}`,
       brand,
       brands: brandsFor(userId),
       result,
@@ -285,7 +295,7 @@ router.post('/opportunities/:brandId/promote', (req, res, next) => {
     const parts = [];
     parts.push(created
       ? `${created} new task${created === 1 ? '' : 's'} added to the backlog. Existing tasks for the same page were updated rather than duplicated.`
-      : 'No new tasks were created — every current opportunity already has a task.');
+      : 'No new tasks were created - every current opportunity already has a task.');
     if (retired && retired.resolved) {
       parts.push(`${retired.resolved} task${retired.resolved === 1 ? '' : 's'} auto-resolved because the finding is no longer detected.`);
     }
@@ -373,7 +383,7 @@ router.post('/:id/assign', async (req, res, next) => {
     const fail = (m) => res.redirect(`${back}${sep}error=` + encodeURIComponent(m));
 
     // Either an existing person from the directory, or a new one being added
-    // inline — which is where a developer's personal email gets captured for
+    // inline - which is where a developer's personal email gets captured for
     // the first time, and remembered for next time.
     let person = null;
     if (req.body.person_id === 'new' || (!req.body.person_id && req.body.new_name)) {
@@ -388,7 +398,7 @@ router.post('/:id/assign', async (req, res, next) => {
     } else if (req.body.person_id) {
       person = teamLib.person(teamId, Number(req.body.person_id));
       if (!person) return fail('That person is no longer in the team.');
-      // An address supplied now updates the stored one — this is how a missing
+      // An address supplied now updates the stored one - this is how a missing
       // email gets filled in at the moment it is actually needed.
       if (req.body.new_email && req.body.new_email.trim() && req.body.new_email.trim() !== person.email) {
         const r = teamLib.upsertPerson(teamId, {
@@ -409,7 +419,7 @@ router.post('/:id/assign', async (req, res, next) => {
     const wantsEmail = req.body.notify !== 'off';
     if (wantsEmail) {
       if (!person.email) {
-        msg += ' No email address is on file for them, so nothing will be sent — add one to notify them.';
+        msg += ' No email address is on file for them, so nothing will be sent - add one to notify them.';
       } else {
         // Queued, not sent: everything assigned to this person in the next few
         // minutes goes out as ONE email rather than one per task.
@@ -422,7 +432,7 @@ router.post('/:id/assign', async (req, res, next) => {
         });
         const waiting = assignmentQueue.pendingSummary().find((x) => x.email === person.email);
         msg += waiting && waiting.tasks > 1
-          ? ` ${waiting.tasks} tasks are queued for ${person.email} — they will arrive as one email shortly.`
+          ? ` ${waiting.tasks} tasks are queued for ${person.email} - they will arrive as one email shortly.`
           : ` ${person.email} will be emailed shortly.`;
       }
     }
@@ -430,7 +440,7 @@ router.post('/:id/assign', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Re-sends the assignment email without changing the assignment — for when a
+// Re-sends the assignment email without changing the assignment - for when a
 // developer says they never got it.
 router.post('/:id/resend-assignment', async (req, res, next) => {
   try {
@@ -560,7 +570,7 @@ router.post('/bulk', (req, res, next) => {
         done += 1;
       } else if (action === 'assign') {
         // Bulk assign resolves through the same directory as single assignment,
-        // so a name typed here reuses that person's remembered email — and all
+        // so a name typed here reuses that person's remembered email - and all
         // of these tasks queue into ONE email rather than one per task.
         if (bulkPerson) {
           const a = tasksLib.assignTask(id, userId, { person: bulkPerson, actorId: req.actorId });

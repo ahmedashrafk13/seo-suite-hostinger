@@ -2,7 +2,7 @@
 //
 // WHY NOT connect-sqlite3
 // The original build stored sessions with connect-sqlite3, which depends on the
-// native `sqlite3` addon — a second compiler dependency, and one that fails to
+// native `sqlite3` addon - a second compiler dependency, and one that fails to
 // install on shared hosting for the same reason better-sqlite3 does. It also
 // opened a *second* connection to a second file, which is what forces its
 // `concurrentDB` option and the locking that comes with it.
@@ -16,7 +16,7 @@
 // touch/length/clear/all are optional but implemented because `rolling: true`
 // calls touch on every request.
 //
-// TOUCH IS THROTTLED — see the comment on touch() for why that matters here
+// TOUCH IS THROTTLED - see the comment on touch() for why that matters here
 // more than it would with a normal database.
 const { Store } = require('express-session');
 
@@ -55,7 +55,7 @@ class SqliteSessionStore extends Store {
 
     this.reap();
     // Expired rows are cleared hourly. unref() so this timer never holds the
-    // process open — under Passenger the app is stopped when idle, and a live
+    // process open - under Passenger the app is stopped when idle, and a live
     // timer would delay shutdown for no benefit.
     const interval = options.reapInterval == null ? 3600000 : options.reapInterval;
     if (interval > 0) {
@@ -112,7 +112,7 @@ class SqliteSessionStore extends Store {
   //
   // So the expiry on disk is allowed to lag by up to touchInterval. The cost is
   // that a session's real lifetime can be up to ten minutes shorter than its
-  // cookie claims, against a seven-day window — unmeasurable. The saving is
+  // cookie claims, against a seven-day window - unmeasurable. The saving is
   // roughly two orders of magnitude fewer session writes on an active day.
   touch(sid, sess, cb) {
     try {

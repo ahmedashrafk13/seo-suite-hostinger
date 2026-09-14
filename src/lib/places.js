@@ -4,7 +4,7 @@
 // Clustering treated place names as ordinary content tokens, so the
 // shared-head rule happily merged "web development services usa",
 // "web development services atlanta" and "custom web development chicago"
-// into one cluster — they all share the head "web development". The content
+// into one cluster - they all share the head "web development". The content
 // brief then picked the highest-impression member as the title and produced
 // "Web Design and Web Development Services Atlanta" as the recommended title
 // for a NATIONAL keyword cluster, and listed "Atlanta Web Development" as a
@@ -16,16 +16,16 @@
 // place token set: keywords carrying different places never merge, and
 // keywords carrying no place form their own (national) cluster.
 //
-// SCOPE AND LIMITS — stated plainly rather than implied:
-//   - This is a US-and-major-markets list, matching where this app is used.
+// SCOPE AND LIMITS - stated plainly rather than implied:
+//  - This is a US-and-major-markets list, matching where this app is used.
 //     It is NOT a gazetteer. A small town not on this list is invisible to it
 //     and its keywords will cluster on lexical similarity as before, which is
-//     the same behaviour as before this file existed — a miss degrades to the
+//     the same behaviour as before this file existed - a miss degrades to the
 //     old behaviour, it does not break anything.
-//   - The brand's own configured `market` is merged in at call time, so a
+//  - The brand's own configured `market` is merged in at call time, so a
 //     brand operating in a town not listed here still gets correct handling
 //     once that field is filled in.
-//   - Ambiguous words that are both places and common nouns ("mobile",
+//  - Ambiguous words that are both places and common nouns ("mobile",
 //     "phoenix", "reading", "orange", "jackson") are handled by AMBIGUOUS
 //     below: they only count as places when the keyword carries another
 //     local signal, so "mobile app development" is not read as Mobile,
@@ -94,7 +94,7 @@ const UNAMBIGUOUS_PLACES = new Set([
 ].filter((p) => !AMBIGUOUS.has(p)));
 
 // State abbreviations are only recognised as a whole token, and only when
-// they are not a common English word — "in", "or", "me", "la", "de", "hi",
+// they are not a common English word - "in", "or", "me", "la", "de", "hi",
 // "ok", "pa", "co" would otherwise fire constantly.
 const SAFE_STATE_ABBR = new Set(
   US_STATE_ABBR.filter((a) => !['in', 'or', 'me', 'la', 'hi', 'ok', 'pa', 'co', 'de', 'id', 'ma', 'mt', 'ne', 'oh', 'ar', 'al'].includes(a)),
@@ -150,7 +150,7 @@ function hasPlace(keyword, extraPlaces = null) {
   return placesIn(keyword, extraPlaces).size > 0;
 }
 
-// Words that follow "in"/"near" but are not places — so a keyword like
+// Words that follow "in"/"near" but are not places - so a keyword like
 // "web design in 2026" or "links in bulk" is not reported as an unknown town.
 const NOT_A_PLACE_AFTER_PREPOSITION = new Set(`
   stock bulk cart advance general detail details progress person private
@@ -163,7 +163,7 @@ const NOT_A_PLACE_AFTER_PREPOSITION = new Set(`
 //
 // The gazetteer is a fixed list, so a town that is not on it is simply
 // invisible: its keywords fall back to lexical clustering and nobody is told.
-// That silence is the real problem — a miss is acceptable, an *unreported*
+// That silence is the real problem - a miss is acceptable, an *unreported*
 // miss is not. Callers report these so someone can see "you have keywords
 // about Boise, and clustering did not treat it as a location" and add it to
 // the brand's market, rather than quietly getting a worse cluster.
@@ -176,7 +176,7 @@ function unrecognisedPlaceCandidates(keywords, extraPlaces = null) {
     const word = m[1];
     if (NOT_A_PLACE_AFTER_PREPOSITION.has(word)) return;
     if (/^\d/.test(word)) return;
-    // Already known — nothing to report.
+    // Already known - nothing to report.
     if (placesIn(word, extraPlaces).size) return;
     counts.set(word, (counts.get(word) || 0) + 1);
   });

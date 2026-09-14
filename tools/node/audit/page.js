@@ -9,7 +9,7 @@
 // "unnamed") the original's reasoning is preserved in the comments below,
 // because those rules were tuned against real Semrush output.
 const cheerio = require('cheerio');
-const { fetchUrl, decodeBody, sleep } = require('../lib/http');
+const { fetchUrl, decodeBody, sleep, fetchMaybeRendered } = require('../lib/http');
 const { sameSite, joinUrl, truncate } = require('../lib/urls');
 
 const NONDESC_ANCHORS = new Set([
@@ -321,14 +321,17 @@ function parseHtml(page, text) {
 // Fetches one page. Transient failures (timeout / connection reset — often just
 // rate-limiting) get one retry so a throttled response does not silently drop
 // the page from the crawl and make issue counts wobble between runs.
-async function fetchPage(url) {
+async function fetchPage(url, renderBudget = null) {
   const page = makePage(url);
   const t0 = Date.now();
   let lastTransient = null;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const res = await fetchUrl(url, { timeout: 20000 });
+      // The raw fetch runs first and costs nothing. A credit is spent only
+      // if that free result proves the page is a JavaScript shell, and only
+      // while the run's budget lasts.
+      const res = await fetchMaybeRendered(url, { timeout: 20000 }, renderBudget);
       page.elapsed = Number(((Date.now() - t0) / 1000).toFixed(3));
       page.status = res.status;
       page.url = res.url;
@@ -339,6 +342,9 @@ async function fetchPage(url) {
       page.redirect_chain = res.history.map((h) => [h.status, h.url]);
       page.is_html = page.content_type.toLowerCase().includes('html')
         || (!page.content_type && page.ok);
+      // Recorded so a report can say the content was recovered rather than
+      // read from the server's own HTML.
+      page.rendered = !!res.rendered;
       if (page.is_html && res.body.length) {
         parseHtml(page, decodeBody(res));
       }

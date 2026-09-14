@@ -154,7 +154,7 @@ router.post('/apply-defaults', (req, res, next) => {
     const n = engine.applyRecommendedDefaults(userId, brand);
     res.redirect(`/alerts?brand=${brandId}&msg=` + encodeURIComponent(
       n ? `Enabled ${n} recommended alerts based on the data this brand has connected.`
-        : 'No alerts could be enabled yet — sync Search Console or GA4 data for this brand first.'
+        : 'No alerts could be enabled yet - sync Search Console or GA4 data for this brand first.'
     ));
   } catch (err) { next(err); }
 });
@@ -204,13 +204,13 @@ router.post('/run-now', async (req, res, next) => {
       const msg = r.fired
         ? `${r.fired} alert${r.fired === 1 ? '' : 's'} fired from ${r.evaluated} check${r.evaluated === 1 ? '' : 's'}.`
         : `${r.evaluated} check${r.evaluated === 1 ? '' : 's'} ran and nothing crossed its threshold.`;
-      const errs = r.errors.length ? ` ${r.errors.length} check(s) errored — see the server log.` : '';
+      const errs = r.errors.length ? ` ${r.errors.length} check(s) errored - see the server log.` : '';
       return res.redirect(`/alerts?brand=${brandId}&msg=` + encodeURIComponent(msg + errs));
     }
 
     const results = await engine.runAll({ force: true, userId });
     const fired = results.reduce((a, x) => a + (x.fired || 0), 0);
-    res.redirect('/alerts?msg=' + encodeURIComponent(`Checked every brand — ${fired} alert${fired === 1 ? '' : 's'} fired.`));
+    res.redirect('/alerts?msg=' + encodeURIComponent(`Checked every brand - ${fired} alert${fired === 1 ? '' : 's'} fired.`));
   } catch (err) { next(err); }
 });
 
@@ -230,10 +230,10 @@ router.post('/test-notification', async (req, res, next) => {
       severity: 'medium',
       brandName: brand.name,
       siteUrl: brand.site_url,
-      title: 'Test alert — delivery is working',
+      title: 'Test alert - delivery is working',
       message: 'This is a test notification from the SEO Automation Suite. If you can read it, this channel is configured correctly and real alerts will reach you the same way.',
       affected: [brand.site_url],
-      suggestedAction: 'No action needed — this is only a delivery test.',
+      suggestedAction: 'No action needed - this is only a delivery test.',
       dashboardUrl: `${process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 4200}`}/alerts?brand=${brand.id}`,
       detectedAt: new Date().toISOString(),
     };

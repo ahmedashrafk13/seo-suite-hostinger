@@ -1,11 +1,11 @@
-// PageSpeed Insights v5 — full report client.
+// PageSpeed Insights v5 - full report client.
 //
 // AUTHENTICATION
 // The PageSpeed Insights API does NOT accept API keys on a project where it is
 // enabled as a normal service: it answers a key with
 // "API keys are not supported by this API. Expected OAuth2 access token or
 // other authentication credentials that assert a principal."
-// So the primary credential here is the user's existing Google connection —
+// So the primary credential here is the user's existing Google connection - 
 // the same OAuth client already used for Search Console and GA4. No extra
 // scope is needed: PSI authorises the *principal*, not a scope, so the token
 // minted for webmasters.readonly + analytics.readonly is accepted as-is.
@@ -13,7 +13,7 @@
 // Order of attempts:
 //   1. The user's OAuth access token (per-project quota, the reliable path)
 //   2. PSI_API_KEY, if one is set and the project does accept keys
-//   3. No credential at all — Google's shared anonymous pool, which is small
+//   3. No credential at all - Google's shared anonymous pool, which is small
 //      and frequently exhausted (HTTP 429)
 //
 // The raw response is stored verbatim so a report can be re-rendered later
@@ -179,7 +179,7 @@ function extractNode(details, depth = 0) {
 
 // The network dependency tree is a nested chain object rather than a table.
 // Flattening it to "longest chain + the requests in it" keeps the one fact
-// that matters — what is serialising the critical path.
+// that matters - what is serialising the critical path.
 function extractNetworkTree(details, depth = 0) {
   if (!details || depth > 2) return null;
   if (details.type === 'network-tree' || (details.value && details.value.type === 'network-tree')) {
@@ -247,7 +247,7 @@ const FIELD_METRICS = [
 ];
 
 function fieldValue(percentile, unit) {
-  if (percentile == null) return '—';
+  if (percentile == null) return ' - ';
   if (unit === 's') return `${(percentile / 1000).toFixed(1)} s`;
   if (unit === 'cls') return (percentile / 100).toFixed(2);
   return `${Math.round(percentile)} ms`;
@@ -255,7 +255,7 @@ function fieldValue(percentile, unit) {
 
 // CrUX buckets come back as three proportions (good / needs improvement /
 // poor). PSI draws them as a stacked bar, which is the honest way to show a
-// distribution — a single p75 number hides how split the population is.
+// distribution - a single p75 number hides how split the population is.
 function fieldSection(experience) {
   if (!experience || !experience.metrics) return { available: false };
   const metrics = FIELD_METRICS
@@ -294,7 +294,7 @@ function normalise(raw) {
       id: r.id,
       acronym: r.acronym || '',
       title: audits[r.id].title,
-      displayValue: audits[r.id].displayValue || '—',
+      displayValue: audits[r.id].displayValue || ' - ',
       score: audits[r.id].score,
       band: band(audits[r.id].score),
     }));
@@ -345,7 +345,7 @@ function normalise(raw) {
     lighthouseVersion: lr.lighthouseVersion || null,
     userAgent: env.hostUserAgent || null,
     // PSI runs through the Lighthouse-as-a-service channel, which strips the
-    // throttling block from configSettings — so the label is derived from the
+    // throttling block from configSettings - so the label is derived from the
     // form factor, matching what pagespeed.web.dev prints for each: mobile is
     // throttled to Slow 4G, desktop to its own custom profile.
     throttling: cfg.throttlingMethod === 'provided'

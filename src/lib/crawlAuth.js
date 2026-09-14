@@ -3,8 +3,8 @@
 //
 // THE PROBLEM THIS SOLVES
 // Both crawlers request pages anonymously. On a site that will not serve its
-// content to a stranger — a members-only site, a client portal, a staging
-// build behind HTTP basic auth — there were two outcomes, and the second is
+// content to a stranger - a members-only site, a client portal, a staging
+// build behind HTTP basic auth - there were two outcomes, and the second is
 // the dangerous one:
 //
 //   401 on the seed            the run fails, which is at least honest.
@@ -13,7 +13,7 @@
 //                              forgot password, privacy), and produces a
 //                              three-page audit with a plausible health score.
 //
-// That second case is a login wall wearing a success code — the same trap this
+// That second case is a login wall wearing a success code - the same trap this
 // repo already documents for old.reddit.com/search in the Reddit scraper. A
 // score computed over three pages of a login form is not a smaller truth than
 // a real audit, it is a different and false one, and nothing on screen said so.
@@ -25,7 +25,7 @@
 //      (Python audit, Python linking agent, and both Node ports).
 //   2. PROBE BEFORE CRAWLING. One request to the seed URL, before a crawl is
 //      spawned, deciding whether the site will serve its pages at all. A
-//      second spent here replaces a ten-minute crawl that returns nothing —
+//      second spent here replaces a ten-minute crawl that returns nothing - 
 //      and catches the case that actually bites in practice: a saved cookie
 //      that has since expired.
 //
@@ -33,7 +33,7 @@
 // A site that crawled correctly before this feature existed must still crawl
 // correctly, identically, with no credentials and no new way to fail. A guard
 // that stops a public crawl on a bad guess costs the team far more than the
-// wall it catches — so the probe stops a run ONLY on evidence that cannot mean
+// wall it catches - so the probe stops a run ONLY on evidence that cannot mean
 // anything else (see BLOCKING_WALLS). A 403, a timeout, a bad seed URL, a
 // sparse homepage with a login box: all noted, none blocking, crawl proceeds
 // exactly as before. The only cost to a public site is one extra HTTP request
@@ -56,7 +56,7 @@ const pythonEnv = require('./pythonEnv');
 //
 // An auth object is `{ cookie, headers, basicUser, basicPass }`, all optional.
 // `null` and an object whose every field is empty both mean "crawl anonymously"
-// — callers should not have to distinguish those.
+// - callers should not have to distinguish those.
 
 // Header names a caller must not be able to set. `Host` and `Content-Length`
 // would corrupt the request itself; the hop-by-hop names are meaningless to
@@ -122,7 +122,7 @@ function isEmpty(auth) {
 }
 
 // What the credentials are, in one line, for a log or a run banner. Values are
-// never included — a run log is read by more people than the brand settings
+// never included - a run log is read by more people than the brand settings
 // page, and a session cookie in a log tail is a session cookie leaked.
 function describe(auth) {
   if (isEmpty(auth)) return 'anonymous (no credentials)';
@@ -150,7 +150,7 @@ function toHeaders(auth) {
   return out;
 }
 
-// The environment this app spawns a crawler with — the DEFAULT transport for
+// The environment this app spawns a crawler with - the DEFAULT transport for
 // credentials, in preference to the command line.
 //
 // WHY NOT ARGUMENTS
@@ -162,7 +162,7 @@ function toHeaders(auth) {
 //
 // The flags remain, because a developer running the crawler by hand needs them
 // and because the two implementations must keep identical command lines. A flag
-// wins over the environment when both are present — an explicit argument should
+// wins over the environment when both are present - an explicit argument should
 // always beat an inherited one.
 const AUTH_ENV_VAR = 'CRAWL_AUTH_HEADERS';
 
@@ -176,7 +176,7 @@ function toEnv(auth) {
 // `--cookie` once and `--header "Name: value"` repeated.
 //
 // Kept for manual use and for the verify suite, which drives the crawlers
-// directly. This app spawns them with toEnv() instead — see above.
+// directly. This app spawns them with toEnv() instead - see above.
 function toArgs(auth) {
   const headers = toHeaders(auth);
   const args = [];
@@ -237,7 +237,7 @@ function statusForBrand(brandId) {
 // Merges an incoming credential set over what is already stored.
 //
 // WHY THIS EXISTS
-// The brand form cannot show a stored cookie or password back to the user —
+// The brand form cannot show a stored cookie or password back to the user - 
 // they are secrets, and the fields render as placeholders. So a team member
 // who edits only the basic-auth username posts an EMPTY cookie box, and a
 // plain replace silently destroyed a working session cookie. That was a real
@@ -304,7 +304,7 @@ function recordVerification(brandId, probe) {
 // TWO THINGS ARE LOAD-BEARING HERE, and both were bugs first.
 //
 // 1. THE BOUNDARY. Matched as a whole path segment, ending at the end of the
-//    string or at / ? # . — never as a bare substring. Without the boundary
+//    string or at / ? # . - never as a bare substring. Without the boundary
 //    `/sso` matched `/ssortment-of-cheeses`, `/login` matched
 //    `/logins-explained`, `/signin` matched `/signing-a-lease` and
 //    `/authenticate` matched `/authenticated-users-guide`. A restaurant with
@@ -312,8 +312,8 @@ function recordVerification(brandId, probe) {
 //    had its crawl stopped as a login wall. The `.` is allowed because
 //    `/login.php` and `/login.aspx` are real sign-in pages.
 //
-// 2. THE NON-ENGLISH PATHS. This app is used on non-English sites — brands
-//    carry a `locale` and the crawlers take `--locale` — so an English-only
+// 2. THE NON-ENGLISH PATHS. This app is used on non-English sites - brands
+//    carry a `locale` and the crawlers take `--locale` - so an English-only
 //    list quietly fails to recognise a French or German login wall, which is
 //    the silent half of the original bug on exactly the sites least likely to
 //    be double-checked by an English-speaking operator.
@@ -325,7 +325,7 @@ const LOGIN_SEGMENTS = [
   '/members/login', '/member/login', '/customer/account/login', '/portal/login',
   '/idp', '/oauth2/authorize', '/o/oauth2/auth', '/adfs/ls',
   // French, German, Spanish, Portuguese, Italian, Dutch, Nordic, Polish,
-  // Turkish, Indonesian — the locales this suite is actually pointed at.
+  // Turkish, Indonesian - the locales this suite is actually pointed at.
   '/connexion', '/se-connecter', '/identification',
   '/anmelden', '/anmeldung', '/einloggen',
   '/iniciar-sesion', '/inicio-sesion', '/acceder', '/ingresar',
@@ -386,7 +386,7 @@ const LOGIN_PATH = new RegExp(
 // form the segments above are written in.
 //
 // Node's URL percent-encodes non-ASCII, so `https://site.cn/登录` arrives as
-// `/%E7%99%BB%E5%BD%95` and a literal `/登录` in the list would never match —
+// `/%E7%99%BB%E5%BD%95` and a literal `/登录` in the list would never match - 
 // the non-Latin half of the list would have been dead code. Malformed escapes
 // (`/%zz`) make decodeURIComponent throw, so the raw path is the fallback:
 // a path that cannot be decoded is still worth matching in its raw form.
@@ -405,7 +405,7 @@ function pathForMatch(urlOrPath) {
 
 // Phrases that appear on a wall and essentially nowhere else. Kept short and
 // unambiguous: "sign in" alone is in the header of half the web, so it is not
-// here — only phrases that state the page IS the gate.
+// here - only phrases that state the page IS the gate.
 const WALL_PHRASES = [
   'you must be logged in',
   'you need to be logged in',
@@ -444,7 +444,7 @@ function saysSignIn(html, finalPath) {
 // How many links on this page lead further into the same site?
 //
 // This is the strongest signal available, because it answers the question the
-// guard is actually asking — *would a crawl started here get anywhere?* A real
+// guard is actually asking - *would a crawl started here get anywhere?* A real
 // login wall is a dead end: a password box, and links to forgot-password and
 // signup if anything. A restaurant's login page carries the site's whole
 // header nav, so a crawl seeded there reaches the menu, the hours and the
@@ -467,7 +467,7 @@ function countInternalLinks(html, finalUrl) {
       try {
         const u = new URL(raw, finalUrl);
         // Same site, and not a link back to this very page or to the sign-in
-        // family — a wall linking to /forgot-password is still a wall.
+        // family - a wall linking to /forgot-password is still a wall.
         const decoded = pathForMatch(u.pathname);
         if (u.origin === origin && !LOGIN_PATH.test(decoded)
           && !/(forgot|reset|register|signup|sign-up|注册|登録|регистрация)/i.test(decoded)) {
@@ -490,7 +490,7 @@ const DEAD_END_LINKS = 3;
 //
 // THE RULE, and the reason this split exists at all: a site that crawled fine
 // before must still crawl. So a run is stopped only where the evidence is
-// unambiguous and verifiable — the server demanded credentials (401), or it
+// unambiguous and verifiable - the server demanded credentials (401), or it
 // redirected to a page that identifies itself as the sign-in page. Everything
 // else the probe can notice is a guess:
 //
@@ -498,7 +498,7 @@ const DEAD_END_LINKS = 3;
 //                and report what it found, and it still does.
 //   4xx/5xx      a bad seed URL or a site having a moment. The crawler's own
 //                error reporting is better than a pre-flight veto.
-//   unreachable  one timed-out request must never veto a crawl — that would
+//   unreachable  one timed-out request must never veto a crawl - that would
 //                turn a flaky moment into "this site cannot be audited".
 //   gated phrase a phrase match is weak evidence on its own.
 //
@@ -530,7 +530,7 @@ function wordCount(html) {
 //
 // Three outcomes, not two:
 //
-//   ok: true                     the site serves its content — crawl it.
+//   ok: true                     the site serves its content - crawl it.
 //   ok: false, blocking: true    an unambiguous auth wall. Stop the run.
 //   ok: false, blocking: false   something worth noting (a 403, a timeout, a
 //                                bad URL) that is NOT proof of a login wall.
@@ -574,10 +574,10 @@ async function probe(url, auth = null, { timeout = 20000, render = 'auto' } = {}
   // --- status-based walls -------------------------------------------------
   if (res.status === 401) {
     out.wall = 'http_auth';
-    out.reasons.push('the server answered 401 Unauthorized — the site is behind HTTP basic auth');
+    out.reasons.push('the server answered 401 Unauthorized - the site is behind HTTP basic auth');
   } else if (res.status === 403) {
     out.wall = 'forbidden';
-    out.reasons.push('the server answered 403 Forbidden — an edge rule or WAF is refusing the crawler');
+    out.reasons.push('the server answered 403 Forbidden - an edge rule or WAF is refusing the crawler');
   } else if (res.status >= 400) {
     out.wall = 'http_error';
     out.reasons.push(`the server answered HTTP ${res.status} on the seed URL`);
@@ -588,7 +588,7 @@ async function probe(url, auth = null, { timeout = 20000, render = 'auto' } = {}
   if (!out.wall && redirected && LOGIN_PATH.test(finalPath)) {
     out.wall = 'redirect_to_login';
     out.reasons.push(
-      `the seed URL redirected to ${res.url}, which is a sign-in page — `
+      `the seed URL redirected to ${res.url}, which is a sign-in page - `
       + 'a login wall that answers HTTP 200, so a crawl would report the login form as the site'
     );
   }
@@ -603,16 +603,16 @@ async function probe(url, auth = null, { timeout = 20000, render = 'auto' } = {}
 
     const onward = countInternalLinks(res.body, res.url);
     out.internalLinks = onward;
-    // A declared client-side redirect. Not a verdict on its own — plenty of
-    // legitimate pages use one — but a reason to look in a browser.
+    // A declared client-side redirect. Not a verdict on its own - plenty of
+    // legitimate pages use one - but a reason to look in a browser.
     const refresh = /<meta[^>]+http-equiv\s*=\s*["']?refresh[^>]*>/i.exec(res.body);
     out.metaRefresh = refresh ? refresh[0].slice(0, 200) : null;
 
     // FOUR signals must agree before this is called a login page: a password
     // field, almost no content, a title or URL that says sign-in, and no way
-    // onward into the site. Any three of the four describe real public pages —
+    // onward into the site. Any three of the four describe real public pages - 
     // a restaurant's login page carrying the full header nav being the case
-    // that found this — and stopping a crawl that used to work is a worse
+    // that found this - and stopping a crawl that used to work is a worse
     // outcome than the wall this catches.
     //
     // The link count is the one that matters most, because it answers what the
@@ -626,13 +626,13 @@ async function probe(url, auth = null, { timeout = 20000, render = 'auto' } = {}
         + `${onward === 1 ? '' : 's'} onward into the site`
       );
     } else if (hasForm && words < 150 && onward < DEAD_END_LINKS) {
-      // Suspicious but not proven — a password field on a thin dead-end page
+      // Suspicious but not proven - a password field on a thin dead-end page
       // that does not call itself a login page. Noted, and the crawl proceeds.
       out.wall = 'maybe_login';
       out.reasons.push(
         `the seed page has a password field, only ${words} words of visible text and `
         + `${onward} link${onward === 1 ? '' : 's'} onward into the site. That may be a `
-        + 'login page, or a sparse homepage with a login box — the crawl was run either '
+        + 'login page, or a sparse homepage with a login box - the crawl was run either '
         + 'way, so check the page count below looks right for this site'
       );
     } else if (phrase && words < 150) {
@@ -647,8 +647,8 @@ async function probe(url, auth = null, { timeout = 20000, render = 'auto' } = {}
   out.ok = !out.wall;
   out.blocking = isBlocking(out.wall);
 
-  // The rendered second look. Only for a shell — a page a crawl would get
-  // nothing from anyway — and only when the static verdict was "fine", because
+  // The rendered second look. Only for a shell - a page a crawl would get
+  // nothing from anyway - and only when the static verdict was "fine", because
   // that is the case the static check gets wrong.
   if (out.ok && render !== 'off' && looksLikeShell(out) && rendererAvailable()) {
     const r = await renderProbe(url, auth);
@@ -670,7 +670,7 @@ async function probe(url, auth = null, { timeout = 20000, render = 'auto' } = {}
         out.wall = 'client_side_login';
         out.reasons.push(
           `the page answered HTTP ${res.status} and then redirected itself in the browser to `
-          + `${r.finalUrl} ("${r.title}"), which is a sign-in page — invisible to any `
+          + `${r.finalUrl} ("${r.title}"), which is a sign-in page - invisible to any `
           + 'server-side check, because the bounce happens in JavaScript'
         );
       } else if (r.hasPassword && r.words < 150 && r.internalLinks < DEAD_END_LINKS) {
@@ -699,14 +699,14 @@ async function probe(url, auth = null, { timeout = 20000, render = 'auto' } = {}
       : `${url} serves its content anonymously (HTTP ${res.status}, ~${out.words} words).`;
   } else if (!out.blocking) {
     // Advisory only. Worded as an observation about a crawl that IS running,
-    // never as a refusal — the crawl behaves exactly as it did before.
+    // never as a refusal - the crawl behaves exactly as it did before.
     out.summary = `Access check on ${url}: ${out.reasons[0]}.`;
   } else if (out.authUsed) {
     // The single most common real-world failure: a cookie that worked when it
     // was pasted and has since expired. Say that, rather than repeating the
     // generic "site needs a login" message.
     out.summary = `The stored credentials did not get past the wall on ${url}. `
-      + `${out.reasons[0]}. Session cookies expire — re-copy it from a logged-in browser and test again.`;
+      + `${out.reasons[0]}. Session cookies expire - re-copy it from a logged-in browser and test again.`;
   } else {
     out.summary = `${url} will not serve its pages to an anonymous crawler. ${out.reasons[0]}.`;
   }
@@ -716,13 +716,13 @@ async function probe(url, auth = null, { timeout = 20000, render = 'auto' } = {}
 // Advice a route or a view can print for each wall kind. Kept here so the
 // audit page, the linking page and the brand page give the same instructions.
 const REMEDY = {
-  // Blocking walls — the run stopped, and this is how to get past it.
-  http_auth: 'Enter the HTTP basic auth username and password under "Crawl access" — that is all this kind of wall needs.',
+  // Blocking walls - the run stopped, and this is how to get past it.
+  http_auth: 'Enter the HTTP basic auth username and password under "Crawl access" - that is all this kind of wall needs.',
   redirect_to_login: 'Log into the site in your browser, copy the session cookie from DevTools → Application → Cookies, and paste it under "Crawl access".',
   login_page: 'Log into the site in your browser, copy the session cookie from DevTools → Application → Cookies, and paste it under "Crawl access".',
-  client_side_login: 'This is a JavaScript app that signs users in before showing anything. Log in in your browser, copy the session cookie from DevTools → Application → Cookies, and paste it under "Crawl access" — and note that a crawl will also need rendering enabled to read it.',
+  client_side_login: 'This is a JavaScript app that signs users in before showing anything. Log in in your browser, copy the session cookie from DevTools → Application → Cookies, and paste it under "Crawl access" - and note that a crawl will also need rendering enabled to read it.',
   renders_empty: 'The page renders to nothing even in a browser. Check the site is working, and crawl a URL that serves real content.',
-  // Advisory — the crawl RAN. Worded as "if the result looks wrong, this is why".
+  // Advisory - the crawl RAN. Worded as "if the result looks wrong, this is why".
   maybe_login: 'If the report covers fewer pages than the site has, paste a logged-in session cookie under "Crawl access" and run it again.',
   gated_content: 'If the report looks thin, paste a logged-in session cookie under "Crawl access" and run it again.',
   forbidden: 'A 403 is usually a WAF or bot rule rather than a login. If the report came back empty, allowlist the crawler at the CDN, or send whatever header your edge rules expect under "Crawl access".',
@@ -741,15 +741,15 @@ function remedyFor(wall) {
 //
 // One wall shape defeats every server-side check: the server answers 200 with
 // a JavaScript shell and the bounce to the sign-in page happens in the
-// browser. app.slack.com/client is the reference case — 200, no login form in
+// browser. app.slack.com/client is the reference case - 200, no login form in
 // the HTML, and following its meta refresh lands back on the same shell.
 // Measured against the live site, only rendering reveals it:
 //
 //   static probe   200, 146 words, no form, no redirect     -> looks fine
 //   rendered       -> app.slack.com/workspace-signin        -> a login wall
 //
-// So when the static probe finds a page that looks like a SHELL — almost no
-// text, almost no links onward — and a renderer exists, the page is rendered
+// So when the static probe finds a page that looks like a SHELL - almost no
+// text, almost no links onward - and a renderer exists, the page is rendered
 // and judged again. The narrow trigger is the point: this costs a browser
 // launch, so an ordinary page never pays for it.
 const RENDER_PROBE = path.join(__dirname, '..', '..', 'tools', 'render_probe.py');
@@ -822,9 +822,9 @@ function renderProbe(url, auth, { timeoutMs = 45000, settleMs = 6000 } = {}) {
 // links in its shell, so the link half of the test was never true and the
 // renderer never ran.
 //
-// What actually characterises a shell is that the TEXT is not there — a page
+// What actually characterises a shell is that the TEXT is not there - a page
 // with under 150 visible words has no content to audit whatever its nav looks
-// like — or that the page declares a redirect it expects a client to follow.
+// like - or that the page declares a redirect it expects a client to follow.
 // Slack does both. Either is enough to spend one browser launch on; a real
 // page with real copy never pays for it.
 //
@@ -856,7 +856,7 @@ async function coverage(siteUrl, pagesCrawled, { maxPages = null, auth = null } 
     return null;
   }
   const total = sitemap && Array.isArray(sitemap.urls) ? sitemap.urls.length : 0;
-  // No sitemap, or an unreadable one, is not evidence either way — and this
+  // No sitemap, or an unreadable one, is not evidence either way - and this
   // check must never turn "I could not tell" into a warning.
   if (!total) return null;
 
@@ -873,7 +873,7 @@ async function coverage(siteUrl, pagesCrawled, { maxPages = null, auth = null } 
     shortfall,
     note: shortfall
       ? `The sitemap lists ${total} URLs but the crawl read ${pagesCrawled}. `
-        + 'Something is stopping the crawler part-way through the site — commonly a gated section, '
+        + 'Something is stopping the crawler part-way through the site - commonly a gated section, '
         + 'a robots rule, or pages reachable only from a logged-in navigation.'
       : null,
   };
@@ -884,7 +884,7 @@ module.exports = {
   AUTH_ENV_VAR,
   isBlocking, BLOCKING_WALLS, rendererAvailable, renderProbe, looksLikeShell,
   // Exported for the verify suite: the path matcher is table-tested there,
-  // because its failure mode is silent in both directions — a missed wall, or
+  // because its failure mode is silent in both directions - a missed wall, or
   // a public page mistaken for one.
   LOGIN_PATH, LOGIN_SEGMENTS, countInternalLinks, DEAD_END_LINKS, pathForMatch,
   forBrand, statusForBrand, save, clear, recordVerification,

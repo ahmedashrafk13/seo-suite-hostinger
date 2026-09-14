@@ -4,7 +4,7 @@
 // that nobody keeps in sync: GSC is keyed by URL ("https://www.example.com/"
 // or "sc-domain:example.com") while GA4 is keyed by a numeric id with a
 // human-typed display name ("Example Ltd", "Website"). Nothing links them, so
-// the pairing has to be inferred — and where the inference is weak, the UI has
+// the pairing has to be inferred - and where the inference is weak, the UI has
 // to say so rather than quietly guess.
 //
 // Everything here is pure, so the matching can be tested without API calls.
@@ -41,7 +41,7 @@ function slug(s) {
 // A GA4 property is a candidate for a site when its display name reduces to
 // the site's root label, or contains it (or vice versa). "Novella Publishers"
 // -> "novellapublishers" matches novellapublishers.com. Generic names like
-// "Website" match nothing, which is the correct outcome — better unmatched
+// "Website" match nothing, which is the correct outcome - better unmatched
 // than wrongly attached to a client's data.
 function scoreGa4Match(host, ga4Name) {
   const root = slug(rootLabel(host));

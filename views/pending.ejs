@@ -4,7 +4,16 @@
 <body>
 <div class="auth-wrap">
   <div class="auth-card">
-    <div class="brand-mark"><span class="dot"></span> SEO Suite</div>
+    <div class="brand-mark-row">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <rect x="3" y="13" width="3.4" height="7" rx="1"/>
+          <rect x="10.3" y="9" width="3.4" height="11" rx="1"/>
+          <rect x="17.6" y="4" width="3.4" height="16" rx="1"/>
+        </svg>
+      </span>
+      <span class="bm-text">SEO Suite</span>
+    </div>
     <p class="sub">Your account is waiting for approval</p>
 
     <div class="notice info" style="margin-bottom:16px">
@@ -16,10 +25,10 @@
     </div>
 
     <% if (admins.length) { %>
-      <p style="font-size:13px;color:var(--text-2);margin-bottom:6px">Ask one of these admins to approve you:</p>
-      <ul style="margin:0 0 16px;padding-left:18px;font-size:13px">
+      <p class="hint" style="margin-bottom:6px">Ask one of these admins to approve you:</p>
+      <ul class="tight" style="margin-bottom:16px">
         <% admins.forEach(function(a){ %>
-          <li><%= a.name || a.email %> — <a href="mailto:<%= a.email %>"><%= a.email %></a></li>
+          <li><%= a.name || a.email %> <a href="mailto:<%= a.email %>"><%= a.email %></a></li>
         <% }) %>
       </ul>
     <% } %>

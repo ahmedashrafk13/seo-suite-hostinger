@@ -76,7 +76,7 @@ const CATALOG = [];
 function define(entry) { CATALOG.push(entry); return entry; }
 
 // =========================================================================
-// GROUP 1 — Organic traffic and visibility (Search Console, site level)
+// GROUP 1 - Organic traffic and visibility (Search Console, site level)
 // =========================================================================
 
 define({
@@ -104,7 +104,7 @@ define({
       message: `Search Console clicks fell from ${int(prior.clicks)} (${prior.startDate} → ${prior.endDate}) to ${int(recent.clicks)} (${recent.startDate} → ${recent.endDate}), a drop of ${pct1(drop)}. Impressions moved ${pct1(A.pctChange(recent.impressions, prior.impressions))} and average position went from ${pos1(prior.position)} to ${pos1(recent.position)}.`,
       affected: [brand.site_url],
       action: recent.impressions >= prior.impressions * 0.95
-        ? 'Impressions held steady while clicks fell — this looks like a CTR or SERP-feature problem rather than lost rankings. Review titles and meta descriptions on the top landing pages, and check whether an AI Overview or new ad block now sits above you.'
+        ? 'Impressions held steady while clicks fell - this looks like a CTR or SERP-feature problem rather than lost rankings. Review titles and meta descriptions on the top landing pages, and check whether an AI Overview or new ad block now sits above you.'
         : 'Impressions fell alongside clicks, which points to lost rankings or lost indexation. Compare page-level and query-level movement, then check indexation status on the biggest losers.',
       evidence: { recent, prior, drop },
     }];
@@ -115,7 +115,7 @@ define({
   key: 'gsc_impressions_drop',
   label: 'Search impressions dropped',
   group: 'Traffic & visibility',
-  description: 'Impressions fell sharply — usually the earliest sign of lost rankings, deindexation or a Google update, and it moves before clicks do.',
+  description: 'Impressions fell sharply - usually the earliest sign of lost rankings, deindexation or a Google update, and it moves before clicks do.',
   sources: ['Search Console'], requires: 'gsc', severity: 'high',
   defaultFrequency: 'daily',
   params: [
@@ -165,7 +165,7 @@ define({
       title: `Site CTR down ${deltaPp.toFixed(2)} points`,
       message: `CTR fell from ${pp2(prior.ctr * 100)} to ${pp2(recent.ctr * 100)} while impressions moved ${pct1(A.pctChange(recent.impressions, prior.impressions))}. That is ${int(Math.round(recent.impressions * (prior.ctr - recent.ctr)))} clicks lost to CTR alone.`,
       affected: [brand.site_url],
-      action: 'Rewrite titles and meta descriptions on the highest-impression pages. Check the live SERP for the top queries — an AI Overview, ad block or new rich result may have taken the clicks.',
+      action: 'Rewrite titles and meta descriptions on the highest-impression pages. Check the live SERP for the top queries - an AI Overview, ad block or new rich result may have taken the clicks.',
       evidence: { recent, prior, deltaPp },
     }];
   },
@@ -263,7 +263,7 @@ define({
   key: 'gsc_data_stalled',
   label: 'Search Console data stopped arriving',
   group: 'Data health',
-  description: 'No new Search Console rows for several days. Catches a broken sync, a revoked OAuth token or a property that lost verification — silent failures that would otherwise disable every other alert.',
+  description: 'No new Search Console rows for several days. Catches a broken sync, a revoked OAuth token or a property that lost verification - silent failures that would otherwise disable every other alert.',
   sources: ['Search Console'], requires: 'gsc', severity: 'critical',
   defaultFrequency: 'daily',
   params: [
@@ -296,7 +296,7 @@ define({
 });
 
 // =========================================================================
-// GROUP 2 — Keyword and ranking movement (Search Console, query level)
+// GROUP 2 - Keyword and ranking movement (Search Console, query level)
 // =========================================================================
 
 define({
@@ -323,7 +323,7 @@ define({
     return [{
       dedupe: `${brand.id}:keyword_rank_drop:${token}`,
       title: `${hits.length} keyword${hits.length === 1 ? '' : 's'} lost ${params.deltaPositions}+ positions`,
-      message: `Comparing the ${params.windowDays} days to ${rows[0].windows.recent.endDate} against the previous ${params.windowDays}:\n\n${hits.map((h) => `• "${h.entity}" — position ${pos1(h.priorPosition)} → ${pos1(h.recentPosition)} (${h.positionDelta.toFixed(1)} worse), ${int(h.priorImpressions)} → ${int(h.recentImpressions)} impressions`).join('\n')}`,
+      message: `Comparing the ${params.windowDays} days to ${rows[0].windows.recent.endDate} against the previous ${params.windowDays}:\n\n${hits.map((h) => `• "${h.entity}" - position ${pos1(h.priorPosition)} → ${pos1(h.recentPosition)} (${h.positionDelta.toFixed(1)} worse), ${int(h.priorImpressions)} → ${int(h.recentImpressions)} impressions`).join('\n')}`,
       affected: hits.map((h) => `"${h.entity}" (pos ${pos1(h.priorPosition)} → ${pos1(h.recentPosition)})`),
       action: 'For each keyword, identify the ranking URL and check what changed: content edits, lost internal or external links, a competitor publishing something better, or cannibalisation from another page on your own site.',
       evidence: { hits: hits.map((h) => ({ query: h.entity, from: h.priorPosition, to: h.recentPosition, delta: h.positionDelta, priorImpressions: h.priorImpressions })) },
@@ -335,7 +335,7 @@ define({
   key: 'keyword_lost_top10',
   label: 'Keyword fell out of the top 10',
   group: 'Keywords & rankings',
-  description: 'A query that was ranking on page one has slipped to page two or beyond — where clicks essentially stop.',
+  description: 'A query that was ranking on page one has slipped to page two or beyond - where clicks essentially stop.',
   sources: ['Search Console'], requires: 'gsc', severity: 'high',
   defaultFrequency: 'weekly',
   params: [WINDOW_PARAM, MIN_IMPR_PARAM(50), MAX_ITEMS_PARAM],
@@ -351,7 +351,7 @@ define({
     return [{
       dedupe: `${brand.id}:keyword_lost_top10:${token}`,
       title: `${hits.length} keyword${hits.length === 1 ? '' : 's'} dropped off page one`,
-      message: `These queries were in the top 10 and no longer are:\n\n${hits.map((h) => `• "${h.entity}" — ${pos1(h.priorPosition)} → ${h.recentPosition == null ? 'no impressions' : pos1(h.recentPosition)}, clicks ${int(h.priorClicks)} → ${int(h.recentClicks)}`).join('\n')}`,
+      message: `These queries were in the top 10 and no longer are:\n\n${hits.map((h) => `• "${h.entity}" - ${pos1(h.priorPosition)} → ${h.recentPosition == null ? 'no impressions' : pos1(h.recentPosition)}, clicks ${int(h.priorClicks)} → ${int(h.recentClicks)}`).join('\n')}`,
       affected: hits.map((h) => `"${h.entity}" (${pos1(h.priorPosition)} → ${h.recentPosition == null ? 'gone' : pos1(h.recentPosition)})`),
       action: 'Page-one losses are the highest-value recoveries available. For each, pull up the ranking URL, compare it against whoever replaced you, and prioritise a content refresh plus internal links from your strongest related pages.',
       evidence: { hits: hits.map((h) => ({ query: h.entity, from: h.priorPosition, to: h.recentPosition, priorClicks: h.priorClicks })) },
@@ -379,7 +379,7 @@ define({
     return [{
       dedupe: `${brand.id}:keyword_lost_top3:${token}`,
       title: `${hits.length} keyword${hits.length === 1 ? '' : 's'} lost a top-3 position`,
-      message: hits.map((h) => `• "${h.entity}" — ${pos1(h.priorPosition)} → ${h.recentPosition == null ? 'no impressions' : pos1(h.recentPosition)}, clicks ${int(h.priorClicks)} → ${int(h.recentClicks)}`).join('\n'),
+      message: hits.map((h) => `• "${h.entity}" - ${pos1(h.priorPosition)} → ${h.recentPosition == null ? 'no impressions' : pos1(h.recentPosition)}, clicks ${int(h.priorClicks)} → ${int(h.recentClicks)}`).join('\n'),
       affected: hits.map((h) => `"${h.entity}" (${pos1(h.priorPosition)} → ${h.recentPosition == null ? 'gone' : pos1(h.recentPosition)})`),
       action: 'Treat as urgent. Check the ranking URL is still indexed and unchanged, then look for a competitor who has just published or refreshed. These are usually recoverable within weeks if addressed quickly.',
       evidence: { hits: hits.map((h) => ({ query: h.entity, from: h.priorPosition, to: h.recentPosition, priorClicks: h.priorClicks })) },
@@ -407,7 +407,7 @@ define({
     return [{
       dedupe: `${brand.id}:keyword_entered_top10:${token}`,
       title: `${hits.length} keyword${hits.length === 1 ? '' : 's'} reached page one`,
-      message: hits.map((h) => `• "${h.entity}" — ${h.priorPosition == null ? 'unranked' : pos1(h.priorPosition)} → ${pos1(h.recentPosition)}, ${int(h.recentImpressions)} impressions, ${int(h.recentClicks)} clicks`).join('\n'),
+      message: hits.map((h) => `• "${h.entity}" - ${h.priorPosition == null ? 'unranked' : pos1(h.priorPosition)} → ${pos1(h.recentPosition)}, ${int(h.recentImpressions)} impressions, ${int(h.recentClicks)} clicks`).join('\n'),
       affected: hits.map((h) => `"${h.entity}" (now ${pos1(h.recentPosition)})`),
       action: 'Add internal links to the ranking page from your strongest related pages and tighten the title around the query. Newly page-one keywords respond faster to on-page work than established ones.',
       evidence: { hits: hits.map((h) => ({ query: h.entity, from: h.priorPosition, to: h.recentPosition })) },
@@ -451,10 +451,10 @@ define({
       message: hits.map((h) => {
         const ctr = h.impressions > 0 ? (h.clicks / h.impressions) * 100 : 0;
         const p = A.pageForQuery(brand.id, h.entity);
-        return `• "${h.entity}" — ${int(h.impressions)} impressions, ${int(h.clicks)} clicks (${pp2(ctr)}), position ${pos1(h.position)}${p ? `, ranking: ${short(p.page)}` : ''}`;
+        return `• "${h.entity}" - ${int(h.impressions)} impressions, ${int(h.clicks)} clicks (${pp2(ctr)}), position ${pos1(h.position)}${p ? `, ranking: ${short(p.page)}` : ''}`;
       }).join('\n'),
       affected: hits.map((h) => `"${h.entity}" (${int(h.impressions)} impr, ${pp2(h.impressions > 0 ? (h.clicks / h.impressions) * 100 : 0)} CTR)`),
-      action: 'Rewrite the title tag to lead with the query wording and the outcome the searcher wants, and write a meta description that answers the query directly. Where position is 4–10, a CTR fix often doubles clicks without any ranking change.',
+      action: 'Rewrite the title tag to lead with the query wording and the outcome the searcher wants, and write a meta description that answers the query directly. Where position is 4-10, a CTR fix often doubles clicks without any ranking change.',
       evidence: { window: w, hits },
     }];
   },
@@ -462,7 +462,7 @@ define({
 
 define({
   key: 'keyword_striking_distance',
-  label: 'Keywords in striking distance (positions 4–20)',
+  label: 'Keywords in striking distance (positions 4-20)',
   group: 'Keywords & rankings',
   description: 'Queries ranking just below the top three, where a modest improvement produces a disproportionate click gain. The core content-opportunity signal.',
   sources: ['Search Console'], requires: 'gsc', severity: 'low', positive: true,
@@ -494,7 +494,7 @@ define({
       title: `${rows.length} keyword${rows.length === 1 ? '' : 's'} in striking distance`,
       message: rows.map((h) => {
         const p = A.pageForQuery(brand.id, h.entity);
-        return `• "${h.entity}" — position ${pos1(h.position)}, ${int(h.impressions)} impressions, ${int(h.clicks)} clicks${p ? `, ranking: ${short(p.page)}` : ''}`;
+        return `• "${h.entity}" - position ${pos1(h.position)}, ${int(h.impressions)} impressions, ${int(h.clicks)} clicks${p ? `, ranking: ${short(p.page)}` : ''}`;
       }).join('\n'),
       affected: rows.map((h) => `"${h.entity}" (pos ${pos1(h.position)}, ${int(h.impressions)} impr)`),
       action: 'For each, strengthen the ranking page: cover the sub-questions competitors answer and you do not, add internal links from related pages using the keyword as anchor text, and make sure the title targets the query directly.',
@@ -524,16 +524,16 @@ define({
     return [{
       dedupe: `${brand.id}:keyword_cannibalization:${period.period_start}_${period.period_end}`,
       title: `${rows.length} quer${rows.length === 1 ? 'y' : 'ies'} with competing URLs`,
-      message: rows.map((r) => `• "${r.query}" — ${r.page_count} URLs, ${int(r.impressions)} impressions:\n    ${String(r.pages).split(' | ').slice(0, 4).map(short).join('\n    ')}`).join('\n'),
+      message: rows.map((r) => `• "${r.query}" - ${r.page_count} URLs, ${int(r.impressions)} impressions:\n    ${String(r.pages).split(' | ').slice(0, 4).map(short).join('\n    ')}`).join('\n'),
       affected: rows.map((r) => `"${r.query}" (${r.page_count} URLs)`),
-      action: 'Pick one canonical page per query. Consolidate the weaker pages into it or differentiate their focus, and repoint internal links to the chosen page. Do not simply add canonical tags without deciding the intent split first — and route any URL change or redirect through SEO approval.',
+      action: 'Pick one canonical page per query. Consolidate the weaker pages into it or differentiate their focus, and repoint internal links to the chosen page. Do not simply add canonical tags without deciding the intent split first - and route any URL change or redirect through SEO approval.',
       evidence: { rows },
     }];
   },
 });
 
 // =========================================================================
-// GROUP 3 — Landing page performance (Search Console, page level)
+// GROUP 3 - Landing page performance (Search Console, page level)
 // =========================================================================
 
 define({
@@ -573,7 +573,7 @@ define({
   key: 'page_impressions_drop',
   label: 'Landing page losing impressions',
   group: 'Landing pages',
-  description: 'Pages whose impressions collapsed — the earliest page-level warning, and the one that precedes click loss.',
+  description: 'Pages whose impressions collapsed - the earliest page-level warning, and the one that precedes click loss.',
   sources: ['Search Console'], requires: 'gsc', severity: 'medium',
   defaultFrequency: 'weekly',
   params: [
@@ -620,7 +620,7 @@ define({
     return [{
       dedupe: `${brand.id}:page_traffic_lost_entirely:${token}`,
       title: `${hits.length} page${hits.length === 1 ? '' : 's'} went from clicks to zero impressions`,
-      message: hits.map((h) => `• ${short(h.entity, 90)} — had ${int(h.priorClicks)} clicks / ${int(h.priorImpressions)} impressions, now none at all`).join('\n'),
+      message: hits.map((h) => `• ${short(h.entity, 90)} - had ${int(h.priorClicks)} clicks / ${int(h.priorImpressions)} impressions, now none at all`).join('\n'),
       affected: hits.map((h) => h.entity),
       action: 'Check each URL immediately: request it in a browser, confirm it returns 200, is not noindex, is not canonicalised elsewhere, and run it through Search Console URL Inspection. Zero impressions is almost always a technical fault rather than a ranking change.',
       evidence: { hits: hits.map((h) => ({ page: h.entity, priorClicks: h.priorClicks, priorImpressions: h.priorImpressions })) },
@@ -653,7 +653,7 @@ define({
     return [{
       dedupe: `${brand.id}:page_rising:${token}`,
       title: `${hits.length} page${hits.length === 1 ? '' : 's'} gaining clicks fast`,
-      message: hits.map((h) => `• ${short(h.entity, 90)} — clicks ${int(h.priorClicks)} → ${int(h.recentClicks)} (+${pct1(h.clicksChangePct)}), position ${pos1(h.priorPosition)} → ${pos1(h.recentPosition)}`).join('\n'),
+      message: hits.map((h) => `• ${short(h.entity, 90)} - clicks ${int(h.priorClicks)} → ${int(h.recentClicks)} (+${pct1(h.clicksChangePct)}), position ${pos1(h.priorPosition)} → ${pos1(h.recentPosition)}`).join('\n'),
       affected: hits.map((h) => h.entity),
       action: 'Double down while the page has momentum: expand it to cover adjacent queries it already gets impressions for, add internal links to it, and make sure it has a clear call to action.',
       evidence: { hits: hits.map((h) => ({ page: h.entity, priorClicks: h.priorClicks, recentClicks: h.recentClicks })) },
@@ -686,7 +686,7 @@ define({
     return [{
       dedupe: `${brand.id}:page_ctr_drop:${token}`,
       title: `${hits.length} page${hits.length === 1 ? '' : 's'} lost CTR`,
-      message: hits.map((h) => `• ${short(h.entity, 90)} — CTR ${pp2(h.priorCtr * 100)} → ${pp2(h.recentCtr * 100)}, position ${pos1(h.priorPosition)} → ${pos1(h.recentPosition)}, impressions ${int(h.priorImpressions)} → ${int(h.recentImpressions)}`).join('\n'),
+      message: hits.map((h) => `• ${short(h.entity, 90)} - CTR ${pp2(h.priorCtr * 100)} → ${pp2(h.recentCtr * 100)}, position ${pos1(h.priorPosition)} → ${pos1(h.recentPosition)}, impressions ${int(h.priorImpressions)} → ${int(h.recentImpressions)}`).join('\n'),
       affected: hits.map((h) => h.entity),
       action: 'Compare each page\'s current title and meta description against what it had before. If nothing changed on your side, search the target query and look for a new AI Overview, ad block, or richer competitor snippet taking the click. Note that changing titles on high-performing pages needs SEO approval.',
       evidence: { hits: hits.map((h) => ({ page: h.entity, priorCtr: h.priorCtr, recentCtr: h.recentCtr })) },
@@ -695,7 +695,7 @@ define({
 });
 
 // =========================================================================
-// GROUP 4 — Indexation and Search Console health
+// GROUP 4 - Indexation and Search Console health
 // =========================================================================
 
 define({
@@ -743,7 +743,7 @@ define({
       title: `${bad.length} important page${bad.length === 1 ? '' : 's'} not indexed`,
       message: `${bad.length} of the top ${pages.length} pages by clicks are not currently indexed:\n\n${bad.map((b) => `• ${short(b.page, 90)} (${int(b.clicks)} clicks)\n    verdict: ${b.verdict}, coverage: ${b.coverageState || 'unknown'}${b.robotsTxtState && b.robotsTxtState !== 'ALLOWED' ? `, robots.txt: ${b.robotsTxtState}` : ''}${b.googleCanonical && b.userCanonical && b.googleCanonical !== b.userCanonical ? `\n    Google picked a different canonical: ${short(b.googleCanonical)}` : ''}`).join('\n')}${errors.length ? `\n\n(${errors.length} URL(s) could not be inspected: ${errors.slice(0, 3).join('; ')})` : ''}`,
       affected: bad.map((b) => b.page),
-      action: 'Work through each URL: confirm it returns 200, carries no noindex, is allowed in robots.txt, and self-canonicalises. Where Google chose a different canonical, decide which URL should win before changing anything — canonical edits require SEO approval.',
+      action: 'Work through each URL: confirm it returns 200, carries no noindex, is allowed in robots.txt, and self-canonicalises. Where Google chose a different canonical, decide which URL should win before changing anything - canonical edits require SEO approval.',
       evidence: { checked: pages.length, bad, errors },
     }];
   },
@@ -776,9 +776,9 @@ define({
     return [{
       dedupe: `${brand.id}:indexed_page_count_drop:${recent.startDate}_${recent.endDate}`,
       title: `URLs earning impressions fell ${pct1(drop)} (${int(p)} → ${int(r)})`,
-      message: `${int(p)} distinct URLs earned impressions in ${prior.startDate} → ${prior.endDate}, but only ${int(r)} did in ${recent.startDate} → ${recent.endDate} — a ${pct1(drop)} reduction in the site's visible footprint.`,
+      message: `${int(p)} distinct URLs earned impressions in ${prior.startDate} → ${prior.endDate}, but only ${int(r)} did in ${recent.startDate} → ${recent.endDate} - a ${pct1(drop)} reduction in the site's visible footprint.`,
       affected: [brand.site_url],
-      action: 'Compare the two URL sets to see exactly which pages dropped out, then check the Pages report in Search Console for a rise in "Crawled – currently not indexed" or "Excluded by noindex". Also verify robots.txt and the sitemap have not changed.',
+      action: 'Compare the two URL sets to see exactly which pages dropped out, then check the Pages report in Search Console for a rise in "Crawled - currently not indexed" or "Excluded by noindex". Also verify robots.txt and the sitemap have not changed.',
       evidence: { recentCount: r, priorCount: p, drop, recent, prior },
     }];
   },
@@ -836,7 +836,7 @@ define({
       title: `${problems.length} sitemap issue${problems.length === 1 ? '' : 's'}`,
       message: problems.map((p) => `• ${short(p.path, 90)}\n    ${p.issue}`).join('\n'),
       affected: problems.map((p) => p.path),
-      action: 'Fix parse errors first, then remove URLs that 404, redirect, or are noindex from the sitemap — Google treats a dirty sitemap as a quality signal. Re-submit once clean. Sitemap and robots.txt changes require SEO approval.',
+      action: 'Fix parse errors first, then remove URLs that 404, redirect, or are noindex from the sitemap - Google treats a dirty sitemap as a quality signal. Re-submit once clean. Sitemap and robots.txt changes require SEO approval.',
       evidence: { sitemaps, problems },
     }];
   },
@@ -864,7 +864,7 @@ define({
     if (drop < 80) return [];
     return [{
       dedupe: `${brand.id}:gsc_manual_action:${periodToken(cmp)}`,
-      title: `Possible manual action — impressions collapsed ${pct1(drop)}`,
+      title: `Possible manual action - impressions collapsed ${pct1(drop)}`,
       message: `Impressions fell from ${int(prior.impressions)} to ${int(recent.impressions)} in one week (${pct1(drop)}). A collapse of this size across an entire property is the signature of a manual action, a security issue such as hacked content, or an accidental site-wide noindex or robots.txt block.\n\nNote: Google does not expose manual actions or security issues through any public API, so this alert is inferred from the traffic pattern and must be confirmed by hand.`,
       affected: [brand.site_url],
       action: 'Open Search Console now and check Security & Manual Actions directly. In parallel, fetch robots.txt and the homepage to rule out a site-wide noindex or Disallow, and confirm the site resolves and is not serving hacked content.',
@@ -874,7 +874,7 @@ define({
 });
 
 // =========================================================================
-// GROUP 5 — Engagement and conversions (GA4)
+// GROUP 5 - Engagement and conversions (GA4)
 // =========================================================================
 
 define({
@@ -901,7 +901,7 @@ define({
       title: `Organic sessions down ${pct1(drop)} (GA4)`,
       message: `GA4 organic-search sessions fell from ${int(prior.sessions)} to ${int(recent.sessions)} (${pct1(drop)}) comparing ${recent.startDate} → ${recent.endDate} with ${prior.startDate} → ${prior.endDate}. Conversions over the same periods: ${int(prior.conversions)} → ${int(recent.conversions)}.`,
       affected: [brand.site_url],
-      action: 'Cross-check against Search Console clicks. If GSC clicks held but GA4 sessions fell, suspect tracking — a broken tag, consent-banner change or deployment. If both fell, it is a genuine search visibility loss.',
+      action: 'Cross-check against Search Console clicks. If GSC clicks held but GA4 sessions fell, suspect tracking - a broken tag, consent-banner change or deployment. If both fell, it is a genuine search visibility loss.',
       evidence: { recent, prior, drop },
     }];
   },
@@ -932,7 +932,7 @@ define({
       message: `Conversions from organic search fell from ${int(prior.conversions)} to ${int(recent.conversions)} (${pct1(drop)}). Sessions over the same periods moved ${int(prior.sessions)} → ${int(recent.sessions)}, so conversion rate went from ${pp2(prior.conv_rate * 100)} to ${pp2(recent.conv_rate * 100)}.`,
       affected: [brand.site_url],
       action: A.dropPct(recent.sessions, prior.sessions) >= params.dropPct * 0.6
-        ? 'Sessions fell by a similar amount, so this is a traffic problem rather than a conversion problem — chase the organic visibility loss.'
+        ? 'Sessions fell by a similar amount, so this is a traffic problem rather than a conversion problem - chase the organic visibility loss.'
         : 'Sessions held up while conversions fell, so the funnel itself broke. Test the primary conversion path end to end and verify the conversion event is still firing.',
       evidence: { recent, prior, drop },
     }];
@@ -973,7 +973,7 @@ define({
   key: 'ga4_engagement_drop',
   label: 'Engagement rate dropped (GA4)',
   group: 'Engagement & conversions',
-  description: 'A falling share of engaged sessions suggests arriving visitors are not finding what the search result promised — an intent-mismatch or page-experience signal.',
+  description: 'A falling share of engaged sessions suggests arriving visitors are not finding what the search result promised - an intent-mismatch or page-experience signal.',
   sources: ['GA4'], requires: 'ga4', severity: 'medium',
   defaultFrequency: 'weekly',
   params: [
@@ -1003,7 +1003,7 @@ define({
   key: 'ga4_landing_page_drop',
   label: 'Landing page losing organic sessions (GA4)',
   group: 'Engagement & conversions',
-  description: 'Page-level GA4 view of organic session loss, which catches pages where the click happened but the visit did not — a signal Search Console cannot give you.',
+  description: 'Page-level GA4 view of organic session loss, which catches pages where the click happened but the visit did not - a signal Search Console cannot give you.',
   sources: ['GA4'], requires: 'ga4', severity: 'medium',
   defaultFrequency: 'weekly',
   params: [
@@ -1082,7 +1082,7 @@ define({
 });
 
 // =========================================================================
-// GROUP 6 — Core Web Vitals and page experience
+// GROUP 6 - Core Web Vitals and page experience
 // =========================================================================
 
 function cwvAlert({ key, label, metric, unit, description, goodThreshold, defaultThreshold, severity }) {
@@ -1135,7 +1135,7 @@ cwvAlert({
 
 cwvAlert({
   key: 'cwv_cls', label: 'CLS too high', metric: 'cls', unit: '', severity: 'medium',
-  description: 'Cumulative Layout Shift exceeded your threshold — content is moving under the user as the page loads.',
+  description: 'Cumulative Layout Shift exceeded your threshold - content is moving under the user as the page loads.',
   goodThreshold: 0.1, defaultThreshold: 0.1,
 });
 
@@ -1143,7 +1143,7 @@ define({
   key: 'psi_score_drop',
   label: 'PageSpeed score dropped',
   group: 'Core Web Vitals',
-  description: 'The Lighthouse performance score fell between two measurements — a fast way to catch a deployment that made the site slower.',
+  description: 'The Lighthouse performance score fell between two measurements - a fast way to catch a deployment that made the site slower.',
   sources: ['PageSpeed Insights'], requires: 'psi', severity: 'medium',
   defaultFrequency: 'weekly',
   params: [
@@ -1169,7 +1169,7 @@ define({
 });
 
 // =========================================================================
-// GROUP 7 — Availability
+// GROUP 7 - Availability
 // =========================================================================
 
 define({
@@ -1231,7 +1231,7 @@ define({
   key: 'homepage_status_changed',
   label: 'Homepage HTTP status changed',
   group: 'Availability',
-  description: 'The status code returned by the site changed — for example 200 becoming a 301 or 403. Catches accidental redirects and access rules that block crawlers.',
+  description: 'The status code returned by the site changed - for example 200 becoming a 301 or 403. Catches accidental redirects and access rules that block crawlers.',
   sources: ['HTTP probe'], requires: 'uptime', severity: 'high',
   defaultFrequency: 'daily',
   params: [],
@@ -1253,7 +1253,7 @@ define({
 });
 
 // =========================================================================
-// GROUP 8 — Technical audit findings (from the crawl tools)
+// GROUP 8 - Technical audit findings (from the crawl tools)
 // =========================================================================
 
 define({
@@ -1298,7 +1298,7 @@ define({
   key: 'audit_health_drop',
   label: 'Site health score dropped',
   group: 'Technical audit',
-  description: 'The overall health score from the technical audit fell between two crawls — a single number that catches broad technical regressions.',
+  description: 'The overall health score from the technical audit fell between two crawls - a single number that catches broad technical regressions.',
   sources: ['Technical audit crawl'], requires: 'audit', severity: 'medium',
   defaultFrequency: 'weekly',
   params: [
@@ -1330,7 +1330,7 @@ define({
   key: 'audit_new_critical_issues',
   label: 'New critical technical issues found',
   group: 'Technical audit',
-  description: 'Error-tier findings from the latest crawl that were not failing in the previous one — regressions rather than long-standing debt.',
+  description: 'Error-tier findings from the latest crawl that were not failing in the previous one - regressions rather than long-standing debt.',
   sources: ['Technical audit crawl'], requires: 'audit', severity: 'high',
   defaultFrequency: 'weekly',
   params: [MAX_ITEMS_PARAM],
@@ -1353,7 +1353,7 @@ define({
     return [{
       dedupe: `${brand.id}:audit_new_critical_issues:${runs[0].id}`,
       title: `${news.length} new critical technical issue${news.length === 1 ? '' : 's'}`,
-      message: news.map((f) => `• ${f.name} — ${int(f.failed)} ${f.unit || 'pages'} affected\n    ${f.summary || ''}`).join('\n'),
+      message: news.map((f) => `• ${f.name} - ${int(f.failed)} ${f.unit || 'pages'} affected\n    ${f.summary || ''}`).join('\n'),
       affected: news.flatMap((f) => (f.items || []).slice(0, 3).map((i) => (typeof i === 'string' ? i : (i.url || JSON.stringify(i))))),
       action: 'These checks were passing in the previous crawl and are failing now, so they most likely came from a recent deployment. Fix these before working on older technical debt.',
       evidence: { newIssues: news.map((f) => ({ id: f.id, name: f.name, failed: f.failed })), runId: runs[0].id },
@@ -1399,14 +1399,14 @@ define({
 });
 
 // =========================================================================
-// GROUP 10 — AI SEO suite
+// GROUP 10 - AI SEO suite
 // =========================================================================
 //
 // These read what the AI SEO analyses have already measured (aiseo_runs,
 // aiseo_findings, aiseo_metrics) rather than doing the measuring themselves.
 //
 // That separation is deliberate. The analyses crawl sites, probe user agents
-// and call PageSpeed — work measured in minutes. The alert engine runs every
+// and call PageSpeed - work measured in minutes. The alert engine runs every
 // brand's subscriptions on an hourly tick and must stay fast, so it reads the
 // stored result of the last sweep instead of triggering a new one. The sweeps
 // themselves are scheduled jobs (see lib/scheduler.js: aiseo_tracking,
@@ -1414,7 +1414,7 @@ define({
 //
 // The consequence, stated so nobody is surprised by it: these alerts are only
 // as current as the last sweep. `aiseo_stale_sweep` below exists specifically
-// so a sweep that has silently stopped running is itself alertable — otherwise
+// so a sweep that has silently stopped running is itself alertable - otherwise
 // a broken cron would present as "no problems found".
 
 // Latest completed run of one kind for a brand.
@@ -1438,7 +1438,7 @@ define({
   key: 'aiseo_retrieval_blocked',
   label: 'AI retrieval fetcher cannot read the site',
   group: 'AI SEO suite',
-  description: 'Fires when the last AI-crawler readiness check found a retrieval fetcher — OAI-SearchBot, ChatGPT-User, PerplexityBot, Claude-User, Googlebot, Bingbot — unable to read the page. While one is blocked, the brand cannot be cited in that assistant\'s answers at all. Training crawlers such as GPTBot and CCBot are deliberately NOT included: blocking those costs nothing in visibility and many publishers do it on purpose.',
+  description: 'Fires when the last AI-crawler readiness check found a retrieval fetcher - OAI-SearchBot, ChatGPT-User, PerplexityBot, Claude-User, Googlebot, Bingbot - unable to read the page. While one is blocked, the brand cannot be cited in that assistant\'s answers at all. Training crawlers such as GPTBot and CCBot are deliberately NOT included: blocking those costs nothing in visibility and many publishers do it on purpose.',
   sources: ['AI-crawler readiness'], requires: 'aiseo_readiness', requiresLabel: 'a completed AI-crawler readiness check', severity: 'critical',
   defaultFrequency: 'daily',
   params: [],
@@ -1493,13 +1493,13 @@ define({
   sources: ['SEO tracking sweep'], requires: 'aiseo_tracking', requiresLabel: 'a completed tracking sweep', severity: 'high',
   defaultFrequency: 'daily',
   params: [
-    { key: 'includeWarnings', label: 'Also alert on good → warning', type: 'select', default: 0, options: [{ value: 0, label: 'No — only good → fail' }, { value: 1, label: 'Yes' }] },
+    { key: 'includeWarnings', label: 'Also alert on good → warning', type: 'select', default: 0, options: [{ value: 0, label: 'No - only good → fail' }, { value: 1, label: 'Yes' }] },
     { key: 'maxItems', label: 'Report at most', type: 'number', default: 12, unit: 'metrics per alert' },
   ],
   evaluate({ brand, params }) {
     // The newest capture per (metric, url), and the one before it. The
     // correlated subquery is what keeps the timestamp and the value on the
-    // same row — a MAX() with GROUP BY would pair the latest timestamp with an
+    // same row - a MAX() with GROUP BY would pair the latest timestamp with an
     // arbitrary value, which is the classic way this check goes silently wrong.
     const latest = db.prepare(`SELECT m.* FROM aiseo_metrics m
       WHERE m.brand_id = ? AND m.metric_key LIKE 'track.%' AND m.captured_at = (
@@ -1527,11 +1527,11 @@ define({
     return [{
       dedupe: `${brand.id}:aiseo_tracking_regression:${latest[0].captured_at}`,
       title: `${regressions.length} tracking metric${regressions.length === 1 ? '' : 's'} regressed on ${brand.name}`,
-      message: shown.map((x) => `• ${x.metric}${x.url ? ` (${short(x.url, 60)})` : ''}\n    was ${x.from.value} (${x.from.status}) on ${String(x.from.captured_at).slice(0, 16)}, now ${x.to.value} (${x.to.status})${x.to.detail ? ` — ${x.to.detail}` : ''}`).join('\n')
+      message: shown.map((x) => `• ${x.metric}${x.url ? ` (${short(x.url, 60)})` : ''}\n    was ${x.from.value} (${x.from.status}) on ${String(x.from.captured_at).slice(0, 16)}, now ${x.to.value} (${x.to.status})${x.to.detail ? ` - ${x.to.detail}` : ''}`).join('\n')
         + (regressions.length > shown.length ? `\n\n…and ${regressions.length - shown.length} more.` : '')
         + '\n\nRead from the stored tracking history, so this reflects the last completed sweep rather than the site right now.',
       affected: shown.map((x) => x.url || brand.site_url),
-      action: 'Open the tracking board for this brand — the failing check names the affected URLs and the specific fix.',
+      action: 'Open the tracking board for this brand - the failing check names the affected URLs and the specific fix.',
       evidence: { regressions: shown },
     }];
   },
@@ -1559,7 +1559,7 @@ define({
       dedupe: `${brand.id}:aiseo_damaging_mention:${rows[0].dedupe_key}`,
       title: `${rows.length} new mention${rows.length === 1 ? '' : 's'} carrying a damaging claim about ${brand.name}`,
       message: rows.map((m) => `• [${m.source}] ${m.risk}\n    ${m.title || m.url}\n    ${m.url}`).join('\n')
-        + '\n\nAsked whether this brand can be trusted, an assistant weighs third-party discussion heavily — it is the part the brand did not write.',
+        + '\n\nAsked whether this brand can be trusted, an assistant weighs third-party discussion heavily - it is the part the brand did not write.',
       affected: rows.map((m) => m.url),
       action: 'Read each one before responding. Where a claim is factually wrong, correct it at the source and publish a page stating the correct fact plainly, so both a person and a retrieval system can find it. Mark each as reviewed on the reputation page once handled.',
       evidence: { mentions: rows.map((m) => ({ url: m.url, source: m.source, risk: m.risk, title: m.title })) },
@@ -1571,7 +1571,7 @@ define({
   key: 'aiseo_intent_drift',
   label: 'A page\'s search intent has drifted',
   group: 'AI SEO suite',
-  description: 'Fires when the freshness sweep finds a page whose query mix has shifted materially — the topic is unchanged but the question being asked of it has moved. Traffic usually falls too slowly for any other alert to catch this, and the page reads perfectly well on inspection.',
+  description: 'Fires when the freshness sweep finds a page whose query mix has shifted materially - the topic is unchanged but the question being asked of it has moved. Traffic usually falls too slowly for any other alert to catch this, and the page reads perfectly well on inspection.',
   sources: ['Freshness & intent drift'], requires: 'aiseo_freshness', requiresLabel: 'a completed freshness sweep', severity: 'high',
   defaultFrequency: 'weekly',
   params: [{ key: 'maxItems', label: 'Report at most', type: 'number', default: 8, unit: 'pages' }],
@@ -1587,10 +1587,10 @@ define({
       message: shown.map((p) => {
         const gained = (p.drift.gained || []).slice(0, 3).map((g) => `"${g.query}"`).join(', ');
         const lost = (p.drift.lost || []).slice(0, 3).map((g) => `"${g.query}"`).join(', ');
-        return `• ${short(p.page, 80)}\n    divergence ${p.drift.divergence} bits${p.drift.intentChanged ? `, ${p.drift.intentFrom} → ${p.drift.intentTo}` : ''}\n    now gaining: ${gained || '—'}\n    no longer showing for: ${lost || '—'}`;
+        return `• ${short(p.page, 80)}\n    divergence ${p.drift.divergence} bits${p.drift.intentChanged ? `, ${p.drift.intentFrom} → ${p.drift.intentTo}` : ''}\n    now gaining: ${gained || ' - '}\n    no longer showing for: ${lost || ' - '}`;
       }).join('\n') + `\n\nMeasured ${fmtWhen(run.finished_at)} as Jensen-Shannon divergence over the impression-weighted query mix between two Search Console snapshots.`,
       affected: shown.map((p) => p.page),
-      action: 'Re-angle rather than rewrite — the subject is still right. Compare each page\'s gained and lost query lists: together they name the new question precisely.',
+      action: 'Re-angle rather than rewrite - the subject is still right. Compare each page\'s gained and lost query lists: together they name the new question precisely.',
       evidence: { runId: run.id, pages: shown.map((p) => ({ page: p.page, divergence: p.drift.divergence, intentFrom: p.drift.intentFrom, intentTo: p.drift.intentTo })) },
     }];
   },
@@ -1613,7 +1613,7 @@ define({
     return [{
       dedupe: `${brand.id}:aiseo_stale_sweep:${A.isoDate(new Date())}`,
       title: `No tracking sweep for ${brand.name} in ${ageDays} days`,
-      message: `The last completed sweep finished ${String(row.last).slice(0, 16)}. Every other alert in this group reads stored sweep results, so while sweeps are not running they will report nothing — which looks exactly like a clean site.\n\nWith several brands the scheduled job rotates one per tick, so each brand is swept every N days by design; raise the threshold if that is the intended cadence.`,
+      message: `The last completed sweep finished ${String(row.last).slice(0, 16)}. Every other alert in this group reads stored sweep results, so while sweeps are not running they will report nothing - which looks exactly like a clean site.\n\nWith several brands the scheduled job rotates one per tick, so each brand is swept every N days by design; raise the threshold if that is the intended cadence.`,
       affected: [brand.site_url],
       action: 'Check the scheduled job is firing (Settings → scheduled work, or /internal/cron/status), then run a sweep by hand from the tracking board to confirm it completes.',
       evidence: { lastSweep: row.last, ageDays },
@@ -1700,7 +1700,7 @@ function brandCapabilities(brand) {
     // The AI SEO alerts read stored analysis results, so each one's capability
     // is "has that analysis ever completed for this brand". Gating on the run
     // rather than on a credential is what makes a subscription unusable until
-    // there is actually something for it to read — otherwise it would sit
+    // there is actually something for it to read - otherwise it would sit
     // enabled and silent, which is worse than being unavailable.
     aiseo_readiness: has("SELECT COUNT(*) n FROM aiseo_runs WHERE brand_id=? AND kind='readiness' AND status='completed'"),
     aiseo_tracking: has("SELECT COUNT(*) n FROM aiseo_runs WHERE brand_id=? AND kind='tracking' AND status='completed'"),

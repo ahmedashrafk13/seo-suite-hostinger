@@ -8,7 +8,8 @@
 // pool the audit port uses over node:http. Behaviour that matters to the
 // results — the frontier order, robots handling, retry statuses, the crawl
 // delay cap — is preserved.
-const { fetchUrl, decodeBody, sleep } = require('../lib/http');
+const { fetchUrl, decodeBody, sleep, fetchMaybeRendered } = require('../lib/http');
+const renderer = require('../lib/renderer');
 const { buildRobotsMatcher } = require('../audit/crawl');
 const { DEFAULTS, L, acceptLanguageHeader } = require('./config');
 const {
@@ -56,6 +57,11 @@ class Crawler {
     this.crawlDelay = 0;
     this.throttled = 0;
     this.filteredOut = 0;
+    // Pages recovered by the rendering service, and the run's spending cap.
+    // The cap is sized from the page budget, so the worst case of this crawl
+    // is knowable before it starts rather than after the bill.
+    this.rendered = 0;
+    this.renderBudget = renderer.newBudget(this.cfg.max_pages);
     this.unfetchedDiscovered = new Set();
     this.canFetch = null;
     this.headers = {
@@ -131,10 +137,15 @@ class Crawler {
     let lastErr = null;
     for (let attempt = 0; attempt < this.cfg.max_retries; attempt += 1) {
       try {
-        const r = await fetchUrl(url, {
+        // Rendering is decided per page inside this call: the raw fetch runs
+        // first and for free, and only a page whose own HTML proves it is a
+        // shell costs a credit. On a server-rendered site this is exactly the
+        // fetch it always was.
+        const r = await fetchMaybeRendered(url, {
           timeout: this.cfg.request_timeout * 1000,
           headers: this.headers,
-        });
+        }, this.renderBudget);
+        if (r.rendered) this.rendered += 1;
         if (this.cfg.retry_statuses.includes(r.status) && attempt < this.cfg.max_retries - 1) {
           this.throttled += 1;
           await sleep(600 * (attempt + 1));

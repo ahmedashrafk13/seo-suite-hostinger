@@ -68,7 +68,7 @@ function n(v) { return Math.round(Number(v) || 0).toLocaleString('en-US'); }
   <% } else { %>
     <div class="stat-row">
       <div class="stat"><div class="label">Site health</div>
-        <div class="value"><span class="badge <%= report.health >= 90 ? 'good' : (report.health >= 70 ? 'medium' : 'critical') %>"><%= report.health == null ? '—' : report.health %>/100</span></div>
+        <div class="value"><span class="badge <%= report.health >= 90 ? 'good' : (report.health >= 70 ? 'medium' : 'critical') %>"><%= report.health == null ? ' - ' : report.health %>/100</span></div>
       </div>
       <div class="stat"><div class="label">Pages crawled</div><div class="value"><%= n(report.pagesCrawled) %></div></div>
       <div class="stat"><div class="label">Critical</div><div class="value"><%= report.bySeverity.critical || 0 %></div></div>
@@ -78,7 +78,7 @@ function n(v) { return Math.round(Number(v) || 0).toLocaleString('en-US'); }
 
     <h2>Failing checks (<%= report.failing.length %>)</h2>
     <% if (!report.failing.length) { %>
-      <p>No failing checks — every check passed.</p>
+      <p>No failing checks - every check passed.</p>
     <% } else { %>
       <table>
         <thead><tr><th>Severity</th><th>Issue</th><th class="num">Affected</th><th>Recommended action</th></tr></thead>
@@ -90,7 +90,7 @@ function n(v) { return Math.round(Number(v) || 0).toLocaleString('en-US'); }
                 <strong><%= f.issue %></strong>
                 <% if (f.items && f.items.length) { %>
                   <ul class="urls">
-                    <% f.items.slice(0, 8).forEach(function(it){ %><li><%= it.url || it.note || '—' %><% if (it.url && it.note) { %> — <%= it.note %><% } %><% if (it.sources && it.sources.length) { %><div class="action">Found on: <%= it.sources.slice(0, 5).join(', ') %><%= it.sources.length > 5 ? ' (+' + (it.sources.length - 5) + ' more)' : '' %></div><% } %></li><% }) %>
+                    <% f.items.slice(0, 8).forEach(function(it){ %><li><%= it.url || it.note || ' - ' %><% if (it.url && it.note) { %> - <%= it.note %><% } %><% if (it.sources && it.sources.length) { %><div class="action">Found on: <%= it.sources.slice(0, 5).join(', ') %><%= it.sources.length > 5 ? ' (+' + (it.sources.length - 5) + ' more)' : '' %></div><% } %></li><% }) %>
                   </ul>
                   <% if (f.items.length > 8) { %><div class="action"><%= f.items.length - 8 %> more not shown.</div><% } %>
                 <% } %>

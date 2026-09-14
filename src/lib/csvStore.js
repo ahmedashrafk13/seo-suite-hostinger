@@ -2,8 +2,8 @@
 //
 // The internal linking agent writes a report directory per run containing a
 // .docx plus five styled .xlsx workbooks and two JSON files. Those workbooks
-// are the genuinely useful output — the .docx is for clients, the xlsx files
-// are what an SEO actually works from — so this module reads them on demand
+// are the genuinely useful output - the .docx is for clients, the xlsx files
+// are what an SEO actually works from - so this module reads them on demand
 // and hands them to the UI as sortable, filterable, paginated tables, with
 // the raw file still downloadable.
 //
@@ -29,7 +29,7 @@ const LINKING_FILES = [
     file: 'recommendations.xlsx',
     key: 'recommendations',
     label: 'Link recommendations',
-    description: 'Source page, target page and the exact anchor text to use — each anchor is text that already appears verbatim on the source page, so nothing has to be invented.',
+    description: 'Source page, target page and the exact anchor text to use - each anchor is text that already appears verbatim on the source page, so nothing has to be invented.',
     primary: true,
     columns: [
       { key: 'priority', label: '#', width: 'narrow' },
@@ -117,7 +117,7 @@ function resolveLinkingFile(outDir, def) {
 }
 
 // Minimal CSV parser for legacy pre-migration files: handles quoted fields,
-// embedded commas, and escaped quotes ("") — the same shape the old hand-
+// embedded commas, and escaped quotes ("") - the same shape the old hand-
 // rolled CSV writers produced.
 function parseLegacyCsv(text) {
   const rows = [];
@@ -187,7 +187,7 @@ function readCsvFile(filePath) {
 }
 
 // The linking crawler's full page inventory (every page it crawled, with
-// word count, title, primary keyword, link counts) — not one of the five
+// word count, title, primary keyword, link counts) - not one of the five
 // deliverable CSVs, so it isn't in LINKING_FILES, but it's the only place a
 // real word-count baseline or topical-overlap signal can come from without
 // an external crawl. Read on demand, same reasoning as the CSVs: it can run
@@ -318,7 +318,7 @@ function resolveDownload(outDir, filename) {
 const AUDIT_ACTIONS = {
   dup_titles: 'Give each page a unique title that describes that page specifically. Duplicate titles make Google choose between near-identical pages.',
   dup_meta: 'Write a unique meta description per page. Duplicates are usually a template writing the same text everywhere.',
-  dup_content: 'Consolidate or differentiate the duplicated pages. Decide which URL should rank before adding canonicals — canonical changes need SEO approval.',
+  dup_content: 'Consolidate or differentiate the duplicated pages. Decide which URL should rank before adding canonicals - canonical changes need SEO approval.',
   missing_title: 'Add a title tag. A page with no title has Google invent one from the content, which almost always performs worse.',
   missing_h1: 'Add a single H1 that states what the page is about, using the wording searchers actually use.',
   multiple_h1: 'Keep one H1 per page and demote the rest to H2/H3 so the heading hierarchy reflects the content structure.',
@@ -326,17 +326,17 @@ const AUDIT_ACTIONS = {
   text_ratio: 'Reduce template and script weight relative to content, or add substantive content to the page.',
   missing_alt: 'Add descriptive alt text to every content image. This is both an accessibility requirement and how images get found in search.',
   broken_links: 'Fix or remove each broken link. Update the target where the destination moved, and drop the link where it is genuinely gone.',
-  broken_internal: 'Fix internal links pointing at dead URLs — these waste crawl budget and leak internal link equity.',
+  broken_internal: 'Fix internal links pointing at dead URLs - these waste crawl budget and leak internal link equity.',
   broken_external: 'Update or remove links to external pages that no longer exist.',
   redirect_chains: 'Point each link directly at the final destination so there is a single hop. Chains slow crawling and dilute signals.',
-  non_indexable: 'Confirm each non-indexable page is meant to be excluded. If a page should rank, remove the noindex or robots block — robots.txt changes need SEO approval.',
+  non_indexable: 'Confirm each non-indexable page is meant to be excluded. If a page should rank, remove the noindex or robots block - robots.txt changes need SEO approval.',
   canonical: 'Review each canonical tag. Every indexable page should normally canonicalise to itself; cross-page canonicals must be deliberate. Canonical edits need SEO approval.',
-  slow_pages: 'Profile the slowest pages in PageSpeed Insights and address the largest opportunities — usually images, render-blocking resources and server response time.',
+  slow_pages: 'Profile the slowest pages in PageSpeed Insights and address the largest opportunities - usually images, render-blocking resources and server response time.',
   orphans: 'Add editorial internal links to each orphan page from topically related content. Use the internal linking report to find the best sources and anchor text.',
   viewport: 'Add a viewport meta tag so the page renders correctly on mobile.',
   charset: 'Declare the character set in the document head to prevent encoding problems.',
   doctype: 'Add a doctype declaration so browsers do not fall back to quirks mode.',
-  empty_anchor: 'Give every link visible, descriptive anchor text — or an aria-label where the link is an icon.',
+  empty_anchor: 'Give every link visible, descriptive anchor text - or an aria-label where the link is an icon.',
   nondesc_anchor: 'Replace "click here" and "read more" with anchor text that describes the destination.',
   hsts: 'Enable HSTS so browsers only ever connect over HTTPS.',
   sitemap: 'Fix the sitemap so it lists only canonical, indexable, 200-status URLs. Sitemap changes need SEO approval.',

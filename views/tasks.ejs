@@ -6,6 +6,12 @@
 <%- include('partials/sidebar') %>
 <%- include('partials/topbar') %>
 
+<%- include('partials/pagehead', {
+      heading: "Tasks",
+      lede: "Everything the audits, alerts and opportunity scans have proposed, and who is doing it."
+    }) %>
+
+
     <%
       // filters uses the internal names (brandId, search); the routes read the
       // query-string names (brand, q). Mapping between them here is what keeps
@@ -43,14 +49,14 @@
         return { cls: '', text: 'Due ' + t.due_date.slice(5) };
       }
       function initials(name) {
-        if (!name) return '—';
+        if (!name) return ' - ';
         var parts = String(name).trim().split(/[\s@._-]+/).filter(Boolean);
-        if (!parts.length) return '—';
+        if (!parts.length) return ' - ';
         return (parts[0][0] + (parts[1] ? parts[1][0] : '')).slice(0, 2);
       }
 
       // Human-readable summary of what is currently filtering the board, each
-      // removable on its own — an empty board should never be a mystery.
+      // removable on its own - an empty board should never be a mystery.
       var activeChips = [];
       if (filters.brandId) {
         var fb = brands.filter(function(b){ return b.id === filters.brandId; })[0];
@@ -78,7 +84,7 @@
           on: Boolean(filters.onlyOpen) },
         { label: 'Needs approval', value: counts.needsApproval, href: '?' + qs(Object.assign({}, noFilter, { approval: 'pending' })),
           on: filters.approval === 'pending', cls: counts.needsApproval ? 'warn' : '',
-          hint: 'Flagged for SEO sign-off — most sit in Backlog, not in the Awaiting column' },
+          hint: 'Flagged for SEO sign-off - most sit in Backlog, not in the Awaiting column' },
         { label: 'Overdue', value: counts.overdue, href: '?' + qs(Object.assign({}, noFilter, { overdue: '1' })),
           on: Boolean(filters.overdue), cls: counts.overdue ? 'bad' : '' },
         { label: 'Done', value: counts.done, href: '?' + qs(Object.assign({}, noFilter, { status: 'done' })),
@@ -108,15 +114,6 @@
         <form method="GET" action="/tasks">
           <input type="hidden" name="view" value="<%= view %>">
           <div class="filter-bar">
-            <div class="fb-field">
-              <label for="f-brand">Brand</label>
-              <select id="f-brand" name="brand">
-                <option value="">All brands</option>
-                <% brands.forEach(function(b){ %>
-                  <option value="<%= b.id %>" <%= filters.brandId === b.id ? 'selected' : '' %>><%= b.name %></option>
-                <% }) %>
-              </select>
-            </div>
             <div class="fb-field">
               <label for="f-status">Status</label>
               <select id="f-status" name="status">
@@ -177,48 +174,97 @@
     </div>
 
     <% if (view === 'board') { %>
+      <%
+      /* EMPTY LANES DO NOT GET A COLUMN.
+         A real board here is 172 tasks in Backlog and nothing anywhere else,
+         because three of the four lanes only fill up once someone starts
+         moving work by hand. Giving each of those a full-width dashed box
+         produced three tall empty boxes and a screen of white space beside
+         one scrolling column - the emptiness was the most prominent thing on
+         the page.
+
+         Lanes with work become columns. Lanes without it collapse into one
+         quiet strip underneath that still names them, still shows the zero
+         and still explains what each is for on hover, so nothing is hidden
+         and the board keeps teaching its own workflow. The strip costs one
+         row instead of three columns. */
+      const liveCols = openCols.filter(function (c) { return c.tasks.length; });
+      const quietCols = openCols.filter(function (c) { return !c.tasks.length; });
+      const openTotal = openCols.reduce(function (a, c) { return a + c.total; }, 0);
+      %>
       <details class="board-group" open>
         <summary>
           Active work
-          <span class="grp-count"><%= openCols.reduce(function(a,c){ return a + c.total; }, 0) %> open</span>
+          <span class="grp-count"><%= openTotal %> open</span>
         </summary>
-        <div class="board">
-          <% openCols.forEach(function(col){ %>
-            <div class="board-col <%= col.tasks.length ? '' : 'is-empty' %>">
+
+        <% if (!liveCols.length) { %>
+          <div class="empty-state">
+            <div class="icon">&#9744;</div>
+            No open tasks match these filters.
+          </div>
+        <% } else { %>
+        <div class="board" style="--board-cols:<%= liveCols.length %>">
+          <% liveCols.forEach(function(col){ %>
+            <div class="board-col">
               <div class="board-col-head">
                 <span class="status-dot <%= col.value %>"></span>
                 <span class="t"><%= col.label %></span>
                 <span class="n"><%= col.total %></span>
               </div>
               <div class="board-col-body">
-                <% if (!col.tasks.length) { %>
-                  <div class="empty-state" style="padding:14px 6px;font-size:12px"><%= col.description %></div>
-                <% } %>
                 <% col.tasks.forEach(function(t){ var due = dueMeta(t); %>
                   <a class="task-card <%= t.severity %> <%= due && due.cls === 'overdue' ? 'is-overdue' : '' %>" href="/tasks/<%= t.id %>">
                     <div class="tc-title" title="<%= t.title %>"><%= t.title %></div>
+                    <%
+                      /* Card density.
+                         -------------------------------------------------
+                         This used to be four stacked rows: title, a row of
+                         pill chips, a URL line, then a footer. The chips
+                         wrapped onto two or three lines on a 280px column,
+                         so a one-line task took ~110px and six cards filled
+                         the screen.
+
+                         Severity is already carried by the coloured bar down
+                         the left edge, so repeating it as a filled badge was
+                         saying the same thing twice. It survives as plain
+                         text, which keeps it readable without colour and
+                         costs no vertical space.
+
+                         The URL guard tests the STRING THAT GETS RENDERED,
+                         not the raw value. shortUrl() reduces any origin to
+                         its path, so "https://example.com/" comes back as
+                         "/" - guarding on the raw URL let a bare slash
+                         through under every single card. */
+                      var _url = t.affected_url ? shortUrl(t.affected_url, 80) : '';
+                      var _showUrl = _url && _url !== '/' && _url !== ' - ';
+                    %>
                     <div class="tc-meta">
-                      <span class="badge <%= t.severity %>"><%= t.severity %></span>
-                      <span class="chip"><%= sources[t.source] || t.source %></span>
-                      <% if (t.brand_name) { %><span class="chip brand"><%= t.brand_name %></span><% } %>
-                      <% if (t.requires_approval) { %>
-                        <span class="badge <%= t.approved_at ? 'good' : 'medium' %>"><%= t.approved_at ? 'approved' : 'needs approval' %></span>
+                      <span class="dot-sev <%= t.severity %>" aria-hidden="true"></span>
+                      <span class="tc-sev"><%= t.severity %></span>
+                      <span class="tc-sep" aria-hidden="true">&middot;</span>
+                      <span><%= sources[t.source] || t.source %></span>
+                      <% if (t.brand_name) { %>
+                        <span class="tc-sep" aria-hidden="true">&middot;</span>
+                        <span class="tc-brand"><%= t.brand_name %></span>
                       <% } %>
                     </div>
-                    <% if (t.affected_url) { %>
-                      <div class="tc-url" title="<%= t.affected_url %>"><%= shortUrl(t.affected_url, 80) %></div>
+                    <% if (_showUrl) { %>
+                      <div class="tc-url" title="<%= t.affected_url %>"><%= _url %></div>
                     <% } %>
                     <%
                       // The footer only earns its space when it carries
                       // something: a board where every card says "Unassigned"
                       // is 119 rows of noise, not information.
-                      var hasFoot = t.assignee || due || t.effort;
+                      var hasFoot = t.assignee || due || t.effort || t.requires_approval;
                     %>
                     <% if (hasFoot) { %>
                       <div class="tc-foot">
+                        <% if (t.requires_approval) { %>
+                          <span class="badge <%= t.approved_at ? 'good' : 'medium' %>"><%= t.approved_at ? 'approved' : 'needs approval' %></span>
+                        <% } %>
                         <% if (t.assignee) { %>
-                          <span class="avatar" title="<%= t.assignee %>"><%= initials(t.assignee) %></span>
-                          <span><%= t.assignee %></span>
+                          <span class="avatar sm" title="<%= t.assignee %>"><%= initials(t.assignee) %></span>
                         <% } %>
                         <span class="spacer"></span>
                         <% if (due) { %>
@@ -234,13 +280,27 @@
               <% if (col.total > col.tasks.length) { %>
                 <div class="board-col-foot">
                   <a href="/tasks?<%= qs({ view: 'table', status: col.value }) %>">
-                    +<%= col.total - col.tasks.length %> more — open in table
+                    +<%= col.total - col.tasks.length %> more - open in table
                   </a>
                 </div>
               <% } %>
             </div>
           <% }) %>
         </div>
+        <% } %>
+
+        <% if (quietCols.length) { %>
+          <div class="board-quiet" role="list">
+            <span class="bq-label">Nothing in</span>
+            <% quietCols.forEach(function(col){ %>
+              <span class="bq-lane" role="listitem" title="<%= col.description %>">
+                <span class="status-dot <%= col.value %>"></span>
+                <span class="bq-name"><%= col.label %></span>
+                <span class="bq-n"><%= col.total %></span>
+              </span>
+            <% }) %>
+          </div>
+        <% } %>
       </details>
 
       <details class="board-group">
@@ -253,18 +313,16 @@
         <% if (!closedTotal) { %>
           <div class="empty-state">Nothing has been completed or dismissed yet.</div>
         <% } else { %>
+          <% const liveClosed = closedCols.filter(function (c) { return c.tasks.length; }); %>
           <div class="board board-closed">
-            <% closedCols.forEach(function(col){ %>
-              <div class="board-col <%= col.tasks.length ? '' : 'is-empty' %>">
+            <% liveClosed.forEach(function(col){ %>
+              <div class="board-col">
                 <div class="board-col-head">
                   <span class="status-dot <%= col.value %>"></span>
                   <span class="t"><%= col.label %></span>
                   <span class="n"><%= col.total %></span>
                 </div>
                 <div class="board-col-body">
-                  <% if (!col.tasks.length) { %>
-                    <div class="empty-state" style="padding:14px 6px;font-size:12px"><%= col.description %></div>
-                  <% } %>
                   <% col.tasks.forEach(function(t){ %>
                     <a class="task-card <%= t.severity %>" href="/tasks/<%= t.id %>">
                       <div class="tc-title" title="<%= t.title %>"><%= t.title %></div>
@@ -287,7 +345,7 @@
                 <% if (col.total > col.tasks.length) { %>
                   <div class="board-col-foot">
                     <a href="/tasks?<%= qs({ view: 'table', status: col.value }) %>">
-                      +<%= col.total - col.tasks.length %> more — open in table
+                      +<%= col.total - col.tasks.length %> more - open in table
                     </a>
                   </div>
                 <% } %>
@@ -333,15 +391,15 @@
                 <tr>
                   <td class="pick"><input type="checkbox" name="task_ids" value="<%= t.id %>" aria-label="Select task <%= t.id %>"></td>
                   <td class="wrap col-title"><a href="/tasks/<%= t.id %>"><%= t.title %></a></td>
-                  <td class="wrap col-brand"><%= t.brand_name || '—' %></td>
+                  <td class="wrap col-brand"><%= t.brand_name || ' - ' %></td>
                   <td class="narrow">
                     <span class="status-dot <%= t.status %>" style="display:inline-block;margin-right:5px"></span><%= statusLabel[t.status] || t.status.replace('_',' ') %>
                   </td>
                   <td><span class="badge <%= t.severity %>"><%= t.severity %></span></td>
                   <td class="narrow"><%= sources[t.source] || t.source %></td>
-                  <td class="wrap col-assignee"><%= t.assignee || '—' %></td>
-                  <td class="narrow"><% if (due) { %><span class="tc-due <%= due.cls %>"><%= due.text %></span><% } else { %>—<% } %></td>
-                  <td><% if (t.requires_approval) { %><span class="badge <%= t.approved_at ? 'good' : 'medium' %>"><%= t.approved_at ? 'approved' : 'needed' %></span><% } else { %>—<% } %></td>
+                  <td class="wrap col-assignee"><%= t.assignee || ' - ' %></td>
+                  <td class="narrow"><% if (due) { %><span class="tc-due <%= due.cls %>"><%= due.text %></span><% } else { %> - <% } %></td>
+                  <td><% if (t.requires_approval) { %><span class="badge <%= t.approved_at ? 'good' : 'medium' %>"><%= t.approved_at ? 'approved' : 'needed' %></span><% } else { %> - <% } %></td>
                   <td class="narrow"><%= fmtDateTime(t.updated_at) %></td>
                 </tr>
               <% }) %>
@@ -368,7 +426,7 @@
               <div>
                 <label for="brand_id">Brand</label>
                 <select id="brand_id" name="brand_id">
-                  <option value="">— none —</option>
+                  <option value="">None</option>
                   <% brands.forEach(function(b){ %>
                     <option value="<%= b.id %>" <%= filters.brandId === b.id ? 'selected' : '' %>><%= b.name %></option>
                   <% }) %>

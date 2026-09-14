@@ -6,7 +6,7 @@ const config = require('./config');
 fs.mkdirSync(path.dirname(config.DB_PATH), { recursive: true });
 
 // SqliteDatabase is a thin adapter that prefers the native better-sqlite3 build
-// and falls back to a WebAssembly SQLite when no native binary can be loaded —
+// and falls back to a WebAssembly SQLite when no native binary can be loaded - 
 // the normal case on shared hosting, which has no compiler. See
 // lib/sqliteDriver.js. Everything below this line is engine-agnostic.
 const db = new SqliteDatabase(config.DB_PATH, { driver: config.DB_DRIVER });
@@ -21,7 +21,7 @@ console.log(`[db] ${db.engineName}, journal=${journalMode}, busy_timeout=${busyM
 // v1 stored alert_events keyed to `alert_rules` (rule_id NOT NULL) with
 // message/details/emailed columns. v2 keys them to brands + alert_subscriptions
 // and carries severity/affected/suggested_action. Since the v1 table cannot
-// accept a v2 insert, rebuild it — preserving nothing only when it is empty,
+// accept a v2 insert, rebuild it - preserving nothing only when it is empty,
 // and archiving the rows otherwise so nothing is silently destroyed.
 try {
   const hasTable = db.prepare(
@@ -263,7 +263,7 @@ CREATE TABLE IF NOT EXISTS ga4_event_daily (
 );
 CREATE INDEX IF NOT EXISTS idx_ga4_event_daily_brand_date ON ga4_event_daily (brand_id, date);
 
--- URL Inspection snapshots — the closest available substitute for GSC's Page
+-- URL Inspection snapshots - the closest available substitute for GSC's Page
 -- Indexing report (Google exposes no bulk "index coverage" API; this samples
 -- pages one at a time via the URL Inspection API, quota-limited to ~2,000
 -- calls/day/property, so it is a rolling sample rather than an exhaustive crawl).
@@ -453,7 +453,7 @@ CREATE TABLE IF NOT EXISTS keyword_runs (
 
 -- A cluster must be approved before a content brief can be generated for it
 -- (mirrors the same human-in-the-loop philosophy already enforced for tasks
--- in tasks.js — briefs are cheap to generate, but generating them for
+-- in tasks.js - briefs are cheap to generate, but generating them for
 -- arbitrary keywords defeats the point of "approved" in the brief spec).
 -- Clusters live inside keyword_runs.result_json, not their own rows, so
 -- approval is keyed on (keyword_run_id, cluster_id) rather than a foreign key.
@@ -495,7 +495,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 -- else, which is the failure this table exists to remove.
 --
 -- Stored per brand, in the clear, in the same database that already holds
--- Google OAuth refresh tokens — so the existing rule stands: data/app.db is
+-- Google OAuth refresh tokens - so the existing rule stands: data/app.db is
 -- gitignored and must never be copied off the host.
 --
 -- verify_* records the result of the last credential test, so an expired
@@ -539,7 +539,7 @@ try {
   addColumn('linking_runs', 'auth_used', 'auth_used INTEGER NOT NULL DEFAULT 0');
   addColumn('linking_runs', 'access_note', 'access_note TEXT');
   // One-time-per-brand inputs the Content Brief Agent cannot derive from any
-  // synced data — what the brand actually sells, and how it wants to ask for
+  // synced data - what the brand actually sells, and how it wants to ask for
   // the sale. Set once in the brand's settings, reused by every brief after.
   addColumn('brands', 'services_json', 'services_json TEXT');
   addColumn('brands', 'cta_json', 'cta_json TEXT');
@@ -599,8 +599,8 @@ CREATE INDEX IF NOT EXISTS idx_content_briefs_user ON content_briefs (user_id, c
 
 // ------------------------------------------------------------------ AI Assist
 // Additive, separate section for AI Assist (see src/lib/ai/*,
-// src/routes/aiAssist.js). Every table here is purely additive —
-// nothing above this block is touched — and every row is written only from
+// src/routes/aiAssist.js). Every table here is purely additive - 
+// nothing above this block is touched - and every row is written only from
 // an explicit, manual user action, never from a scheduled job.
 db.exec(`
 -- Every AI call this app ever makes is logged here for the hard spend cap
@@ -616,7 +616,7 @@ CREATE TABLE IF NOT EXISTS ai_usage_log (
 );
 CREATE INDEX IF NOT EXISTS idx_ai_usage_log_created ON ai_usage_log (created_at);
 
--- AI Content Brief: one row per (brand, cluster, inputs) — see input_hash.
+-- AI Content Brief: one row per (brand, cluster, inputs) - see input_hash.
 CREATE TABLE IF NOT EXISTS ai_content_briefs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
@@ -705,6 +705,34 @@ CREATE TABLE IF NOT EXISTS psi_reports (
 );
 CREATE INDEX IF NOT EXISTS idx_psi_reports_user ON psi_reports (user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_psi_reports_url ON psi_reports (url, strategy, created_at);
+
+-- Keyword Planner runs.
+--
+-- The page was built stateless on the theory that a research session is
+-- transient and anything worth keeping leaves as CSV. That was wrong in
+-- practice: navigating to another page and back lost a result that had just
+-- cost a Google Ads call and up to a minute of Bing lookups, which made the
+-- tool feel broken rather than lean.
+--
+-- The whole result object is stored, exactly as psi_reports stores the whole
+-- Lighthouse payload and for the same reason: a run can then be reopened
+-- months later and rendered precisely as it ran - including the basis line
+-- naming the account that produced it - without spending the quota again.
+-- params_json is the submitted form, so "run this again" refills every field.
+CREATE TABLE IF NOT EXISTS keyword_planner_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  label TEXT,
+  market TEXT,
+  language TEXT,
+  engines TEXT,
+  row_count INTEGER NOT NULL DEFAULT 0,
+  params_json TEXT NOT NULL,
+  result_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_kp_runs_user ON keyword_planner_runs (user_id, created_at);
 `);
 
 // ------------------------------------------------------------------- teams
@@ -764,9 +792,9 @@ try {
     if (!userCols.includes(name)) db.exec(`ALTER TABLE users ADD COLUMN ${name} ${decl}`);
   };
   addUser('team_id', 'INTEGER REFERENCES teams(id) ON DELETE SET NULL');
-  // admin  — runs the team: approves members, sets roles, assigns anything
-  // seo    — does the SEO work; may be granted assignment rights
-  // dev    — receives implementation tasks; read-only on everything else
+  // admin - runs the team: approves members, sets roles, assigns anything
+  // seo   - does the SEO work; may be granted assignment rights
+  // dev   - receives implementation tasks; read-only on everything else
   addUser('role', "TEXT NOT NULL DEFAULT 'admin'");
   // pending users can authenticate but see nothing until an admin approves.
   addUser('status', "TEXT NOT NULL DEFAULT 'active'");
@@ -797,7 +825,7 @@ try {
     VALUES (?,?,?,?,'admin',?)`);
   orphans.forEach((u) => {
     const label = u.name || String(u.email).split('@')[0];
-    // A short, human-typeable code rather than a UUID — it gets read aloud.
+    // A short, human-typeable code rather than a UUID - it gets read aloud.
     const code = `${label.replace(/[^a-z0-9]/gi, '').slice(0, 6).toLowerCase() || 'team'}-${u.id}${Math.random().toString(36).slice(2, 6)}`;
     const t = makeTeam.run(`${label}'s team`, u.id, code);
     setUser.run(t.lastInsertRowid, u.id);
@@ -829,7 +857,7 @@ try {
 // The URL Inspection response carries more than the original columns kept:
 // which Googlebot crawled the page, which sitemap it was found in, the pages
 // linking to it, and the rich-result types Google detected. All of it arrives
-// in the SAME API call that was already being made and was simply discarded —
+// in the SAME API call that was already being made and was simply discarded - 
 // so backfilling these columns costs no extra quota, it just stops throwing
 // the answer away. CREATE TABLE IF NOT EXISTS cannot add columns to an
 // existing table, hence the explicit ALTERs.
@@ -838,7 +866,7 @@ try {
   const add = (name, decl) => {
     if (!cols.includes(name)) db.exec(`ALTER TABLE url_inspections ADD COLUMN ${name} ${decl}`);
   };
-  add('crawled_as', 'TEXT');            // DESKTOP | MOBILE — which bot indexed it
+  add('crawled_as', 'TEXT');            // DESKTOP | MOBILE - which bot indexed it
   add('sitemap', 'TEXT');               // sitemap(s) the URL was discovered in
   add('referring_urls', 'TEXT');        // internal/external pages Google followed
   add('rich_result_verdict', 'TEXT');   // PASS | FAIL | NEUTRAL | null when none
@@ -850,7 +878,7 @@ try {
 
 // ------------------------------------------------ additional GSC/GA4 slices
 // Discover/News/Image/Video performance (GSC searchType dimension), GA4
-// new-vs-returning cross-tabs, GA4 cohort retention, and GA4 monetization —
+// new-vs-returning cross-tabs, GA4 cohort retention, and GA4 monetization - 
 // all additive, same style as the tables above.
 db.exec(`
 CREATE TABLE IF NOT EXISTS gsc_search_type (
@@ -867,7 +895,7 @@ CREATE INDEX IF NOT EXISTS idx_gsc_search_type_brand_date ON gsc_search_type (br
 
 -- New-vs-returning cross-tab. Kept as separate tables (rather than an ALTER
 -- adding the dimension onto ga4_device_daily/ga4_geo_daily) because those
--- tables' primary keys do not include it — folding it in would let two rows
+-- tables' primary keys do not include it - folding it in would let two rows
 -- with the same PK but different new_vs_returning values collide on upsert.
 CREATE TABLE IF NOT EXISTS ga4_device_segment_daily (
   brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
@@ -906,7 +934,7 @@ CREATE TABLE IF NOT EXISTS ga4_retention (
 );
 
 -- Monetization (ecommerce) metrics. Zero/blank for brands without ecommerce
--- tracking configured in GA4 — that is expected, not a sync failure.
+-- tracking configured in GA4 - that is expected, not a sync failure.
 CREATE TABLE IF NOT EXISTS ga4_monetization (
   brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
   date TEXT NOT NULL,
@@ -918,7 +946,7 @@ CREATE TABLE IF NOT EXISTS ga4_monetization (
 
 -- Predictive metrics (purchaseProbability, churnProbability,
 -- predictedRevenuePer90Days). GA4 only computes these for properties with
--- enough purchase/conversion volume and eligible audiences enabled — most
+-- enough purchase/conversion volume and eligible audiences enabled - most
 -- brands will simply have zero rows here, which is expected, not a sync
 -- failure. See syncGa4Predictive in sync.js.
 CREATE TABLE IF NOT EXISTS ga4_predictive (
@@ -933,7 +961,7 @@ CREATE TABLE IF NOT EXISTS ga4_predictive (
 -- Generic store for whatever custom dimensions/metrics a brand's GA4
 -- property happens to have configured. Deliberately schema-less about the
 -- dimension/metric names themselves (one row per dimension/metric-name pair
--- per day) since those vary per property and must never be hardcoded — see
+-- per day) since those vary per property and must never be hardcoded - see
 -- syncGa4CustomDimensions in sync.js.
 CREATE TABLE IF NOT EXISTS ga4_custom_dimensions (
   brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
@@ -956,13 +984,13 @@ CREATE INDEX IF NOT EXISTS idx_ga4_custom_dimensions_brand_date ON ga4_custom_di
 // plus the tracking board all persist through this block.
 //
 // WHY THIS IS FOUR TABLES AND NOT THIRTY
-// Every one of those features has the same shape: someone — or a cron tick —
+// Every one of those features has the same shape: someone - or a cron tick - 
 // runs an analysis against a brand or a URL, and it produces a score, a set
 // of findings, and some metrics worth keeping a time series of. Giving each
 // feature its own runs+findings pair would mean nine near-identical schemas,
 // nine list queries, nine "delete a run" handlers, and nine places to
 // remember when the task bridge or the alert engine changes. So the run
-// itself is generic — `kind` says which analysis it was — and the payload
+// itself is generic - `kind` says which analysis it was - and the payload
 // stays in json_result, exactly as audit_runs and linking_runs already do.
 //
 // Findings are pulled OUT of the JSON into their own table because they are
@@ -1121,7 +1149,7 @@ CREATE TABLE IF NOT EXISTS competitors (
 -- The canonical-facts hub an AI engine should be able to read and trust:
 -- what the company is, where it operates, what it charges, who runs it.
 -- Written once by a human, then rendered into llms.txt, Organization schema
--- and the brand hub page — so all three say the same thing by construction
+-- and the brand hub page - so all three say the same thing by construction
 -- rather than by somebody remembering to update three places.
 CREATE TABLE IF NOT EXISTS brand_facts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1168,12 +1196,12 @@ CREATE INDEX IF NOT EXISTS idx_mentions_brand ON mentions (brand_id, published_a
 -- ------------------------------------------------------- sitemap snapshots
 -- Real, observed publishing velocity for a site (this brand's own, or a
 -- competitor's), built by diffing the sitemap against what a previous run
--- saw — rather than guessing from lastmod dates alone, which many CMS
+-- saw - rather than guessing from lastmod dates alone, which many CMS
 -- platforms stamp identically for every page at deploy time and which says
 -- nothing about when a page was actually published.
 --
 -- One row per URL ever seen for a given (brand_id, site). first_seen_at is
--- set once and never rewritten — a fresh sitemap-vs-history run cannot
+-- set once and never rewritten - a fresh sitemap-vs-history run cannot
 -- retroactively make an old page look new. removed_at is set the first run
 -- that no longer finds the URL, and cleared if it reappears. This is the
 -- ledger a "velocity" figure is computed from; nothing here is guessed.
@@ -1207,18 +1235,18 @@ CREATE INDEX IF NOT EXISTS idx_sitemap_history_runs_site ON sitemap_history_runs
 `);
 
 /// ==========================================================================
-// SPECIALIST TOOLING — eight capabilities the suite was missing
+// SPECIALIST TOOLING - eight capabilities the suite was missing
 // ==========================================================================
 //
 // These table groups back the features added for day-to-day client-side SEO
 // work: change annotations, imported rank data, server-log analysis, hreflang
 // audits, redirect maps, IndexNow submissions and client report sharing. (The
-// portfolio roll-up stores nothing of its own — it reads what is already
+// portfolio roll-up stores nothing of its own - it reads what is already
 // here, which is the reason it was cheap to build.)
 //
 // Every one follows the rule the rest of the schema follows: user_id for team
 // scoping, brand_id for the subject, and a stored provenance field naming
-// where a number came from — because a rank imported from a tracker's CSV and
+// where a number came from - because a rank imported from a tracker's CSV and
 // a position averaged out of Search Console are not the same measurement, and
 // must never be rendered as though they were.
 db.exec(`
@@ -1237,7 +1265,7 @@ db.exec(`
 -- category fragments into "deploy", "Deploy" and "release" within a month and
 -- stops being filterable.
 --
--- brand_id NULL means the event affects every brand — which is exactly what a
+-- brand_id NULL means the event affects every brand - which is exactly what a
 -- Google algorithm update is, and the reason the column is nullable.
 CREATE TABLE IF NOT EXISTS annotations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1319,8 +1347,8 @@ CREATE INDEX IF NOT EXISTS idx_rank_pos_day ON rank_positions (brand_id, capture
 -- A month of access logs for a modest site is millions of lines and hundreds
 -- of megabytes. Storing them in a single-writer WebAssembly SQLite on shared
 -- hosting would be the last thing this database ever did. Every question a
--- log answers for SEO — which bot hit what, how often, with what status, how
--- much crawl budget went to junk, which pages Googlebot has never touched —
+-- log answers for SEO - which bot hit what, how often, with what status, how
+-- much crawl budget went to junk, which pages Googlebot has never touched - 
 -- is answerable from per-day-per-bot and per-URL-per-bot counters, so the
 -- parse happens in a stream and only the counters are written.
 --
@@ -1349,7 +1377,7 @@ CREATE TABLE IF NOT EXISTS log_imports (
 CREATE INDEX IF NOT EXISTS idx_log_imports_brand ON log_imports (brand_id, created_at);
 
 -- One row per brand/bot/day. Re-importing an overlapping window ADDS to these
--- counters — the honest fix is to show which date ranges have been imported
+-- counters - the honest fix is to show which date ranges have been imported
 -- (which log_imports records) rather than to pretend lines carrying no unique
 -- id can be de-duplicated.
 CREATE TABLE IF NOT EXISTS log_bot_daily (
@@ -1384,7 +1412,7 @@ CREATE INDEX IF NOT EXISTS idx_log_url_hits ON log_url_stats (brand_id, bot, hit
 
 -- ---------------------------------------------------------------- hreflang
 -- One row per audited page set, with the issue counts kept as columns so a
--- list page can be rendered without parsing every payload — the same reason
+-- list page can be rendered without parsing every payload - the same reason
 -- aiseo_findings exists.
 CREATE TABLE IF NOT EXISTS hreflang_runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1514,7 +1542,7 @@ try {
   addColumn('brands', 'report_footer', 'report_footer TEXT');
   addColumn('brands', 'report_contact', 'report_contact TEXT');
   // The IndexNow key for this site. Held per brand because the key must be
-  // published as a file at the site's own root — one key cannot cover two
+  // published as a file at the site's own root - one key cannot cover two
   // domains.
   addColumn('brands', 'indexnow_key', 'indexnow_key TEXT');
   addColumn('brands', 'indexnow_key_location', 'indexnow_key_location TEXT');
@@ -1522,7 +1550,7 @@ try {
   // against production before it goes live.
   addColumn('brands', 'staging_origin', 'staging_origin TEXT');
   // The specialist's own narrative on a report, written once and re-rendered
-  // by the report page, the print view and the client share link — so all
+  // by the report page, the print view and the client share link - so all
   // three carry the same commentary rather than three drafts of it.
   addColumn('weekly_reports', 'commentary', 'commentary TEXT');
   addColumn('weekly_reports', 'commentary_updated_at', 'commentary_updated_at TEXT');
@@ -1535,7 +1563,7 @@ try {
 // behaviour", never "crash".
 try {
   // Comma-separated seed topics for research when a brand has no GSC history
-  // yet — a brand-new site has nothing to expand from.
+  // yet - a brand-new site has nothing to expand from.
   addColumn('brands', 'seed_topics', 'seed_topics TEXT');
   // Where the brand publishes its canonical-facts hub, if not /about.
   addColumn('brands', 'brand_hub_path', 'brand_hub_path TEXT');
@@ -1557,11 +1585,111 @@ try {
   console.error('[db] aiseo migration warning:', e.message);
 }
 
+// --------------------------------------------------------------- leads
+// Conversions that are not page views.
+//
+// WHY THIS TABLE EXISTS
+// Every number in this app up to here is a Search Console or GA4 metric, and
+// both stop at the moment a visitor arrives. A client does not ask whether a
+// page gained clicks; they ask whether it produced business. GA4's own
+// `conversions` metric is the closest this suite had, and it is a count of
+// events fired in the browser - it cannot say which of those turned into a
+// booked job, and it is gone the moment consent is declined or an ad blocker
+// runs. A lead posted server-to-server by the form handler or the CRM is
+// recorded whatever the browser did.
+//
+// WHAT IT IS JOINED TO
+// `landing_path` is a normalised path, not a URL, because the two tables it
+// has to meet disagree: gsc_page_daily stores an absolute URL and
+// ga4_page_daily stores a path. Normalising once on the way in means neither
+// side has to be rewritten, and the join is an equality test rather than a
+// LIKE over a URL. See lib/leads.js normalisePath() for the exact rules.
+//
+// PII WARNING - READ BEFORE ADDING A FEATURE THAT READS THIS TABLE
+// These rows carry a real person's name, email and phone number, which is a
+// category of data nothing else in this database held. Three rules follow, and
+// all three are enforced in code rather than documented and hoped for:
+//  - data/app.db is gitignored and must not be copied off the host. That rule
+//     already existed for Google refresh tokens and crawl credentials; this
+//     table is the reason it now also matters under GDPR.
+//  - A client share link (lib/reportShares.js) renders lead COUNTS and value,
+//     never a contact detail. A shared URL has no password on it, and
+//     verify_leads.js asserts against the rendered page rather than trusting
+//     the template to have been written correctly.
+//  - Contact details leave this app only through the Leads page and its Excel
+//     export, both of which need a session. The weekly report email is
+//     unchanged and carries no lead data at all.
+db.exec(`
+CREATE TABLE IF NOT EXISTS leads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  -- The sender's own identifier for this lead. Optional, but supplying it makes
+  -- the endpoint idempotent: a CRM that retries a failed POST, or a form that
+  -- fires twice on a double-click, produces one row instead of two. SQLite
+  -- treats NULLs as distinct in a UNIQUE index, so leads without one are
+  -- unaffected by each other.
+  external_id TEXT,
+  occurred_at TEXT NOT NULL,
+  -- Normalised path ('/contact'), joinable to gsc_page_daily/ga4_page_daily.
+  landing_path TEXT,
+  -- Exactly what was posted, kept unmodified so a normalisation bug is
+  -- diagnosable after the fact rather than having silently eaten the evidence.
+  landing_url TEXT,
+  source TEXT,
+  medium TEXT,
+  campaign TEXT,
+  referrer TEXT,
+  -- Derived once on insert (organic/paid/referral/direct/email/social/other) so
+  -- the attribution query does not re-derive it per row per request.
+  channel TEXT NOT NULL DEFAULT 'unknown',
+  status TEXT NOT NULL DEFAULT 'new',
+  value REAL,
+  currency TEXT,
+  name TEXT,
+  email TEXT,
+  phone TEXT,
+  company TEXT,
+  note TEXT,
+  -- The whole payload as received. A form tool sends fields nobody anticipated
+  -- and they are worth keeping; the columns above are only the ones this app
+  -- can reason about.
+  raw_json TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (brand_id, external_id)
+);
+CREATE INDEX IF NOT EXISTS idx_leads_brand_when ON leads (brand_id, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_leads_brand_path ON leads (brand_id, landing_path);
+CREATE INDEX IF NOT EXISTS idx_leads_brand_status ON leads (brand_id, status);
+`);
+
+try {
+  // The ingest key for POST /api/leads. Held per brand, and stored as a hash
+  // for the same reason a password is: this endpoint is the one credential in
+  // the app that gets pasted into a third party's form builder, so it will end
+  // up in someone else's dashboard, someone's Slack, and eventually a support
+  // ticket. A leaked key writes junk into one brand's leads and reads nothing.
+  // The hint is the last four characters, so a key can be identified in the UI
+  // without being shown again.
+  addColumn('brands', 'lead_key_hash', 'lead_key_hash TEXT');
+  addColumn('brands', 'lead_key_hint', 'lead_key_hint TEXT');
+  addColumn('brands', 'lead_key_created_at', 'lead_key_created_at TEXT');
+  // Counters, so the settings page can answer "is it wired up yet?" without a
+  // scan of the leads table and without confusing "nothing has posted" with
+  // "something posted and was rejected".
+  addColumn('brands', 'lead_last_seen_at', 'lead_last_seen_at TEXT');
+  addColumn('brands', 'lead_last_error', 'lead_last_error TEXT');
+  addColumn('brands', 'lead_last_error_at', 'lead_last_error_at TEXT');
+} catch (e) {
+  console.error('[db] leads migration warning:', e.message);
+}
+
+
 // Release the database when the process ends, however it ends.
 //
 // This matters far more with the WebAssembly engine than it did with the native
 // one. node-sqlite3-wasm holds SQLite's file lock as a "<database>.lock"
-// DIRECTORY, and only the process that created it removes it — so a process
+// DIRECTORY, and only the process that created it removes it - so a process
 // that exits without closing leaves the lock behind and every later connection
 // fails with "database is locked" until someone deletes it by hand. It also
 // leaves the WASM runtime's handles open, which is what produces the
@@ -1572,7 +1700,7 @@ try {
 // script after it failed to open the database at all.
 //
 // 'exit' fires for a normal return and for an explicit process.exit(), and only
-// synchronous work is allowed there — which close() is. The signal handlers
+// synchronous work is allowed there - which close() is. The signal handlers
 // cover Passenger stopping an idle app. Nothing can be done about SIGKILL,
 // which is what the stale-lock recovery in lib/sqliteDriver.js is for.
 let closed = false;
@@ -1583,7 +1711,7 @@ function closeDb() {
 }
 process.on('exit', closeDb);
 // beforeExit fires when the loop empties but the process may still continue, so
-// it is deliberately NOT hooked — closing there would break a server that is
+// it is deliberately NOT hooked - closing there would break a server that is
 // merely idle between requests.
 process.once('SIGINT', () => { closeDb(); process.exit(130); });
 process.once('SIGTERM', () => { closeDb(); process.exit(143); });

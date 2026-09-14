@@ -1,7 +1,23 @@
 <%
-function pct(v) { return v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`; }
+// SHARED BY THE PRINT VIEW AND THE CLIENT SHARE LINK.
+//
+// Both /reports/:id/print and the public /r/:token render this file, so every
+// addition below is optional and defaulted here rather than being required of
+// both callers. The alternative - a second near-identical template for clients
+// - is what the commentary column was added to avoid: one report, one
+// narrative, rendered in two places.
+const isShare = !!locals.share;
+const wl = locals.brand || {};
+const accent = /^#[0-9a-f]{3,8}$/i.test(String(wl.accent || '')) ? wl.accent : null;
+const commentary = locals.commentary || null;
+const leadSummary = locals.leadSummary || null;
+function pct(v) { return v == null ? ' - ' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`; }
 function n(v) { return Math.round(Number(v) || 0).toLocaleString('en-US'); }
-function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
+function pos(v) { return v == null ? ' - ' : Number(v).toFixed(1); }
+function money(v, cur) {
+  const amount = Math.round(Number(v) || 0).toLocaleString('en-US');
+  return cur ? `${cur} ${amount}` : amount;
+}
 %>
 <!doctype html>
 <html lang="en">
@@ -63,13 +79,48 @@ function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
     table { break-inside: auto; }
     tr { break-inside: avoid; }
   }
+  .wl-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .wl-head img { max-height: 46px; max-width: 220px; width: auto; }
+  .wl-head .who { font-weight: 650; font-size: 15px; }
+  .commentary { background: #f8fafc; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: 14px 16px; margin: 12px 0 4px; }
+  .commentary p { margin: 0 0 8px; } .commentary p:last-child { margin-bottom: 0; }
+  .report-foot { margin-top: 34px; padding-top: 14px; border-top: 1px solid var(--border); color: var(--text-2); font-size: 12px; }
 </style>
+<% if (accent) { %><style>:root { --accent: <%= accent %>; --low: <%= accent %>; }</style><% } %>
 </head>
 <body>
   <div class="print-bar"><button onclick="window.print()">Print / Save as PDF</button></div>
 
-  <h1><%= row.brand_name %> — Weekly SEO Report</h1>
-  <div class="sub"><%= d.period.startDate %> &rarr; <%= d.period.endDate %> &middot; generated <%= new Date(d.generatedAt).toISOString().slice(0, 16).replace('T', ' ') %> &middot; <%= row.site_url %></div>
+  <% if (wl.logoUrl || wl.company) { %>
+    <div class="wl-head">
+      <% if (wl.logoUrl) { %><img src="<%= wl.logoUrl %>" alt="<%= wl.company || row.brand_name %>"><% } %>
+      <% if (wl.company) { %><div class="who"><%= wl.company %></div><% } %>
+    </div>
+  <% } %>
+
+  <h1><%= row.brand_name %> - Weekly SEO Report</h1>
+  <div class="sub"><%= d.period.startDate %> &rarr; <%= d.period.endDate %>
+    <% if (!isShare) { %>&middot; generated <%= new Date(d.generatedAt).toISOString().slice(0, 16).replace('T', ' ') %><% } %>
+    &middot; <%= row.site_url %></div>
+
+  <% if (commentary) { %>
+    <h2>What happened this week</h2>
+    <%
+      /* The specialist's own words, written in the app as plain text. Rendered
+         paragraph by paragraph with EJS escaping intact rather than as HTML:
+         this string is typed by a user and displayed on a page served to
+         someone outside the team, which is precisely the shape of a stored XSS
+         and not a place to accept markup for the sake of bold text. */
+      /* Split on a blank line. The newline is built at runtime rather than
+         written as a regex escape because this is EJS inside a template that
+         several tools rewrite, and a lone backslash here has already been
+         mangled once. A textarea posts CRLF, so the CRs go first. */
+      const NL = String.fromCharCode(10);
+      const paras = String(commentary).split(String.fromCharCode(13)).join('')
+        .split(NL + NL).map(function(x){ return x.trim(); }).filter(Boolean);
+    %>
+    <div class="commentary"><% paras.forEach(function(para){ %><p><%= para %></p><% }) %></div>
+  <% } %>
 
   <h2>Summary</h2>
   <% if (d.headline && d.headline.length) { %>
@@ -94,6 +145,27 @@ function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
     <div class="stat"><div class="label">Conv. rate</div><div class="value"><%= d.analytics.convRate.recent.toFixed(2) %>%</div><div class="meta"><%= pct(d.analytics.convRate.pct) %> vs prior week</div></div>
     <div class="stat"><div class="label">Engagement rate</div><div class="value"><%= d.analytics.engagementRate.recent.toFixed(1) %>%</div><div class="meta"><%= pct(d.analytics.engagementRate.pct) %> vs prior week</div></div>
   </div>
+  <% } %>
+
+  <% if (leadSummary && leadSummary.total) { %>
+  <h2>Enquiries</h2>
+  <div class="stat-row">
+    <div class="stat"><div class="label">Leads</div><div class="value"><%= n(leadSummary.leads) %></div><div class="meta">recorded this period</div></div>
+    <div class="stat"><div class="label">From organic search</div><div class="value"><%= n(leadSummary.organic) %></div><div class="meta"><%= leadSummary.leads ? Math.round((leadSummary.organic / leadSummary.leads) * 100) : 0 %>% of all leads</div></div>
+    <div class="stat"><div class="label">Won</div><div class="value"><%= n(leadSummary.won) %></div><div class="meta"><%= n(leadSummary.qualified) %> qualified</div></div>
+    <div class="stat"><div class="label">Value won</div><div class="value"><%= money(leadSummary.wonValue) %></div><div class="meta">of closed enquiries</div></div>
+  </div>
+  <% if (leadSummary.byChannel && leadSummary.byChannel.length > 1) { %>
+  <table>
+    <thead><tr><th>Channel</th><th class="num">Leads</th><th class="num">Value</th></tr></thead>
+    <tbody><% leadSummary.byChannel.forEach(function(c){ %>
+      <tr><td><%= c.channel %></td><td class="num"><%= n(c.n) %></td><td class="num"><%= money(c.value) %></td></tr>
+    <% }) %></tbody>
+  </table>
+  <% } %>
+  <% if (leadSummary.spam) { %>
+    <p class="sub"><%= n(leadSummary.spam) %> further submission<%= leadSummary.spam === 1 ? ' was' : 's were' %> marked as spam and excluded from these figures.</p>
+  <% } %>
   <% } %>
 
   <% var gain = d.keywords.useImpressionFallback ? d.keywords.impressionGainers : d.keywords.gainers; %>
@@ -136,9 +208,9 @@ function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
 
   <% if (d.linking) { %>
   <h2>Internal linking</h2>
-  <p>Orphan pages: <strong><%= d.linking.orphanPages == null ? '—' : d.linking.orphanPages %></strong> &middot;
-     Under-linked: <strong><%= d.linking.underlinkedPages == null ? '—' : d.linking.underlinkedPages %></strong> &middot;
-     Cannibalisation pairs: <strong><%= d.linking.cannibalizationPairs == null ? '—' : d.linking.cannibalizationPairs %></strong></p>
+  <p>Orphan pages: <strong><%= d.linking.orphanPages == null ? ' - ' : d.linking.orphanPages %></strong> &middot;
+     Under-linked: <strong><%= d.linking.underlinkedPages == null ? ' - ' : d.linking.underlinkedPages %></strong> &middot;
+     Cannibalisation pairs: <strong><%= d.linking.cannibalizationPairs == null ? ' - ' : d.linking.cannibalizationPairs %></strong></p>
   <% } %>
 
   <% if (d.work.completed.length || d.work.nextActions.length) { %>
@@ -170,7 +242,7 @@ function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
     }
     %>
 
-    <h2 style="page-break-before: always">Appendix — full Search Console &amp; GA4 data</h2>
+    <h2 style="page-break-before: always">Appendix - full Search Console &amp; GA4 data</h2>
     <p class="sub">Everything synced for <%= d.period.startDate %> &rarr; <%= d.period.endDate %>. Long lists are capped;
       the Excel export carries the same rows.</p>
 
@@ -202,8 +274,8 @@ function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
     <table>
       <thead><tr><th>Sitemap</th><th class="num">Submitted</th><th class="num">Indexed</th><th class="num">Warnings</th><th class="num">Errors</th></tr></thead>
       <tbody><% F.gsc.sitemaps.forEach(function(s){ %>
-        <tr><td><%= s.path %></td><td class="num"><%= s.submitted_count == null ? '—' : n(s.submitted_count) %></td>
-          <td class="num"><%= s.indexed_count == null ? '—' : n(s.indexed_count) %></td>
+        <tr><td><%= s.path %></td><td class="num"><%= s.submitted_count == null ? ' - ' : n(s.submitted_count) %></td>
+          <td class="num"><%= s.indexed_count == null ? ' - ' : n(s.indexed_count) %></td>
           <td class="num"><%= s.warnings %></td><td class="num"><%= s.errors %></td></tr>
       <% }) %></tbody>
     </table>
@@ -216,13 +288,13 @@ function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
     <table>
       <thead><tr><th>URL</th><th>Verdict</th><th>Coverage state</th></tr></thead>
       <tbody><% F.gsc.indexing.rows.forEach(function(r){ %>
-        <tr><td><%= r.url %></td><td><%= r.error ? 'error' : (r.verdict || 'unknown') %></td><td><%= r.error || r.coverage_state || '—' %></td></tr>
+        <tr><td><%= r.url %></td><td><%= r.error ? 'error' : (r.verdict || 'unknown') %></td><td><%= r.error || r.coverage_state || ' - ' %></td></tr>
       <% }) %></tbody>
     </table>
     <% } %>
 
     <% if (F.ga4.channels.length) { %>
-    <h2>GA4 — channels</h2>
+    <h2>GA4 - channels</h2>
     <table>
       <thead><tr><th>Channel</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Engagement</th>
         <th class="num">Bounce</th><th class="num">Avg duration</th><th class="num">Conversions</th></tr></thead>
@@ -237,7 +309,7 @@ function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
     <% } %>
 
     <% if (F.ga4.landingPages.length) { %>
-    <h2>GA4 — organic landing pages</h2>
+    <h2>GA4 - organic landing pages</h2>
     <table>
       <thead><tr><th>Landing page</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
       <tbody><% F.ga4.landingPages.forEach(function(r){ %>
@@ -247,7 +319,7 @@ function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
     <% } %>
 
     <% if (F.ga4.acquisition.length) { %>
-    <h2>GA4 — source / medium</h2>
+    <h2>GA4 - source / medium</h2>
     <table>
       <thead><tr><th>Source / medium</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">New users</th><th class="num">Conversions</th></tr></thead>
       <tbody><% F.ga4.acquisition.forEach(function(r){ %>
@@ -258,7 +330,7 @@ function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
     <% } %>
 
     <% if (F.ga4.countries.length) { %>
-    <h2>GA4 — countries</h2>
+    <h2>GA4 - countries</h2>
     <table>
       <thead><tr><th>Country</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
       <tbody><% F.ga4.countries.forEach(function(r){ %>
@@ -268,7 +340,7 @@ function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
     <% } %>
 
     <% if (F.ga4.cities.length) { %>
-    <h2>GA4 — cities</h2>
+    <h2>GA4 - cities</h2>
     <table>
       <thead><tr><th>City</th><th>Country</th><th class="num">Sessions</th><th class="num">Users</th></tr></thead>
       <tbody><% F.ga4.cities.forEach(function(r){ %>
@@ -278,7 +350,7 @@ function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
     <% } %>
 
     <% if (F.ga4.devices.length || F.ga4.browsers.length) { %>
-    <h2>GA4 — devices &amp; browsers</h2>
+    <h2>GA4 - devices &amp; browsers</h2>
     <table>
       <thead><tr><th>Segment</th><th>Value</th><th class="num">Sessions</th><th class="num">Users</th><th class="num">Conversions</th></tr></thead>
       <tbody>
@@ -293,7 +365,7 @@ function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
     <% } %>
 
     <% if (F.ga4.events.length) { %>
-    <h2>GA4 — events</h2>
+    <h2>GA4 - events</h2>
     <table>
       <thead><tr><th>Event name</th><th class="num">Count</th><th class="num">Users</th><th class="num">Value</th></tr></thead>
       <tbody><% F.ga4.events.forEach(function(r){ %>
@@ -309,15 +381,22 @@ function pos(v) { return v == null ? '—' : Number(v).toFixed(1); }
         <th class="num">CLS</th><th class="num">FCP</th><th class="num">TTFB</th></tr></thead>
       <tbody><% F.site.psi.forEach(function(p){ %>
         <tr><td><%= String(p.captured_at).slice(0, 16).replace('T', ' ') %></td><td><%= p.strategy %></td>
-          <td class="num"><%= p.perf_score == null ? '—' : p.perf_score %></td>
-          <td class="num"><%= p.lcp == null ? '—' : n(p.lcp) + 'ms' %></td>
-          <td class="num"><%= p.inp == null ? '—' : n(p.inp) + 'ms' %></td>
-          <td class="num"><%= p.cls == null ? '—' : Number(p.cls).toFixed(3) %></td>
-          <td class="num"><%= p.fcp == null ? '—' : n(p.fcp) + 'ms' %></td>
-          <td class="num"><%= p.ttfb == null ? '—' : n(p.ttfb) + 'ms' %></td></tr>
+          <td class="num"><%= p.perf_score == null ? ' - ' : p.perf_score %></td>
+          <td class="num"><%= p.lcp == null ? ' - ' : n(p.lcp) + 'ms' %></td>
+          <td class="num"><%= p.inp == null ? ' - ' : n(p.inp) + 'ms' %></td>
+          <td class="num"><%= p.cls == null ? ' - ' : Number(p.cls).toFixed(3) %></td>
+          <td class="num"><%= p.fcp == null ? ' - ' : n(p.fcp) + 'ms' %></td>
+          <td class="num"><%= p.ttfb == null ? ' - ' : n(p.ttfb) + 'ms' %></td></tr>
       <% }) %></tbody>
     </table>
     <% } %>
+  <% } %>
+
+  <% if (wl.footer || wl.contact) { %>
+    <div class="report-foot">
+      <% if (wl.contact) { %><div><%= wl.contact %></div><% } %>
+      <% if (wl.footer) { %><div><%= wl.footer %></div><% } %>
+    </div>
   <% } %>
 </body>
 </html>

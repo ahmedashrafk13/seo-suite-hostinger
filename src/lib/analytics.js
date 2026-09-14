@@ -15,7 +15,7 @@ function isoDate(d) {
 }
 
 // Anchor windows on the newest date actually present for the brand rather than
-// on "today" — otherwise every comparison silently includes empty days at the
+// on "today" - otherwise every comparison silently includes empty days at the
 // end whenever a sync is stale or GSC is lagging.
 function latestGscDate(brandId) {
   const r = db.prepare('SELECT MAX(date) d FROM gsc_daily WHERE brand_id=?').get(brandId);
@@ -77,7 +77,7 @@ function gscWindow(brandId, w) {
 
 function ga4Window(brandId, w, channel = 'Organic Search') {
   // bounce_rate and avg_duration are per-day ratios/averages, so they have to
-  // be re-weighted by that day's sessions — a plain SUM or AVG over days would
+  // be re-weighted by that day's sessions - a plain SUM or AVG over days would
   // let a 3-session Sunday count as much as a 3,000-session Tuesday.
   const r = db.prepare(`SELECT
       COALESCE(SUM(sessions),0) sessions,
@@ -150,7 +150,7 @@ function entityComparison(brandId, table, entityCol, days, { minPriorImpressions
   if (!anchor) return [];
   const { recent, prior } = comparisonWindows(anchor, days);
 
-  // FULL OUTER JOIN so an entity present in only one window still appears —
+  // FULL OUTER JOIN so an entity present in only one window still appears - 
   // a page that went to zero clicks is exactly what we most need to catch.
   const sql = `
     WITH r AS (
@@ -358,7 +358,7 @@ function ga4Events(brandId, days, limit = 100) {
 
 // ------------------------------------------------------ Page indexing (sampled)
 
-// Reason breakdown, mirroring GSC's "Why pages aren't indexed" table —
+// Reason breakdown, mirroring GSC's "Why pages aren't indexed" table - 
 // grouped by coverage state, most-common reason first. Only ever reflects
 // URLs actually inspected via inspectSample(), since Google exposes no bulk
 // coverage API.
@@ -380,7 +380,7 @@ function indexingSummary(brandId) {
 }
 
 // Structured data as Google actually sees it, not as the page declares it.
-// A page can serve perfect JSON-LD and still not qualify — this reports what
+// A page can serve perfect JSON-LD and still not qualify - this reports what
 // Google detected on the URLs inspected so far, and any errors it raised.
 function richResultsSummary(brandId) {
   const byType = db.prepare(`SELECT rich_result_types types, COUNT(*) pages
@@ -437,7 +437,7 @@ function indexingRows(brandId, { limit = 50, offset = 0 } = {}) {
 }
 
 // Weekly cohort retention, pivoted into one row per cohort week with a
-// column per weeks-since-first-session — the shape the Retention tab's
+// column per weeks-since-first-session - the shape the Retention tab's
 // cohort table renders directly.
 function ga4RetentionTable(brandId, { weeks = 8 } = {}) {
   const rows = db.prepare(`SELECT cohort_week, week_index, active_users
@@ -450,7 +450,7 @@ function ga4RetentionTable(brandId, { weeks = 8 } = {}) {
   return [...byWeek.values()].slice(0, weeks);
 }
 
-// Ecommerce monetization by date — zero/blank rows are expected for brands
+// Ecommerce monetization by date - zero/blank rows are expected for brands
 // with no GA4 ecommerce tracking configured, not a sync failure.
 function ga4Monetization(brandId, days) {
   const anchor = latestGa4Date(brandId);
@@ -461,7 +461,7 @@ function ga4Monetization(brandId, days) {
     .all(brandId, w.startDate, w.endDate);
 }
 
-// Predictive metrics by date — empty for brands whose GA4 property doesn't
+// Predictive metrics by date - empty for brands whose GA4 property doesn't
 // yet qualify (not enough purchase/conversion volume, no eligible audience).
 function ga4Predictive(brandId, days) {
   const anchor = latestGa4Date(brandId);
@@ -473,7 +473,7 @@ function ga4Predictive(brandId, days) {
 }
 
 // Whatever custom dimensions/metrics were discovered for this brand's GA4
-// property, grouped by dimension/metric name — generic, never hardcoded.
+// property, grouped by dimension/metric name - generic, never hardcoded.
 function ga4CustomDimensions(brandId, days) {
   const anchor = latestGa4Date(brandId);
   if (!anchor) return [];
@@ -492,7 +492,7 @@ function latestCwv(brandId, strategy = 'mobile') {
     ORDER BY captured_at DESC, id DESC LIMIT 2`).all(brandId, strategy);
 }
 
-// Queries where more than one URL takes meaningful impressions — the signal
+// Queries where more than one URL takes meaningful impressions - the signal
 // for keyword cannibalisation.
 function cannibalizedQueries(brandId, { minImpressions = 50, minPages = 2 } = {}) {
   const row = db.prepare('SELECT period_start, period_end FROM gsc_query_page WHERE brand_id=? ORDER BY period_end DESC LIMIT 1').get(brandId);
@@ -519,7 +519,7 @@ function cannibalizedQueries(brandId, { minImpressions = 50, minPages = 2 } = {}
     .all(brandId, row.period_start, row.period_end, minPages, minImpressions);
 }
 
-// The raw query × page pairs from the latest synced window — the answer to
+// The raw query × page pairs from the latest synced window - the answer to
 // "which URL is ranking for this keyword". It was synced and used internally
 // (cannibalisation, clustering, brand-share) but never shown as itself.
 function queryPagePairs(brandId, { limit = 2000, minImpressions = 1 } = {}) {

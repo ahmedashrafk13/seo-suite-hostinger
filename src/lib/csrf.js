@@ -3,10 +3,10 @@
 // WHY THIS IS NEEDED WHEN THE COOKIE IS ALREADY SameSite=Lax
 // Lax stops a cross-site POST from carrying the session cookie in every
 // current browser, which covers the classic attack. It is not the whole story:
-//   - Lax is a browser behaviour, not a server check. An older browser, a
+//  - Lax is a browser behaviour, not a server check. An older browser, a
 //     WebView with a relaxed policy, or a future flag flip removes it silently
 //     and nothing here would notice.
-//   - Lax does not isolate same-site origins. Anything served from a sibling
+//  - Lax does not isolate same-site origins. Anything served from a sibling
 //     subdomain of the deployment (a staging host, a client microsite, a
 //     hijacked marketing subdomain) is "same-site" and its forms would post
 //     with a valid session.
@@ -40,7 +40,7 @@ function sameToken(a, b) {
   const x = Buffer.from(String(a || ''));
   const y = Buffer.from(String(b || ''));
   // Length is compared first because timingSafeEqual throws on a mismatch.
-  // The length of a token is not a secret — every one of them is 43 bytes.
+  // The length of a token is not a secret - every one of them is 43 bytes.
   if (!x.length || x.length !== y.length) return false;
   return crypto.timingSafeEqual(x, y);
 }
@@ -73,7 +73,7 @@ function verify(req, res, next) {
   // 403 rather than a redirect: a redirect to the login page would look like
   // an expired session and invite the user to retry the same broken post
   // forever. The message names the ordinary cause, because that is what this
-  // almost always is — a form left open past a session expiry.
+  // almost always is - a form left open past a session expiry.
   return res.status(403).render('error', {
     title: 'Request could not be verified',
     active: null,

@@ -10,6 +10,12 @@ var VALUE_BADGE = { high: 'good', medium: 'medium', low: 'neutral' };
 <%- include('partials/sidebar') %>
 <%- include('partials/topbar') %>
 
+<%- include('partials/pagehead', {
+      heading: "Workflow map",
+      lede: "How a finding becomes a task, an approval and finally a line in a client report."
+    }) %>
+
+
 <div class="toolbar">
   <div class="spacer"></div>
   <a class="btn secondary sm" href="/workflow/export.md">Download Markdown export</a>
@@ -81,7 +87,7 @@ var VALUE_BADGE = { high: 'good', medium: 'medium', low: 'neutral' };
   <div class="card-body">
     <p style="color:var(--text-2);font-size:13px;margin:0 0 10px">
       The automation identifies, analyses, recommends, reports and creates tasks. These changes remain
-      subject to SEO-team approval, and this is enforced in code — a task touching any of them cannot be
+      subject to SEO-team approval, and this is enforced in code - a task touching any of them cannot be
       marked done until it is explicitly approved.
     </p>
     <table class="data compact">

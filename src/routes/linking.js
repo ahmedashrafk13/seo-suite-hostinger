@@ -1,5 +1,5 @@
 // Internal linking: start crawls and browse the CSV output as real, sortable,
-// filterable tables — with the raw files still downloadable.
+// filterable tables - with the raw files still downloadable.
 const express = require('express');
 const path = require('path');
 const db = require('../db');
@@ -176,7 +176,7 @@ router.post('/:id/create-tasks', (req, res, next) => {
     const brand = run.brand_id ? db.prepare('SELECT * FROM brands WHERE id=?').get(run.brand_id) : null;
     const r = tasksLib.fromLinkingRun(run, brand);
     res.redirect(`/linking/${run.id}?msg=` + encodeURIComponent(
-      r.created ? `${r.created} task${r.created === 1 ? '' : 's'} created.` : 'No new tasks — this run\'s findings already have tasks.'
+      r.created ? `${r.created} task${r.created === 1 ? '' : 's'} created.` : 'No new tasks - this run\'s findings already have tasks.'
     ));
   } catch (err) { next(err); }
 });

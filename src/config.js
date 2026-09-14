@@ -11,7 +11,7 @@ const ROOT = path.join(__dirname, '..');
 // On Hostinger they must not: a Git deployment (or a re-upload) replaces the
 // application folder wholesale, so a database stored under ROOT is destroyed by
 // the next deploy. The fix is to keep state in a sibling directory that no
-// deployment touches — typically ~/seo-suite-data — selected with DATA_DIR.
+// deployment touches - typically ~/seo-suite-data - selected with DATA_DIR.
 //
 // DATA_DIR defaults to <ROOT>/data so local development is unchanged and no
 // existing install has to be reconfigured.
@@ -31,13 +31,13 @@ const TMP_DIR = resolveDir(process.env.TMP_DIR, path.join(ROOT, 'tmp'));
 //
 // The two crawlers are vendored under tools/ so a fresh clone is self-contained
 // and needs nothing but `pip install -r`. Resolution order:
-//   1. an explicit path in .env  — wins outright, so a developer working on the
+//   1. an explicit path in .env - wins outright, so a developer working on the
 //      tool can point at their own checkout
 //   2. the vendored copy under tools/
 //   3. the original sibling-directory layout, kept so existing installs that
 //      predate vendoring keep working without editing .env
 //
-// On shared hosting none of these may be runnable at all — there is no
+// On shared hosting none of these may be runnable at all - there is no
 // guarantee of a Python interpreter, let alone one with httpx/numpy/lxml
 // installed. That is not a failure case here: toolRunner falls back to the
 // JavaScript ports in tools/node/, which need nothing but Node. The paths are
@@ -55,7 +55,7 @@ function resolveTool(envValue, vendoredRelative, siblingRelative) {
 }
 
 // Public base URL of the deployment. Needed because behind Passenger the app
-// cannot infer its own https://domain from PORT — OAuth redirects and the links
+// cannot infer its own https://domain from PORT - OAuth redirects and the links
 // inside emailed reports would otherwise point at localhost.
 const BASE_URL = (process.env.BASE_URL || '').replace(/\/+$/, '');
 
@@ -107,7 +107,7 @@ module.exports = {
   TMP_DIR,
   // Shared secret for the HTTP cron endpoint. Scheduled work cannot run in
   // process on shared hosting (see src/lib/scheduler.js), so it is driven by an
-  // external cron hitting a URL — which must not be publicly triggerable.
+  // external cron hitting a URL - which must not be publicly triggerable.
   CRON_TOKEN: process.env.CRON_TOKEN || '',
   // In-process node-cron is the right choice on a always-on server and the
   // wrong one behind Passenger. Default: on locally, off in production.

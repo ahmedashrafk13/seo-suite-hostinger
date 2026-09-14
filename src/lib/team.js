@@ -2,17 +2,17 @@
 //
 // OWNERSHIP MODEL
 // Every data table in this app is keyed to a user_id. A team shares the data
-// of one account — its owner — so a member's requests resolve to the owner's
+// of one account - its owner - so a member's requests resolve to the owner's
 // id for data access while their own id is still used for anything that has
 // to say WHO acted (approvals, assignment, event log). That keeps 100+
 // existing per-user queries correct without rewriting them, and means a team
 // shares one Google connection, one set of brands, one backlog.
 //
 // ROLES
-//   admin — runs the team: approves members, sets roles, grants assignment
+//   admin - runs the team: approves members, sets roles, grants assignment
 //           rights, connects Google. Always allowed to assign.
-//   seo   — does the work. Can assign only if granted can_assign.
-//   dev   — receives implementation tasks. Read-only: cannot assign, approve,
+//   seo  - does the work. Can assign only if granted can_assign.
+//   dev  - receives implementation tasks. Read-only: cannot assign, approve,
 //           run tools or change settings.
 //
 // A person who receives tasks does not need a login at all: team_people rows
@@ -21,12 +21,12 @@ const db = require('../db');
 
 // WHO CAN SIGN IN
 // Only the SEO team holds accounts. Developers and writers receive work by
-// email and never see the portal — a client's Search Console data, backlog and
+// email and never see the portal - a client's Search Console data, backlog and
 // reports are not theirs to browse, and an account they never asked for is one
 // more password to leak. This is enforced by there being no login role for
 // them at all, rather than by hiding pages from them.
 const ROLES = [
-  { value: 'admin', label: 'Admin', description: 'Runs the workspace — approves members, assigns work, connects Google.' },
+  { value: 'admin', label: 'Admin', description: 'Runs the workspace - approves members, assigns work, connects Google.' },
   { value: 'seo', label: 'SEO', description: 'Does the SEO work in the portal. Can be granted permission to assign tasks.' },
 ];
 
@@ -124,9 +124,9 @@ function upsertPerson(teamId, { name, email, role = 'seo', userId = null, create
   if (!PERSON_ROLES.some((r) => r.value === role)) return { ok: false, error: 'Unknown role.' };
   const mail = String(email || '').trim() || null;
   // A developer or writer is reachable only by email, so an address is not
-  // optional for them — without one, assigning work to them does nothing.
+  // optional for them - without one, assigning work to them does nothing.
   if (EXTERNAL_ROLES.includes(role) && !mail) {
-    return { ok: false, error: 'An email address is required — this person has no portal access, so email is the only way they receive work.' };
+    return { ok: false, error: 'An email address is required - this person has no portal access, so email is the only way they receive work.' };
   }
   if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
     return { ok: false, error: `"${mail}" does not look like an email address.` };
@@ -167,7 +167,7 @@ function syncMemberPerson(teamId, user) {
 // -------------------------------------------------------------- membership
 function setRole(teamId, userId, role) {
   if (!ROLES.some((r) => r.value === role)) {
-    return { ok: false, error: 'Accounts can only be Admin or SEO — developers and writers work by email and have no login.' };
+    return { ok: false, error: 'Accounts can only be Admin or SEO - developers and writers work by email and have no login.' };
   }
   const team = getTeam(teamId);
   if (team && team.owner_user_id === Number(userId) && role !== 'admin') {

@@ -6,10 +6,17 @@
 <%- include('partials/sidebar') %>
 <%- include('partials/topbar') %>
 
+<%- include('partials/pagehead', {
+      heading: "Alerts",
+      lede: "Choose what you want to be told about, and the thresholds that count as worth telling.",
+      actions: '<a class="btn secondary" href="/alerts/history">Alert history</a>'
+    }) %>
+
+
 <% if (!smtpConfigured) { %>
   <div class="notice warn">
     <span class="notice-icon">&#9888;</span>
-    <div class="notice-body">SMTP is not configured — email alerts are logged to the server console instead of sent. Configure it in Settings to deliver real emails.</div>
+    <div class="notice-body">SMTP is not configured - email alerts are logged to the server console instead of sent. Configure it in Settings to deliver real emails.</div>
   </div>
 <% } %>
 
@@ -186,7 +193,7 @@
     <div class="card">
       <div class="card-head">
         <h3>Recent events</h3>
-        <a class="btn ghost sm" href="/alerts/history?brand=<%= brand.id %>">Full history</a>
+        <a class="btn ghost sm" href="/alerts/history?brand=<%= brand.id %>">History for this brand</a>
       </div>
       <% if (!events.length) { %>
         <div class="card-body"><p style="font-size:13px;color:var(--text-2);margin:0">Nothing has fired yet for this brand.</p></div>

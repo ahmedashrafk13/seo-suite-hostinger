@@ -1,6 +1,6 @@
 <%
 const isAjax = typeof ajax !== 'undefined' && ajax;
-// Named chart palette — single source of truth for the per-metric colors
+// Named chart palette - single source of truth for the per-metric colors
 // used across trendchart/barchart/worldmap partials below (kept as literal
 // hex since these render as SVG fill attributes, not CSS classes).
 const chartColor = { volume: '#6b46c1', engagement: '#0f766e', rank: '#b45309' };
@@ -22,7 +22,7 @@ function deltaHtml(recent, prior, invert) {
   const pct = prior === 0 ? null : (abs / prior) * 100;
   const good = invert ? abs < 0 : abs > 0;
   const cls = abs === 0 ? 'flat' : (good ? 'up' : 'down');
-  // Arrow means "better/worse", not "the raw number went up/down" — for an
+  // Arrow means "better/worse", not "the raw number went up/down" - for an
   // inverted metric (Avg Position, bounce rate) a falling number is an
   // IMPROVEMENT and must show ▲, matching report-detail.ejs's convention.
   const arrow = abs === 0 ? '' : (good ? '▲' : '▼');
@@ -54,37 +54,37 @@ function sortLink(key, label) {
 <% } else { %>
 
   <% if (!isAjax) { %>
-  <div class="toolbar">
-    <form method="GET" action="/performance">
-      <label for="brand" style="margin:0;font-size:12.5px;color:var(--text-2)">Brand</label>
-      <select id="brand" name="brand" onchange="this.form.submit()">
-        <% brands.forEach(function(b){ %>
-          <option value="<%= b.id %>" <%= selectedId === b.id ? 'selected' : '' %>><%= b.name %></option>
-        <% }) %>
-      </select>
-      <label for="days" style="margin:0 0 0 10px;font-size:12.5px;color:var(--text-2)">Range</label>
-      <select id="days" name="days" onchange="this.form.submit()">
-        <% RANGES.forEach(function(r){ %>
-          <option value="<%= r %>" <%= days === r ? 'selected' : '' %>>Last <%= r %> days</option>
-        <% }) %>
-      </select>
-      <input type="hidden" name="tab" value="<%= tab %>">
-      <noscript><button type="submit" class="btn secondary sm">Apply</button></noscript>
-    </form>
-    <div class="spacer"></div>
-    <% if (brand) { %>
-      <span style="font-size:12px;color:var(--text-3)"><%= brand.site_url %></span>
-    <% } %>
-  </div>
+  <%
+  /* The brand selector that used to open this page is gone: brand scope is a
+     global control in the top bar now, so it behaves identically here and on
+     every other page. What is left is the one control genuinely specific to
+     this view, the reporting window. */
+  const _rangeLinks = RANGES.map(function (r) {
+    return '<a class="' + (days === r ? 'active' : '') + '" href="/performance?' + qs({ days: r }) + '">' + r + 'd</a>';
+  }).join('');
+  %>
+  <%- include('partials/pagehead', {
+        heading: 'Performance',
+        lede: brand
+          ? 'Search Console and GA4 for ' + brand.name + ', last ' + days + ' days against the ' + days + ' days before.'
+          : 'Search Console and GA4 for the brand in scope.',
+        actions: '<div class="segmented" role="group" aria-label="Reporting window">' + _rangeLinks + '</div>'
+      }) %>
+
+  <% if (brand) { %>
+    <div class="toolbar bare" style="justify-content:flex-end">
+      <span class="toolbar-note"><%= brand.site_url %></span>
+    </div>
+  <% } %>
 
   <% if (!brand) { %>
     <div class="notice warn"><div class="notice-body">No brand selected.</div></div>
   <% } else { %>
-    <!-- Live "active users right now" — the in-app equivalent of GA4 Home's realtime card -->
+    <!-- Live "active users right now" - the in-app equivalent of GA4 Home's realtime card -->
     <div class="card" id="realtime-card">
       <div class="card-head">
         <h3>Right now</h3>
-        <span class="sub" id="realtime-updated">—</span>
+        <span class="sub" id="realtime-updated"></span>
       </div>
       <div class="card-body">
         <div id="realtime-body" style="font-size:13px;color:var(--text-2)">Loading live data…</div>
@@ -99,7 +99,7 @@ function sortLink(key, label) {
           return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
         }); }
         function render(d) {
-          if (!d.ok) { body.innerHTML = '<span style="color:var(--text-3)">Realtime unavailable — ' + esc(d.reason || 'no GA4 property linked') + '</span>'; return; }
+          if (!d.ok) { body.innerHTML = '<span style="color:var(--text-3)">Realtime unavailable - ' + esc(d.reason || 'no GA4 property linked') + '</span>'; return; }
           var countryHtml = (d.byCountry || []).map(function (c) {
             return '<tr><td>' + esc(c.country) + '</td><td class="num">' + c.activeUsers + '</td></tr>';
           }).join('') || '<tr><td colspan="2" style="color:var(--text-3)">No active users right now.</td></tr>';
@@ -146,7 +146,7 @@ function sortLink(key, label) {
     <% if (!isAjax) { %>
     <!-- Search Console style KPI row -->
     <div class="card">
-      <div class="card-head"><h3>Search Console — performance</h3></div>
+      <div class="card-head"><h3>Search Console</h3><span class="sub">Organic search performance</span></div>
       <div class="card-body">
         <% if (!data.gsc) { %>
           <p style="font-size:13px;color:var(--text-2);margin:0">No Search Console data for this window.</p>
@@ -186,7 +186,7 @@ function sortLink(key, label) {
 
     <!-- GA4 style KPI row (Organic Search channel) -->
     <div class="card">
-      <div class="card-head"><h3>GA4 — organic search traffic</h3></div>
+      <div class="card-head"><h3>GA4</h3><span class="sub">Organic search traffic</span></div>
       <div class="card-body">
         <% if (!data.ga4) { %>
           <p style="font-size:13px;color:var(--text-2);margin:0">No GA4 data for this window.</p>
@@ -236,42 +236,90 @@ function sortLink(key, label) {
     <% if (!isAjax) { %><div id="perf-tabs-wrap"><% } %>
     <!-- Detail tabs: Queries / Pages / Channels / GA4 pages -->
     <div class="card">
-      <div class="card-head" style="flex-wrap:wrap;gap:10px">
-        <div class="tabs" style="flex-wrap:wrap">
-          <a class="tab <%= tab === 'queries' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'queries' }) %>">Queries</a>
-          <a class="tab <%= tab === 'pages' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'pages' }) %>">Pages</a>
-          <a class="tab <%= tab === 'querypage' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'querypage' }) %>">Query &rarr; page</a>
-          <a class="tab <%= tab === 'countries' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'countries' }) %>">Countries</a>
-          <a class="tab <%= tab === 'devices' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'devices' }) %>">Devices</a>
-          <a class="tab <%= tab === 'appearance' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'appearance' }) %>">Search appearance</a>
-          <a class="tab <%= tab === 'searchtype' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'searchtype' }) %>">Discover/News</a>
-          <a class="tab <%= tab === 'sitemaps' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'sitemaps' }) %>">Sitemaps</a>
-          <a class="tab <%= tab === 'indexing' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'indexing' }) %>">Page indexing</a>
-          <a class="tab <%= tab === 'channels' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'channels' }) %>">GA4 channels</a>
-          <a class="tab <%= tab === 'ga4pages' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ga4pages' }) %>">GA4 pages</a>
-          <a class="tab <%= tab === 'ga4devices' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ga4devices' }) %>">GA4 tech</a>
-          <a class="tab <%= tab === 'ga4geo' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ga4geo' }) %>">GA4 geo</a>
-          <a class="tab <%= tab === 'ga4acquisition' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ga4acquisition' }) %>">GA4 acquisition</a>
-          <a class="tab <%= tab === 'ga4events' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ga4events' }) %>">GA4 events</a>
-          <a class="tab <%= tab === 'retention' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'retention' }) %>">Retention</a>
-          <a class="tab <%= tab === 'monetization' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'monetization' }) %>">Monetization</a>
-          <a class="tab <%= tab === 'predictive' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'predictive' }) %>">Predictive</a>
-          <a class="tab <%= tab === 'customdimensions' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'customdimensions' }) %>">Custom Dimensions</a>
-          <a class="tab <%= tab === 'ai' ? 'active' : '' %>" href="/performance?<%= qs({ tab: 'ai' }) %>">AI Suggestions</a>
+      <div class="card-head" style="padding:0 var(--s-3);gap:0">
+        <%
+        /* Twenty-one tabs. They used to be a flat wrapping row, which took
+           four lines on a laptop and pushed the table itself below the fold
+           before a single number was visible.
+
+           Two changes: they are grouped by where the data comes from (Search
+           Console, then GA4, then the derived views), and the strip scrolls
+           on one line with arrows at the ends rather than wrapping. app.js
+           scrolls the selected tab into view on load, so the current tab is
+           always visible even when it sits at position 19. */
+        const TAB_GROUPS = [
+          { label: 'Search Console', tabs: [
+            ['queries',    'Queries'],
+            ['pages',      'Pages'],
+            ['querypage',  'Query to page'],
+            ['countries',  'Countries'],
+            ['devices',    'Devices'],
+            ['appearance', 'Appearance'],
+            ['searchtype', 'Discover and News'],
+            ['sitemaps',   'Sitemaps'],
+            ['indexing',   'Indexing'],
+          ] },
+          { label: 'GA4', tabs: [
+            ['channels',        'Channels'],
+            ['ga4pages',        'Pages'],
+            ['ga4devices',      'Tech'],
+            ['ga4geo',          'Geography'],
+            ['ga4acquisition',  'Acquisition'],
+            ['ga4events',       'Events'],
+            ['retention',       'Retention'],
+            ['monetization',    'Monetization'],
+            ['predictive',      'Predictive'],
+            ['customdimensions','Custom dimensions'],
+          ] },
+          { label: 'Derived', tabs: [
+            ['ai', 'AI suggestions'],
+          ] },
+        ];
+        %>
+        <div class="tabbar in-card" style="border-bottom:none;margin:0;flex:1;min-width:0">
+          <button type="button" class="tab-scroll prev" aria-label="Scroll tabs left">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+          </button>
+          <div class="tabs" role="tablist">
+            <% TAB_GROUPS.forEach(function (g, gi) { %>
+              <% if (gi > 0) { %><span class="tab-div" aria-hidden="true"></span><% } %>
+              <span class="tab-grouplabel"><%= g.label %></span>
+              <% g.tabs.forEach(function (t) { %>
+                <a class="tab <%= tab === t[0] ? 'active' : '' %>"
+                   role="tab" aria-selected="<%= tab === t[0] ? 'true' : 'false' %>"
+                   href="/performance?<%= qs({ tab: t[0] }) %>"><%= t[1] %></a>
+              <% }) %>
+            <% }) %>
+          </div>
+          <button type="button" class="tab-scroll next" aria-label="Scroll tabs right">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+          </button>
         </div>
-        <% if (['queries','pages','querypage','countries','ga4pages','ga4geo','ga4acquisition'].includes(tab)) { %>
-          <form method="GET" action="/performance" style="margin-left:auto">
+      </div>
+      <% if (['queries','pages','querypage','countries','ga4pages','ga4geo','ga4acquisition'].includes(tab)) { %>
+        <div class="card-body" style="padding:var(--s-3) var(--s-5);border-bottom:1px solid var(--border-soft)">
+          <form method="GET" action="/performance" class="row" style="gap:var(--s-2)">
             <input type="hidden" name="brand" value="<%= selectedId %>">
             <input type="hidden" name="days" value="<%= days %>">
             <input type="hidden" name="tab" value="<%= tab %>">
-            <input type="text" name="q" value="<%= q %>" placeholder="Filter…" style="width:220px">
+            <label class="sr-only" for="perf-q">Filter rows on the server</label>
+            <div class="search-field" style="flex:0 1 300px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m19.5 19.5-4-4"/></svg>
+              <input type="text" id="perf-q" name="q" value="<%= q %>" placeholder="Filter all rows...">
+            </div>
+            <button type="submit" class="btn secondary sm">Filter</button>
+            <% if (q) { %><a class="btn ghost sm" href="/performance?<%= qs({ q: '' }) %>">Clear</a><% } %>
           </form>
-        <% } %>
-      </div>
+        </div>
+      <% } %>
 
       <% if (tab === 'queries') { %>
-        <div style="margin-bottom:10px">
-          <input type="text" id="queries-livefilter" placeholder="Search loaded queries…" style="width:260px">
+        <div class="card-body" style="padding:var(--s-3) var(--s-5) 0">
+          <label class="sr-only" for="queries-livefilter">Search the rows already loaded</label>
+          <div class="search-field" style="max-width:290px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m19.5 19.5-4-4"/></svg>
+            <input type="text" id="queries-livefilter" placeholder="Search loaded rows...">
+          </div>
         </div>
         <div class="table-wrap">
           <table class="data compact" id="queries-table">
@@ -389,7 +437,7 @@ function sortLink(key, label) {
             </tr></thead>
             <tbody>
               <% if (!data.queryPageRows.length) { %>
-                <tr><td colspan="6"><div class="empty-state">No query-to-page data yet — it lands with the next brand sync.</div></td></tr>
+                <tr><td colspan="6"><div class="empty-state">No query-to-page data yet - it lands with the next brand sync.</div></td></tr>
               <% } %>
               <% data.queryPageRows.forEach(function(r){ %>
                 <tr>
@@ -559,7 +607,7 @@ function sortLink(key, label) {
             </tr></thead>
             <tbody>
               <% if (!data.appearance.length) { %>
-                <tr><td colspan="5"><div class="empty-state">No rich-result / search-appearance data in this window — most sites only see this once they qualify for a rich feature.</div></td></tr>
+                <tr><td colspan="5"><div class="empty-state">No rich-result / search-appearance data in this window - most sites only see this once they qualify for a rich feature.</div></td></tr>
               <% } %>
               <% data.appearance.forEach(function(a){ %>
                 <tr>
@@ -578,7 +626,7 @@ function sortLink(key, label) {
         <div class="notice info" style="margin-bottom:16px">
           <span class="notice-icon">&#8505;</span>
           <div class="notice-body">
-            Search Console's <code>searchType</code> dimension — Discover, Google News, Image and Video results,
+            Search Console's <code>searchType</code> dimension - Discover, Google News, Image and Video results,
             broken out from regular web search. Most sites see mostly "web"; Discover/News rows only appear once
             content actually surfaces there.
           </div>
@@ -635,9 +683,9 @@ function sortLink(key, label) {
                 <tr>
                   <td class="url wide"><%= s.path %></td>
                   <td><%= s.is_sitemaps_index ? 'Sitemap index' : (s.type || 'Sitemap') %></td>
-                  <td class="num"><%= s.submitted_count != null ? fmtInt(s.submitted_count) : '—' %></td>
-                  <td class="num"><%= s.indexed_count != null ? fmtInt(s.indexed_count) : '—' %></td>
-                  <td><%= s.last_submitted ? fmtDate(s.last_submitted) : '—' %></td>
+                  <td class="num"><%= s.submitted_count != null ? fmtInt(s.submitted_count) : '-' %></td>
+                  <td class="num"><%= s.indexed_count != null ? fmtInt(s.indexed_count) : '-' %></td>
+                  <td><%= s.last_submitted ? fmtDate(s.last_submitted) : '-' %></td>
                   <td><%= s.last_downloaded ? fmtDate(s.last_downloaded) : 'Not yet read' %></td>
                   <td class="num"><span class="badge <%= s.warnings > 0 ? 'medium' : 'good' %>"><%= s.warnings %></span></td>
                   <td class="num"><span class="badge <%= s.errors > 0 ? 'critical' : 'good' %>"><%= s.errors %></span></td>
@@ -653,7 +701,7 @@ function sortLink(key, label) {
           <div class="notice-body">
             Google publishes no bulk "index coverage" API, so this checks pages one at a time via the URL Inspection API
             (quota-limited to ~2,000 checks/day/property). Sampling your top-traffic pages would mostly just confirm
-            pages that are already indexed — a page needs to be indexed before it can earn clicks — so this instead
+            pages that are already indexed - a page needs to be indexed before it can earn clicks - so this instead
             prioritises pages the internal-linking crawl already flagged as <strong>broken links</strong> or
             <strong>orphaned / under-linked</strong>, which are the pages actually at risk of not being indexed. It
             fills any remaining quota with top-traffic pages to keep a baseline fresh, and skips anything checked in
@@ -677,7 +725,7 @@ function sortLink(key, label) {
                       <td class="url wide"><%= shortUrl(b.url, 60) %></td>
                       <td><span class="badge high"><%= b.classification || 'broken' %></span></td>
                       <td class="url wide"><%= shortUrl(b.linked_from, 50) %></td>
-                      <td class="num"><%= b.referring_pages || '—' %></td>
+                      <td class="num"><%= b.referring_pages || '-' %></td>
                     </tr>
                   <% }) %>
                 </tbody>
@@ -763,14 +811,14 @@ function sortLink(key, label) {
                   </table>
                   <% if (data.crawlers.some(function(c){ return c.crawled_as === 'DESKTOP'; })) { %>
                     <p class="hint">Google indexes mobile-first. Pages crawled as desktop are usually ones its
-                      smartphone crawler could not fetch — worth checking those URLs directly.</p>
+                      smartphone crawler could not fetch - worth checking those URLs directly.</p>
                   <% } %>
                 <% } %>
               </div>
             </div>
           </div>
 
-          <!-- Rich results — read straight from the URL Inspection response, so
+          <!-- Rich results - read straight from the URL Inspection response, so
                this is what Google actually detected, not what the page declares. -->
           <div class="card" style="margin-bottom:16px">
             <div class="card-head">
@@ -789,7 +837,7 @@ function sortLink(key, label) {
                   <div class="notice-body">
                     Google detected <strong>no rich-result types</strong> on any of the
                     <%= fmtInt(data.richResults.totals.checked) %> pages checked. If this site has schema markup,
-                    Google is not recognising it as eligible — worth validating the JSON-LD.
+                    Google is not recognising it as eligible - worth validating the JSON-LD.
                   </div>
                 </div>
               <% } else { %>
@@ -873,23 +921,23 @@ function sortLink(key, label) {
                   <tr>
                     <td class="url wrap"><%= shortUrl(r.url, 55) %></td>
                     <td><span class="badge <%= r.verdict === 'PASS' ? 'good' : (r.error ? 'neutral' : 'critical') %>"><%= r.error ? 'error' : (r.verdict || 'unknown') %></span></td>
-                    <td class="wrap"><%= r.error ? r.error : (r.coverage_state || '—') %></td>
-                    <td class="narrow"><%= r.robots_txt_state || '—' %></td>
-                    <td class="narrow"><%= r.indexing_state || '—' %></td>
-                    <td class="narrow"><%= r.page_fetch_state || '—' %></td>
-                    <td class="narrow" style="text-transform:capitalize"><%= r.crawled_as ? String(r.crawled_as).toLowerCase() : '—' %></td>
+                    <td class="wrap"><%= r.error ? r.error : (r.coverage_state || '-') %></td>
+                    <td class="narrow"><%= r.robots_txt_state || '-' %></td>
+                    <td class="narrow"><%= r.indexing_state || '-' %></td>
+                    <td class="narrow"><%= r.page_fetch_state || '-' %></td>
+                    <td class="narrow" style="text-transform:capitalize"><%= r.crawled_as ? String(r.crawled_as).toLowerCase() : '-' %></td>
                     <td class="wrap">
                       <% if (r.rich_result_types) { %>
                         <span class="badge <%= r.rich_result_issues ? 'medium' : 'good' %>" title="<%= r.rich_result_types %>"><%= r.rich_result_types %></span>
-                      <% } else { %>—<% } %>
+                      <% } else { %>-<% } %>
                     </td>
-                    <td class="narrow"><%= r.sitemap ? 'Yes' : '—' %></td>
+                    <td class="narrow"><%= r.sitemap ? 'Yes' : '-' %></td>
                     <td class="wrap" style="max-width:220px">
                       <% if (r.referring_urls) { %>
                         <span title="<%= r.referring_urls %>"><%= shortUrl(r.referring_urls.split(' | ')[0], 40) %><%= r.referring_urls.includes(' | ') ? ' +more' : '' %></span>
-                      <% } else { %>—<% } %>
+                      <% } else { %>-<% } %>
                     </td>
-                    <td class="narrow"><%= r.last_crawl_time ? fmtDate(r.last_crawl_time) : '—' %></td>
+                    <td class="narrow"><%= r.last_crawl_time ? fmtDate(r.last_crawl_time) : '-' %></td>
                   </tr>
                 <% }) %>
               </tbody>
@@ -1121,15 +1169,15 @@ function sortLink(key, label) {
             </tr></thead>
             <tbody>
               <% if (!data.retention.length) { %>
-                <tr><td colspan="5"><div class="empty-state">No retention data yet — it lands with the next brand sync.</div></td></tr>
+                <tr><td colspan="5"><div class="empty-state">No retention data yet - it lands with the next brand sync.</div></td></tr>
               <% } %>
               <% data.retention.forEach(function(c){ %>
                 <tr>
                   <td><%= c.cohortWeek %></td>
-                  <td class="num"><%= c.weeks[0] != null ? fmtInt(c.weeks[0]) : '—' %></td>
-                  <td class="num"><%= c.weeks[1] != null ? fmtInt(c.weeks[1]) : '—' %></td>
-                  <td class="num"><%= c.weeks[2] != null ? fmtInt(c.weeks[2]) : '—' %></td>
-                  <td class="num"><%= c.weeks[3] != null ? fmtInt(c.weeks[3]) : '—' %></td>
+                  <td class="num"><%= c.weeks[0] != null ? fmtInt(c.weeks[0]) : '-' %></td>
+                  <td class="num"><%= c.weeks[1] != null ? fmtInt(c.weeks[1]) : '-' %></td>
+                  <td class="num"><%= c.weeks[2] != null ? fmtInt(c.weeks[2]) : '-' %></td>
+                  <td class="num"><%= c.weeks[3] != null ? fmtInt(c.weeks[3]) : '-' %></td>
                 </tr>
               <% }) %>
             </tbody>
@@ -1141,7 +1189,7 @@ function sortLink(key, label) {
           <span class="notice-icon">&#8505;</span>
           <div class="notice-body">
             GA4 ecommerce metrics. These will be zero or blank for brands that have not configured ecommerce tracking
-            (purchase/item events) in GA4 — that is expected, not a sync failure.
+            (purchase/item events) in GA4 - that is expected, not a sync failure.
           </div>
         </div>
         <div class="table-wrap">
@@ -1174,7 +1222,7 @@ function sortLink(key, label) {
           <div class="notice-body">
             GA4's predictive metrics (purchase probability, churn probability, predicted 90-day revenue). Google only
             computes these once a property has enough purchase/conversion volume and an eligible predictive audience
-            enabled — most properties will not qualify, which is expected, not a sync failure.
+            enabled - most properties will not qualify, which is expected, not a sync failure.
           </div>
         </div>
         <% if (!data.predictive.length) { %>
@@ -1207,7 +1255,7 @@ function sortLink(key, label) {
           <span class="notice-icon">&#8505;</span>
           <div class="notice-body">
             Whatever custom dimensions/metrics are configured on this brand's GA4 property, discovered automatically
-            via the GA4 Metadata API — nothing here is hardcoded per brand.
+            via the GA4 Metadata API - nothing here is hardcoded per brand.
           </div>
         </div>
         <% if (!data.customDimensions.length) { %>
@@ -1226,8 +1274,8 @@ function sortLink(key, label) {
               <% data.customDimensions.forEach(function(c){ %>
                 <tr>
                   <td><%= fmtDate(c.date) %></td>
-                  <td><%= c.dimension_name || '—' %></td>
-                  <td><%= c.dimension_value || '—' %></td>
+                  <td><%= c.dimension_name || '-' %></td>
+                  <td><%= c.dimension_value || '-' %></td>
                   <td><%= c.metric_name %></td>
                   <td class="num"><%= fmtInt(c.metric_value) %></td>
                 </tr>
@@ -1240,7 +1288,7 @@ function sortLink(key, label) {
       <% } else if (tab === 'ai') { %>
         <div class="empty-state">
           <div class="icon">&#10024;</div>
-          <h3>AI performance summary — coming soon</h3>
+          <h3>AI performance summary - coming soon</h3>
           <p>Requires an ongoing paid AI API connection, so it isn't switched on yet. This is where an AI-written
             summary of this brand's performance will appear, generated from the real data already on this page.</p>
           <a class="btn secondary sm" href="/ai-seo">See the AI SEO suite</a>
@@ -1256,7 +1304,7 @@ function sortLink(key, label) {
 <script>
   // Swaps the tab card's content via fetch() instead of a full navigation
   // whenever a tab, sort header, filter, or pagination link inside it is
-  // used — those are all plain <a>/<form> elements pointing at /performance,
+  // used - those are all plain <a>/<form> elements pointing at /performance,
   // so this is a drop-in progressive enhancement, not a rewrite of the tabs.
   (function () {
     var wrap = document.getElementById('perf-tabs-wrap');
@@ -1289,7 +1337,7 @@ function sortLink(key, label) {
           wrap.style.opacity = '';
           // Rows replayed the card/row entrance animation on every tab
           // swap (it re-fires on any fresh DOM insert), reading as flicker
-          // rather than polish — suppress it after the initial page load.
+          // rather than polish - suppress it after the initial page load.
           wrap.classList.add('no-entrance-anim');
           executeScripts(wrap);
           if (pushState) window.history.pushState({ perfTabAjax: true }, '', withoutAjaxParam(url));

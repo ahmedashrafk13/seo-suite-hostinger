@@ -43,7 +43,7 @@ function domainLabel(siteUrl) {
   }
 }
 
-// Returns { phrases: [...], tokens: Set, label } — phrases are matched as
+// Returns { phrases: [...], tokens: Set, label } - phrases are matched as
 // substrings, tokens as whole words.
 function brandTerms(brand) {
   const phrases = [];
@@ -107,11 +107,11 @@ function lookupCurve(curve, position) {
 // history, excluding branded queries.
 //
 // Why this is materially better than the generic curve:
-//   - It reflects the brand's actual SERP environment. If every query it
+//  - It reflects the brand's actual SERP environment. If every query it
 //     ranks for carries an AI Overview, an ads block or a local pack, the
 //     achievable CTR at position 3 is not 11% and a generic curve would
 //     manufacture a permanent, uncloseable "CTR gap" on every page.
-//   - It is fitted on WEIGHTED-AVERAGE positions and then applied to
+//  - It is fitted on WEIGHTED-AVERAGE positions and then applied to
 //     weighted-average positions. That self-consistency cancels most of the
 //     Jensen-inequality bias you get from feeding an averaged position into a
 //     curve built for true positions (a page averaging 8.0 may be #3 half the
@@ -123,7 +123,7 @@ function lookupCurve(curve, position) {
 // that says position 7 out-earns position 4 is noise, not signal.
 // A raw empirical fit is degenerate at the tail. On the live brand, positions
 // 20/30/50/100 had thousands of impressions and zero clicks, so the fitted CTR
-// was exactly 0.0000 — which asserts "a page at position 18 should earn no
+// was exactly 0.0000 - which asserts "a page at position 18 should earn no
 // clicks" and makes CTR gaps mathematically undetectable across the entire
 // range where most of that site actually ranks. The detector silently returned
 // nothing.
@@ -226,7 +226,7 @@ function ctrCurve(brandId, brand, { days = 180 } = {}) {
 // The CTR curve is fitted on NON-branded queries, because branded CTR is
 // several times higher and would inflate the whole benchmark. But page-level
 // GSC data (gsc_page_daily) carries no branded/non-branded split, so comparing
-// a page's total CTR — branded traffic included — against a non-branded
+// a page's total CTR - branded traffic included - against a non-branded
 // benchmark understates every gap and can hide real ones entirely.
 //
 // gsc_query_page holds query AND page together, so the branded share of a
@@ -347,7 +347,7 @@ function conversionMultiplier(rates, page) {
 // ------------------------------------------------------------ sitewide control
 //
 // A page down 30% during a month when the whole site is down 30% is not a
-// declining page — it is a declining site, and filing 30 page-level tasks for
+// declining page - it is a declining site, and filing 30 page-level tasks for
 // it buries the one finding that matters. This returns the brand's overall
 // click change across the same windows so detectors can report a page's
 // change RELATIVE to the site.

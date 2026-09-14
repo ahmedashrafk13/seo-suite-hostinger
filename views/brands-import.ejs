@@ -30,7 +30,7 @@ var already = proposals.filter(function(p){ return p.existing; });
   <div class="card-body">
     <p class="hint" style="margin-top:0">
       Every verified Search Console property is listed below, paired with the GA4 property whose name matches its
-      domain. Check the ones to add — each becomes a client site with its own dashboard, alerts, tasks and reports.
+      domain. Check the ones to add - each becomes a client site with its own dashboard, alerts, tasks and reports.
       Anything already added is shown at the bottom and cannot be duplicated.
     </p>
   </div>
@@ -88,22 +88,22 @@ var already = proposals.filter(function(p){ return p.existing; });
                   <label for="a-<%= p.host %>">GA4 property</label>
                   <select id="a-<%= p.host %>" name="ga4_<%= p.host %>"
                           onchange="document.getElementById('an-<%= p.host %>').value = this.options[this.selectedIndex].dataset.name || ''">
-                    <option value="" data-name="">— none —</option>
+                    <option value="" data-name="">None</option>
                     <% ga4Properties.forEach(function(g){ %>
                       <option value="<%= g.id %>" data-name="<%= g.name %>"
                               <%= p.ga4 && p.ga4.id === g.id ? 'selected' : '' %>>
-                        <%= g.name %> — <%= g.account %> (<%= g.id %>)
+                        <%= g.name %> - <%= g.account %> (<%= g.id %>)
                       </option>
                     <% }) %>
                   </select>
                   <input type="hidden" id="an-<%= p.host %>" name="ga4name_<%= p.host %>" value="<%= p.ga4 ? p.ga4.name : '' %>">
                   <div class="hint">
                     <% if (!p.ga4) { %>
-                      <span class="badge medium">no match</span> No GA4 property name resembles this domain — pick one if it has one.
+                      <span class="badge medium">no match</span> No GA4 property name resembles this domain - pick one if it has one.
                     <% } else if (p.ga4AlreadyUsed) { %>
-                      <span class="badge medium">in use</span> Already attached to another site — check this is right.
+                      <span class="badge medium">in use</span> Already attached to another site - check this is right.
                     <% } else if (p.ga4Ambiguous) { %>
-                      <span class="badge medium">uncertain</span> Loose name match — confirm before adding.
+                      <span class="badge medium">uncertain</span> Loose name match - confirm before adding.
                     <% } else { %>
                       <span class="badge good">matched</span> Paired automatically by name.
                     <% } %>
@@ -149,8 +149,8 @@ var already = proposals.filter(function(p){ return p.existing; });
           <% already.forEach(function(p){ %>
             <tr>
               <td class="wrap"><strong><%= p.existing.name %></strong><div class="sub-line"><%= p.host %></div></td>
-              <td class="wrap"><%= p.existing.gsc_property || '—' %></td>
-              <td class="wrap"><%= p.existing.ga4_property_name || p.existing.ga4_property_id || '—' %></td>
+              <td class="wrap"><%= p.existing.gsc_property || ' - ' %></td>
+              <td class="wrap"><%= p.existing.ga4_property_name || p.existing.ga4_property_id || ' - ' %></td>
               <td><a class="btn secondary xs" href="/brands/<%= p.existing.id %>">Open</a></td>
             </tr>
           <% }) %>
@@ -178,7 +178,7 @@ var already = proposals.filter(function(p){ return p.existing; });
     </div>
     <div class="card-foot">
       These have no Search Console property whose domain resembles their name. Either the site is not verified in
-      Search Console, or the property is named something unrelated to its domain — attach it to a site above by hand.
+      Search Console, or the property is named something unrelated to its domain - attach it to a site above by hand.
     </div>
   </div>
 <% } %>

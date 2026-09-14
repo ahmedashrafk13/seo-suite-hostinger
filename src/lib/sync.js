@@ -4,7 +4,7 @@
 // uptime probe, and upserts everything into the brand-keyed tables in db.js.
 // Every downstream feature (alerts, weekly reports, opportunities, keyword
 // clustering, task generation) reads from those tables rather than calling
-// Google directly — so the whole app keeps working when a quota is exhausted,
+// Google directly - so the whole app keeps working when a quota is exhausted,
 // and a metric means the same thing everywhere.
 //
 // All upserts are idempotent: re-syncing an overlapping date range replaces
@@ -104,7 +104,7 @@ async function syncGscQueries(brand, { startDate, endDate }) {
 }
 
 // query x page for the window as a whole. Needed to answer "which page ranks
-// for this keyword" — used by clustering and the opportunity engine.
+// for this keyword" - used by clustering and the opportunity engine.
 async function syncGscQueryPage(brand, { startDate, endDate }) {
   if (!brand.gsc_property) return { rows: 0, skipped: 'no GSC property linked' };
   const rows = await google.searchAnalyticsAll(brand.user_id, brand.gsc_property, {
@@ -164,7 +164,7 @@ async function syncGscDevices(brand, { startDate, endDate }) {
 
 // GSC's API rejects searchAppearance combined with any other dimension
 // (including date), so this is a window snapshot rather than a daily
-// breakdown — stored under the window's end date, replacing any prior
+// breakdown - stored under the window's end date, replacing any prior
 // snapshot for that brand+date the same way a re-sync would.
 async function syncGscAppearance(brand, { startDate, endDate }) {
   if (!brand.gsc_property) return { rows: 0, skipped: 'no GSC property linked' };
@@ -184,7 +184,7 @@ async function syncGscAppearance(brand, { startDate, endDate }) {
   return { rows: rows.length };
 }
 
-// Discover / Google News / Image / Video performance — GSC's searchType
+// Discover / Google News / Image / Video performance - GSC's searchType
 // dimension. Same shape as syncGscDevices; stored under its own table since
 // searchType is a distinct breakdown (a page's Discover clicks are separate
 // from its normal "web" clicks, not a subset shown elsewhere).
@@ -320,7 +320,7 @@ async function syncGa4Devices(brand, { startDate, endDate }) {
   tx(rows);
 
   // New-vs-returning cross-tab, stored separately (see db.js comment on
-  // ga4_device_segment_daily) — same window, one extra dimension.
+  // ga4_device_segment_daily) - same window, one extra dimension.
   const segRows = await google.ga4RunReport(brand.user_id, brand.ga4_property_id, {
     startDate, endDate,
     dimensions: ['date', 'deviceCategory', 'newVsReturning'],
@@ -362,7 +362,7 @@ async function syncGa4Geo(brand, { startDate, endDate }) {
   });
   tx(rows);
 
-  // New-vs-returning cross-tab (country granularity — city would make the
+  // New-vs-returning cross-tab (country granularity - city would make the
   // combination too sparse to be useful).
   const segRows = await google.ga4RunReport(brand.user_id, brand.ga4_property_id, {
     startDate, endDate,
@@ -431,7 +431,7 @@ async function syncGa4Events(brand, { startDate, endDate }) {
 
 // Weekly cohort retention: how many users from each week's first-session
 // cohort were still active in week 0/1/2/3 after. Uses the GA4 Data API's
-// cohortSpec rather than the plain dimensions/metrics report shape — see
+// cohortSpec rather than the plain dimensions/metrics report shape - see
 // google.ga4RunCohortReport. `weeks` controls how many cohort start-weeks are
 // requested; each covers a 4-week retention horizon (week 0-3).
 async function syncGa4Retention(brand, { weeks = 8 } = {}) {
@@ -463,7 +463,7 @@ async function syncGa4Retention(brand, { weeks = 8 } = {}) {
   return { rows: rows.length };
 }
 
-// Ecommerce monetization — zero/blank for brands with no ecommerce tracking
+// Ecommerce monetization - zero/blank for brands with no ecommerce tracking
 // configured in GA4; that is an expected state, not a sync failure.
 async function syncGa4Monetization(brand, { startDate, endDate }) {
   if (!brand.ga4_property_id) return { rows: 0, skipped: 'no GA4 property linked' };
@@ -487,11 +487,11 @@ async function syncGa4Monetization(brand, { startDate, endDate }) {
   return { rows: rows.length };
 }
 
-// Predictive metrics — purchaseProbability, churnProbability,
+// Predictive metrics - purchaseProbability, churnProbability,
 // predictedRevenuePer90Days. Verified against node_modules/googleapis@144.0.0
 // (analyticsdata v1beta types) as real GA4 Data API metric names. Google only
 // computes these for a property once it has enough purchase/conversion volume
-// and an eligible predictive audience enabled — for every other property the
+// and an eligible predictive audience enabled - for every other property the
 // API call itself fails ("not enough data" / metric not available), so this
 // is scoped in its own try/catch (mirroring how other best-effort syncs
 // already report a skip reason instead of bubbling a hard error) in addition
@@ -524,7 +524,7 @@ async function syncGa4Predictive(brand, { startDate, endDate }) {
   return { rows: rows.length };
 }
 
-// Custom dimensions/metrics — generic per property, never hardcoded. Uses the
+// Custom dimensions/metrics - generic per property, never hardcoded. Uses the
 // GA4 Data API's Metadata endpoint (analyticsdata.properties.getMetadata,
 // verified present in node_modules/googleapis@144.0.0) to discover whatever
 // custom dimensions/metrics the brand's property actually has configured,
@@ -633,14 +633,14 @@ async function checkUptime(brand) {
 }
 
 // ------------------------------------------------------ URL Inspection sample
-// Google publishes no bulk "index coverage" API — the URL Inspection API is
+// Google publishes no bulk "index coverage" API - the URL Inspection API is
 // the only way to read real indexing state, one URL at a time, capped at
 // ~2,000 calls/day/property.
 //
 // Candidate selection matters: sampling only from gsc_page_daily (as this
 // used to) guarantees "not indexed" almost never shows up, because a page
 // needs to be indexed before it can earn clicks/impressions in the first
-// place — the sample was structurally biased toward pages that already
+// place - the sample was structurally biased toward pages that already
 // passed. Pages that are actually at risk of not being indexed are the ones
 // with no organic traffic at all: broken internal-link targets, orphaned
 // pages the crawler found no editorial links pointing at, and other
@@ -656,7 +656,7 @@ async function checkUptime(brand) {
 //   1. A site with a long orphan queue would never reach them, so the
 //      indexed-page baseline would go stale indefinitely.
 //   2. The crawl, sitemap and rich-result fields the inspection returns only
-//      exist for pages Google has actually indexed — an at-risk-only sample
+//      exist for pages Google has actually indexed - an at-risk-only sample
 //      answers "is this page indexed?" but can never answer "does this site
 //      qualify for rich results?", because a non-indexed page reports neither.
 function candidatePages(brand, limit, { topShare = 0.35 } = {}) {
@@ -679,7 +679,7 @@ function candidatePages(brand, limit, { topShare = 0.35 } = {}) {
     try {
       const broken = csvStore.readTable(latestLinking.out_dir, 'broken_links', { perPage: atRiskLimit });
       (broken ? broken.rows : []).forEach((r) => { if (out.length < atRiskLimit) add(r.url); });
-    } catch { /* CSV missing or unreadable — fall through to the next tier */ }
+    } catch { /* CSV missing or unreadable - fall through to the next tier */ }
     try {
       const orphans = csvStore.readTable(latestLinking.out_dir, 'orphans', {
         sort: 'gsc_impressions', dir: 'asc', perPage: atRiskLimit,
@@ -731,7 +731,7 @@ async function inspectSample(brand, { limit = 40 } = {}) {
   // richResultsResult lists each detected type with the items carrying it, plus
   // any structured-data errors. Google omits the block entirely when a page has
   // no eligible markup, which is itself the answer to "does this page qualify
-  // for rich results" — so absent is stored as null, not as a failure.
+  // for rich results" - so absent is stored as null, not as a failure.
   const richOf = (rr) => {
     if (!rr) return { verdict: null, types: null, issues: null };
     const detected = rr.detectedItems || [];
@@ -788,7 +788,7 @@ async function inspectSample(brand, { limit = 40 } = {}) {
 
 // ---------------------------------------------------------------- drivers
 
-// Full sync for one brand. Each source is independent — a GA4 failure must
+// Full sync for one brand. Each source is independent - a GA4 failure must
 // not prevent GSC data from landing, so every step is caught separately and
 // reported back in `steps`.
 async function syncBrand(brand, { days = 90, includePsi = false } = {}) {
@@ -848,7 +848,7 @@ async function syncAllBrands({ days = 90, includePsi = false } = {}) {
   const brands = db.prepare('SELECT * FROM brands WHERE active = 1').all();
   const results = [];
   for (const brand of brands) {
-    // Skip brands whose owner has disconnected Google — nothing to pull.
+    // Skip brands whose owner has disconnected Google - nothing to pull.
     const conn = google.getConnection(brand.user_id);
     if (!conn) {
       results.push({ brand: brand.name, skipped: 'owner has no Google connection' });

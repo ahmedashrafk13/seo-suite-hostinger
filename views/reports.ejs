@@ -6,10 +6,16 @@
 <%- include('partials/sidebar') %>
 <%- include('partials/topbar') %>
 
+<%- include('partials/pagehead', {
+      heading: "Weekly reports",
+      lede: "Built from the Search Console, analytics, audit and linking data already on file. No live API call at read time."
+    }) %>
+
+
     <div class="card">
       <div class="card-head"><h2 class="mt-0">Generate a weekly report</h2></div>
       <div class="card-body">
-        <p class="muted">Builds a standard weekly report from the consolidated Search Console, analytics, technical audit and internal linking data already on file for the brand — no live API call at read time.</p>
+        <p class="muted">Builds a standard weekly report from the consolidated Search Console, analytics, technical audit and internal linking data already on file for the brand - no live API call at read time.</p>
         <form method="POST" action="/reports/generate"><%- csrfField %>
           <div class="form-row">
             <div>
@@ -29,9 +35,9 @@
           <label class="check">
             <input type="checkbox" name="full_data" value="1">
             <span>Include the full Search Console &amp; GA4 data appendix
-              <span class="check-hint">Attaches every dimension the suite syncs for the report week — queries, pages,
+              <span class="check-hint">Attaches every dimension the suite syncs for the report week - queries, pages,
                 query&nbsp;→&nbsp;page, countries, devices, search appearance, sitemaps, indexation, and GA4 channels,
-                landing pages, tech, geo (country and city), acquisition and events — plus Core Web Vitals and uptime.
+                landing pages, tech, geo (country and city), acquisition and events - plus Core Web Vitals and uptime.
                 Makes the report a complete hand-over and enables a full Excel export.</span>
             </span>
           </label>
@@ -86,7 +92,7 @@
             <% audits.forEach(function(a){ %>
               <tr>
                 <td><a href="/audit/<%= a.id %>"><%= a.domain %></a></td>
-                <td><%= a.brand_name || '—' %></td>
+                <td><%= a.brand_name || ' - ' %></td>
                 <td><span class="badge <%= statusBadge(a.status) %>"><%= a.status %></span></td>
                 <td><%= fmtDateTime(a.created_at) %></td>
               </tr>
@@ -107,10 +113,10 @@
             <% linkings.forEach(function(l){ %>
               <tr>
                 <td><a href="/linking/<%= l.id %>"><%= l.site_url %></a></td>
-                <td><%= l.brand_name || '—' %></td>
+                <td><%= l.brand_name || ' - ' %></td>
                 <td><span class="badge <%= statusBadge(l.status) %>"><%= l.status %></span></td>
                 <td><%= fmtDateTime(l.created_at) %></td>
-                <td><% if (l.docx_path) { %><a href="/linking/<%= l.id %>/report">.docx</a><% } else { %>—<% } %></td>
+                <td><% if (l.docx_path) { %><a href="/linking/<%= l.id %>/report">.docx</a><% } else { %> - <% } %></td>
               </tr>
             <% }) %>
             </tbody>

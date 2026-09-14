@@ -2,7 +2,7 @@
 //
 // Every generated spreadsheet in this app goes through here so the SEO team
 // gets a consistent, genuinely usable file: a bold styled header row, frozen
-// header, sane column widths, and dropdown validation on enum-like columns —
+// header, sane column widths, and dropdown validation on enum-like columns - 
 // instead of a plain CSV with a multi-line blob crammed into one cell.
 const ExcelJS = require('exceljs');
 

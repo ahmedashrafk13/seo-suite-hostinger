@@ -21,7 +21,7 @@
         <div class="stat-row">
           <div class="stat">
             <div class="label">Brand</div>
-            <div class="value sm"><%= event.brand_name || '—' %></div>
+            <div class="value sm"><%= event.brand_name || ' - ' %></div>
             <div class="meta"><%= event.brand_url || '' %></div>
           </div>
           <div class="stat">
@@ -91,7 +91,7 @@
               <tbody>
                 <% notified.forEach(function(n){ %>
                   <tr>
-                    <td><%= (n && n.channel) || '—' %></td>
+                    <td><%= (n && n.channel) || ' - ' %></td>
                     <td><span class="badge <%= n && n.sent ? 'good' : 'medium' %>"><%= n && n.sent ? 'Sent' : 'Not sent' %></span></td>
                     <td><%= (n && (n.reason || n.error)) || '' %></td>
                   </tr>

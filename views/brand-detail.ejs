@@ -50,7 +50,7 @@
         </span>
       <% } else { %><span class="badge neutral">No checks</span><% } %>
     </div>
-    <div class="meta"><%= uptime.length ? (fmtInt(uptime[0].response_ms) + 'ms · ' + fmtDateTime(uptime[0].checked_at)) : '—' %></div>
+    <div class="meta"><%= uptime.length ? (fmtInt(uptime[0].response_ms) + 'ms · ' + fmtDateTime(uptime[0].checked_at)) : ' - ' %></div>
   </div>
   <div class="stat">
     <div class="label">Rows stored</div>
@@ -100,8 +100,8 @@
                 <tr>
                   <td class="narrow"><%= fmtDateTime(u.checked_at) %></td>
                   <td><span class="badge <%= u.ok ? 'good' : 'critical' %>"><%= u.ok ? ('HTTP ' + u.status_code) : 'Down' %></span></td>
-                  <td class="num"><%= u.response_ms == null ? '—' : (fmtInt(u.response_ms) + 'ms') %></td>
-                  <td class="wrap"><%= u.error || (u.ok ? 'OK' : ('HTTP ' + (u.status_code || '—'))) %></td>
+                  <td class="num"><%= u.response_ms == null ? ' - ' : (fmtInt(u.response_ms) + 'ms') %></td>
+                  <td class="wrap"><%= u.error || (u.ok ? 'OK' : ('HTTP ' + (u.status_code || ' - '))) %></td>
                 </tr>
               <% }) %>
             </tbody>
@@ -193,12 +193,12 @@
                 <tr>
                   <td class="narrow"><%= fmtDateTime(p.captured_at) %></td>
                   <td><%= p.strategy %></td>
-                  <td class="num"><%= p.perf_score == null ? '—' : p.perf_score %></td>
-                  <td class="num"><%= p.lcp == null ? '—' : (fmtInt(p.lcp) + 'ms') %></td>
-                  <td class="num"><%= p.inp == null ? '—' : (fmtInt(p.inp) + 'ms') %></td>
-                  <td class="num"><%= p.cls == null ? '—' : Number(p.cls).toFixed(3) %></td>
-                  <td class="num"><%= p.fcp == null ? '—' : (fmtInt(p.fcp) + 'ms') %></td>
-                  <td class="num"><%= p.ttfb == null ? '—' : (fmtInt(p.ttfb) + 'ms') %></td>
+                  <td class="num"><%= p.perf_score == null ? ' - ' : p.perf_score %></td>
+                  <td class="num"><%= p.lcp == null ? ' - ' : (fmtInt(p.lcp) + 'ms') %></td>
+                  <td class="num"><%= p.inp == null ? ' - ' : (fmtInt(p.inp) + 'ms') %></td>
+                  <td class="num"><%= p.cls == null ? ' - ' : Number(p.cls).toFixed(3) %></td>
+                  <td class="num"><%= p.fcp == null ? ' - ' : (fmtInt(p.fcp) + 'ms') %></td>
+                  <td class="num"><%= p.ttfb == null ? ' - ' : (fmtInt(p.ttfb) + 'ms') %></td>
                   <td>
                     <% if (p.error) { %><span class="badge critical" title="<%= p.error %>">error</span>
                     <% } else { %><span class="badge neutral"><%= p.source === 'crux-field' ? 'real users' : 'lab' %></span><% } %>
@@ -280,8 +280,51 @@
 
     <div class="card">
       <div class="card-head">
+        <h3>Report branding</h3>
+        <span class="sub">What a client sees on the print view and on a shared report link. Leave blank to send the report in this app&rsquo;s own plain styling.</span>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="/brands/<%= brand.id %>/report-branding"><%- csrfField %>
+          <div class="field">
+            <label for="b_report_company">Company name</label>
+            <input type="text" id="b_report_company" name="report_company" maxlength="160"
+                   value="<%= brand.report_company || '' %>" placeholder="Your agency's name">
+            <div class="hint">Shown at the top of the report, above the client's brand name.</div>
+          </div>
+          <div class="field">
+            <label for="b_report_logo_url">Logo URL</label>
+            <input type="url" id="b_report_logo_url" name="report_logo_url" maxlength="500"
+                   value="<%= brand.report_logo_url || '' %>" placeholder="https://example.com/logo.png">
+            <%/* A URL rather than an upload: this app has no reliable
+                 writable asset directory on shared hosting, and the logo is
+                 already served somewhere by the agency's own site. */%>
+            <div class="hint">Must be https - an http image silently fails to load on the report page, which reads as a broken report rather than a missing logo.</div>
+          </div>
+          <div class="field">
+            <label for="b_report_accent">Accent colour</label>
+            <input type="text" id="b_report_accent" name="report_accent" maxlength="9"
+                   value="<%= brand.report_accent || '' %>" placeholder="#1e4d6b" pattern="#[0-9a-fA-F]{3,8}">
+            <div class="hint">Hex only. Headings and rules pick it up; the severity colours do not change, because a warning that no longer reads as one is worse than an off-brand red.</div>
+          </div>
+          <div class="field">
+            <label for="b_report_contact">Contact line</label>
+            <input type="text" id="b_report_contact" name="report_contact" maxlength="300"
+                   value="<%= brand.report_contact || '' %>" placeholder="Questions? sarah@agency.com · +1 555 0100">
+            <div class="hint">Printed in the report footer, so a client reading a shared link has a way to reply to it.</div>
+          </div>
+          <div class="field">
+            <label for="b_report_footer">Footer note</label>
+            <input type="text" id="b_report_footer" name="report_footer" maxlength="400"
+                   value="<%= brand.report_footer || '' %>" placeholder="Prepared by Example Agency · Confidential">
+          </div>
+          <button type="submit" class="btn block">Save report branding</button>
+        </form>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
         <h3>Content brief settings</h3>
-        <span class="sub">One-time setup the Content Brief Agent reuses for every brief — free, and never asked again unless you change it here.</span>
+        <span class="sub">One-time setup the Content Brief Agent reuses for every brief - free, and never asked again unless you change it here.</span>
       </div>
       <div class="card-body">
         <form method="POST" action="/brands/<%= brand.id %>/content-settings"><%- csrfField %>
@@ -307,7 +350,7 @@
           <div class="field">
             <label for="b_market">Market</label>
             <input type="text" id="b_market" name="market" value="<%= brand.market || '' %>" placeholder="US, UK, global, ...">
-            <div class="hint">Free text, e.g. "US", "UK", "global" — helps local-intent detection avoid assuming a US-only audience.</div>
+            <div class="hint">Free text, e.g. "US", "UK", "global" - helps local-intent detection avoid assuming a US-only audience.</div>
           </div>
           <div class="field">
             <label for="b_services">Products / services</label>
@@ -339,7 +382,7 @@
                 } catch { return ''; }
               })()
             %></textarea>
-            <div class="hint">One per line: "page type: CTA text" — matched against a brief's suggested page type/intent (e.g. commercial, transactional, local, informational). Leave blank to always use the default above.</div>
+            <div class="hint">One per line: "page type: CTA text" - matched against a brief's suggested page type/intent (e.g. commercial, transactional, local, informational). Leave blank to always use the default above.</div>
           </div>
           <button type="submit" class="btn secondary block">Save content brief settings</button>
         </form>
@@ -351,7 +394,7 @@
       <div class="card-body">
         <p style="font-size:12.5px;color:var(--text-2);margin-top:0">
           Credentials the technical audit and internal-linking crawlers present to this site.
-          Only needed if the site will not serve its pages to an anonymous visitor — a
+          Only needed if the site will not serve its pages to an anonymous visitor - a
           members-only site, a client portal, or a staging build behind HTTP basic auth.
           Stored here so scheduled crawls authenticate the same way a manual one does.
         </p>
@@ -366,7 +409,7 @@
                 <br><strong><%= crawlAccess.verifyStatus === 'ok' ? 'Last test passed' : 'Last test FAILED' %></strong>
                 (<%= crawlAccess.verifiedAt %>): <%= crawlAccess.verifyNote %>
               <% } else { %>
-                <br><span class="muted">Not tested yet — run the test below before relying on a scheduled crawl.</span>
+                <br><span class="muted">Not tested yet - run the test below before relying on a scheduled crawl.</span>
               <% } %>
             </div>
           </div>
@@ -382,19 +425,19 @@
 
         <form method="POST" action="/brands/<%= brand.id %>/crawl-access"><%- csrfField %>
           <div class="field">
-            <label for="ca_basic_user">HTTP basic auth — username</label>
+            <label for="ca_basic_user">HTTP basic auth - username</label>
             <input type="text" id="ca_basic_user" name="auth_basic_user" autocomplete="off"
                    value="<%= crawlAccess ? crawlAccess.basicUser : '' %>" placeholder="staging">
           </div>
           <div class="field">
-            <label for="ca_basic_pass">HTTP basic auth — password</label>
+            <label for="ca_basic_pass">HTTP basic auth - password</label>
             <input type="password" id="ca_basic_pass" name="auth_basic_pass" autocomplete="off"
-                   placeholder="<%= crawlAccess && crawlAccess.hasBasic ? 'a password is stored — leave empty to keep it' : '' %>">
+                   placeholder="<%= crawlAccess && crawlAccess.hasBasic ? 'a password is stored - leave empty to keep it' : '' %>">
           </div>
           <div class="field">
             <label for="ca_cookie">Session cookie</label>
             <input type="text" id="ca_cookie" name="auth_cookie" autocomplete="off"
-                   placeholder="<%= crawlAccess && crawlAccess.hasCookie ? 'a cookie is stored — leave empty to keep it' : 'sessionid=abc123; csrftoken=def456' %>">
+                   placeholder="<%= crawlAccess && crawlAccess.hasCookie ? 'a cookie is stored - leave empty to keep it' : 'sessionid=abc123; csrftoken=def456' %>">
             <div class="hint">
               Log into the site in your browser, then DevTools → Application → Cookies and copy
               the cookie for this domain. These expire, which is why the test button exists.
@@ -403,7 +446,7 @@
           <div class="field">
             <label for="ca_headers">Extra request headers</label>
             <%# The textarea starts EMPTY, always. It used to be prefilled with
-                "X-Token: (stored — retype to replace)" as its VALUE, so saving
+                "X-Token: (stored - retype to replace)" as its VALUE, so saving
                 the form untouched stored that sentence as the header's value.
                 What is stored is shown as text beside it instead. %>
             <textarea id="ca_headers" name="auth_headers" rows="3"
@@ -456,7 +499,7 @@
       <div class="card-head"><h3 style="color:var(--critical)">Delete brand</h3></div>
       <div class="card-body">
         <p style="font-size:12.5px;color:var(--text-2)">
-          Removes the brand and every row attached to it — consolidated data, alert subscriptions,
+          Removes the brand and every row attached to it - consolidated data, alert subscriptions,
           alert history, tasks and reports. This cannot be undone.
         </p>
         <form method="POST" action="/brands/<%= brand.id %>/delete"
@@ -529,7 +572,7 @@
                   name="<%= f.name %>"
                   autocomplete="off"
                   style="width:100%"
-                  placeholder="<%= v.brandFields.indexOf(f.name) !== -1 ? 'stored — retype to replace, blank to clear' : ('blank = use agency ' + f.env) %>">
+                  placeholder="<%= v.brandFields.indexOf(f.name) !== -1 ? 'stored - retype to replace, blank to clear' : ('blank = use agency ' + f.env) %>">
               </label>
             <% }) %>
           </div>

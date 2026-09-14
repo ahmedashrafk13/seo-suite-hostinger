@@ -4,21 +4,21 @@
 // covering every field the brief spec asks for that can be built from data
 // this app already owns, with zero external calls and zero ongoing cost:
 //
-//   search intent               — clustering.js already classified it
-//   recommended title           — templated from primary keyword + intent
-//   suggested headings          — one per supporting keyword + intent shape
-//   supporting keywords         — clustering.js already grouped them
-//   word-count range            — the linking crawler's own page inventory
-//   internal-link suggestions   — the linking crawler's recommendations, or
+//   search intent              - clustering.js already classified it
+//   recommended title          - templated from primary keyword + intent
+//   suggested headings         - one per supporting keyword + intent shape
+//   supporting keywords        - clustering.js already grouped them
+//   word-count range           - the linking crawler's own page inventory
+//   internal-link suggestions  - the linking crawler's recommendations, or
 //                                 (for a not-yet-created page) the existing
 //                                 pages with the closest topical overlap
-//   relevant products/services  — matched against the brand's own service
+//   relevant products/services - matched against the brand's own service
 //                                 list, entered once in brand settings
-//   recommended call to action  — matched against the brand's own CTA
+//   recommended call to action - matched against the brand's own CTA
 //                                 rules, entered once in brand settings
 //
-// Two fields from the original brief are deliberately NOT produced here —
-// "competitor coverage summary" and "questions to answer" — because both
+// Two fields from the original brief are deliberately NOT produced here - 
+// "competitor coverage summary" and "questions to answer" - because both
 // require seeing live Google search results, which nothing free provides.
 // Rather than fabricate a plausible-looking guess for a paid product, the
 // brief marks both fields as unavailable and says why, so a human knows to
@@ -35,15 +35,15 @@ const clustering = require('./clustering');
 // showing stale output. The v2 comment claimed the stamp did this; nothing
 // actually compared it until now.
 //
-//   v2 — added schemaVersion, warnings, meta description, field sources
-//   v3 — title/heading generation corrected (see the fixes below), fieldSources
+//   v2 - added schemaVersion, warnings, meta description, field sources
+//   v3 - title/heading generation corrected (see the fixes below), fieldSources
 //        no longer reports 'data' for unmeasurable fields
 const SCHEMA_VERSION = 3;
 
 const STOPWORDS = new Set('a an and are as at be but by for from how i in into is it of on or that the to was what when where which who why with your you my me we our us do does can could should would will'.split(' '));
 
 // Words that are grammatically fine but carry no discriminating signal for
-// *what topic* a keyword is about — nearly every commercial SEO keyword
+// *what topic* a keyword is about - nearly every commercial SEO keyword
 // contains "services", "company", "solutions" etc, so matching on those
 // alone produces confident-looking false positives (this is exactly what
 // happened in testing: "SEO services" matched a web-development cluster
@@ -51,11 +51,11 @@ const STOPWORDS = new Set('a an and are as at be but by for from how i in into i
 // excluded only from the relevance-matching token set below, not from the
 // general tokenizer, since headings/titles still want the real words.
 // Deliberately excludes topic words like "web"/"design"/"development"/"seo"
-// even though they're common — those genuinely identify what a keyword is
+// even though they're common - those genuinely identify what a keyword is
 // about. Only pure business-speak filler that says nothing about topic goes
 // here (it would otherwise make e.g. "SEO services" match any cluster whose
 // keywords happen to contain the word "services", which is nearly all of
-// them — confirmed as a real false positive during testing).
+// them - confirmed as a real false positive during testing).
 const GENERIC_BUSINESS_WORDS = new Set('services service company companies solutions solution agency agencies firm firms provider providers business businesses usa us united states near your area best top custom professional'.split(' '));
 
 function tokenize(s) {
@@ -65,7 +65,7 @@ function tokenize(s) {
     .filter((w) => w.length > 2 && !STOPWORDS.has(w));
 }
 
-// Same as tokenize(), but for relevance MATCHING rather than display —
+// Same as tokenize(), but for relevance MATCHING rather than display - 
 // strips generic business filler words so overlap only counts on words that
 // actually identify a topic (e.g. "shopify", "seo", "logo", not "services").
 function distinctiveTokens(s) {
@@ -78,8 +78,8 @@ function distinctiveTokens(s) {
 // "Website Design Services In Usa Near You" as a recommended title tag on the
 // live brand. These stay fully capitalised; the small joining words stay lower
 // case unless they lead the title.
-// Deliberately excludes words that are ambiguous in ordinary prose — "us",
-// "it", "ar", "ml", "amp" — because "About Us" must not become "About US" and
+// Deliberately excludes words that are ambiguous in ordinary prose - "us",
+// "it", "ar", "ml", "amp" - because "About Us" must not become "About US" and
 // "How It Works" must not become "How IT Works". Only initialisms that are
 // effectively never used as common words are listed.
 const ACRONYMS = new Set(`
@@ -94,7 +94,7 @@ const TITLE_MINOR_WORDS = new Set('a an and as at but by for from in into nor of
 
 // Real Search Console query strings carry stray punctuation: a leading quote
 // left over from a phrase search, trailing separators, doubled spaces. Left in
-// place it leaks straight into a title tag — the live brand's brief opened its
+// place it leaks straight into a title tag - the live brand's brief opened its
 // recommended title with a bare `"` character, and the same string was reused
 // verbatim as an H2. Intra-word apostrophes are preserved ("company's").
 function cleanQueryText(query) {
@@ -123,7 +123,7 @@ function titleCase(s) {
 // ------------------------------------------------------------ title/meta limits
 //
 // Google truncates on pixel width, not character count, but characters are a
-// serviceable proxy and nothing was checking them at all — the live brand's
+// serviceable proxy and nothing was checking them at all - the live brand's
 // stored brief recommended a 62-character title with no warning.
 const TITLE_MAX_CHARS = 60;
 const META_MIN_CHARS = 110;
@@ -132,13 +132,13 @@ const META_MAX_CHARS = 155;
 function lengthCheck(text, min, max, label) {
   const len = String(text || '').length;
   if (!len) return { length: 0, status: 'missing', note: `No ${label} generated.` };
-  if (len > max) return { length: len, status: 'too-long', note: `${len} characters — likely truncated in search results (aim for under ${max}). Trim it before publishing.` };
-  if (min && len < min) return { length: len, status: 'too-short', note: `${len} characters — shorter than the ${min}+ that usually earns a full snippet.` };
-  return { length: len, status: 'ok', note: `${len} characters — within the usual display limit.` };
+  if (len > max) return { length: len, status: 'too-long', note: `${len} characters - likely truncated in search results (aim for under ${max}). Trim it before publishing.` };
+  if (min && len < min) return { length: len, status: 'too-short', note: `${len} characters - shorter than the ${min}+ that usually earns a full snippet.` };
+  return { length: len, status: 'ok', note: `${len} characters - within the usual display limit.` };
 }
 
 // clustering.js's `intent` field is a full display string (e.g.
-// "Commercial investigation"), not a short key — normalise it once here so
+// "Commercial investigation"), not a short key - normalise it once here so
 // every matcher in this file (title, headings, CTA rules) agrees on the same
 // small vocabulary instead of each guessing at clustering.js's exact wording.
 function normaliseIntent(intent) {
@@ -168,8 +168,8 @@ function normaliseIntent(intent) {
 //   2. Query-derivation path: if there's no brand-history match (new site,
 //      or nothing topically overlapping yet), but the brand has real GSC
 //      query history, use the single highest-impression literal query string
-//      in the cluster's keyword set — cleaned up and capitalised, but not
-//      reworded — since that is literally what real searchers typed.
+//      in the cluster's keyword set - cleaned up and capitalised, but not
+//      reworded - since that is literally what real searchers typed.
 //   3. Template path: only when neither of the above has anything to work
 //      with (a truly cold-start brand: no crawl, no GSC history) does the
 //      vertical-aware template fire, and fieldSources marks it 'template' so
@@ -186,7 +186,7 @@ const TITLE_TEMPLATES = {
   ecommerce: {
     transactional: (kw) => `Buy ${kw}: Prices, Options & Shipping`,
     commercial: (kw) => `Best ${kw}: Compare Options & Prices`,
-    local: (kw) => `${kw} Near You — Store Locations`,
+    local: (kw) => `${kw} Near You - Store Locations`,
     navigational: (kw) => kw,
     informational: (kw) => `${kw}: A Buying Guide`,
   },
@@ -207,7 +207,7 @@ const TITLE_TEMPLATES = {
 };
 
 // Suffix applied only for the same intents the original code suffixed
-// (transactional/commercial/local) — informational/navigational titles were
+// (transactional/commercial/local) - informational/navigational titles were
 // never suffixed, and that's preserved for every vertical, not just default.
 const SUFFIX_INTENTS = new Set(['transactional', 'commercial', 'local']);
 
@@ -229,7 +229,7 @@ function clusterTokenSet(cluster) {
 }
 
 // Finds the longest contiguous run of `lowerWords` whose tokens belong to
-// `kwTokens` — i.e. where the old keyword actually sits inside the old
+// `kwTokens` - i.e. where the old keyword actually sits inside the old
 // title's word sequence, so it can be swapped out in place while leaving the
 // brand's own wrapper words exactly where they were.
 function longestTokenSpan(lowerWords, kwTokens) {
@@ -247,7 +247,7 @@ function longestTokenSpan(lowerWords, kwTokens) {
 // Rewrites a real, already-published title for a new keyword by keeping
 // every wrapper word (the brand's own modifiers, separators, brand name) in
 // place and only swapping out the span that was the OLD keyword. Returns
-// null when the old keyword can't be located inside the old title at all —
+// null when the old keyword can't be located inside the old title at all - 
 // in that case the title's "pattern" can't be trusted, so the caller should
 // move on to the next candidate rather than force a bad rewrite.
 function rewriteTitleForKeyword(oldTitle, oldKeyword, newKeywordTitleCased, brandName) {
@@ -257,8 +257,8 @@ function rewriteTitleForKeyword(oldTitle, oldKeyword, newKeywordTitleCased, bran
   let brandSuffix = '';
   if (brandName) {
     const esc = brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const suffixRe = new RegExp(`\\s*[|\\-–:]\\s*${esc}\\s*$`, 'i');
-    const prefixRe = new RegExp(`^\\s*${esc}\\s*[|\\-–:]\\s*`, 'i');
+    const suffixRe = new RegExp(`\\s*[|\\--:]\\s*${esc}\\s*$`, 'i');
+    const prefixRe = new RegExp(`^\\s*${esc}\\s*[|\\--:]\\s*`, 'i');
     if (suffixRe.test(core)) { brandSuffix = core.match(suffixRe)[0]; core = core.replace(suffixRe, ''); } else if (prefixRe.test(core)) { brandPrefix = core.match(prefixRe)[0]; core = core.replace(prefixRe, ''); }
   }
   const words = core.split(/\s+/).filter(Boolean);
@@ -268,7 +268,7 @@ function rewriteTitleForKeyword(oldTitle, oldKeyword, newKeywordTitleCased, bran
   if (!kwTokens.size) return null;
   const span = longestTokenSpan(lowerWords, kwTokens);
   // Require the located span to cover a real majority of the old keyword's
-  // tokens — a one-word coincidental overlap isn't the keyword's position.
+  // tokens - a one-word coincidental overlap isn't the keyword's position.
   if (!span || (span.end - span.start) < Math.max(1, Math.ceil(kwTokens.size / 2))) return null;
   const before = words.slice(0, span.start).join(' ');
   const after = words.slice(span.end).join(' ');
@@ -277,7 +277,7 @@ function rewriteTitleForKeyword(oldTitle, oldKeyword, newKeywordTitleCased, bran
   //
   // Without this check the rewrite carried the SOURCE page's own qualifiers
   // onto an unrelated keyword: on the live brand it produced
-  // "Web Development Services USA Services in NYC" — a national keyword
+  // "Web Development Services USA Services in NYC" - a national keyword
   // wearing a New York page's wrapper, with "Services" repeated at the seam.
   // Any wrapper word that is not recognised packaging (a place name, a
   // different service, a year) means this title's pattern cannot be
@@ -300,7 +300,7 @@ function rewriteTitleForKeyword(oldTitle, oldKeyword, newKeywordTitleCased, bran
   // "New York City Website Development" for "custom web development services in
   // new york" left "New" behind as a wrapper (the keyword span began at
   // "York"), and the dedup then deleted the keyword's OWN "New" as a duplicate
-  // — shipping "New Custom Web Development Services in York" and splitting the
+  // - shipping "New Custom Web Development Services in York" and splitting the
   // place name in half. Dropping the redundant wrapper word instead yields
   // "Custom Web Development Services in New York", which is what was meant.
   const keywordStems = new Set(tokenize(newKeywordTitleCased).map((t) => clustering.stem(t, 'en')));
@@ -313,7 +313,7 @@ function rewriteTitleForKeyword(oldTitle, oldKeyword, newKeywordTitleCased, bran
 
 // Removes wrapper words the new keyword already carries, so the seam collapses
 // without touching the keyword itself. Stopwords and short words are structural
-// and always kept — dropping them would break the wrapper's grammar.
+// and always kept - dropping them would break the wrapper's grammar.
 function dropWrapperWordsCoveredBy(wrapper, keywordStems) {
   return String(wrapper || '').split(/\s+/).filter(Boolean).filter((w) => {
     const bare = w.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -332,7 +332,7 @@ const ALLOWED_WRAPPER_WORDS = new Set(`
 
 // Collapses a distinctive word repeated inside the title's core
 // ("... Services USA Services" -> "... Services USA"), matched on the STEM so
-// near-duplicates collapse too — "Company"/"Companies" both stem to "company",
+// near-duplicates collapse too - "Company"/"Companies" both stem to "company",
 // which is what let the live brand ship the title "Website Development Company
 // Providing Websites for Companies Providing". Only ever removes a LATER
 // duplicate of an earlier word, so meaning is never changed by reordering.
@@ -341,7 +341,7 @@ const ALLOWED_WRAPPER_WORDS = new Set(`
 // just because it repeats a keyword word, and passing the fully assembled
 // title collapsed "Web Development Services | American Web Builders" into
 // "... | American Builders", and "Design Services in Austin | Austin Design Co"
-// into "... | Co" — corrupting the brand's name inside a recommended title tag.
+// into "... | Co" - corrupting the brand's name inside a recommended title tag.
 // Every current caller passes bare keyword or query text, never an assembled
 // title; rewriteTitleForKeyword collapses its seam with
 // dropWrapperWordsCoveredBy instead, which cannot touch the keyword either.
@@ -361,7 +361,7 @@ function dropRepeatedWords(title) {
 }
 
 // Strips trailing separators and joining words that carry no meaning at the end
-// of a title — left either by a duplicate removed from after them ("... For
+// of a title - left either by a duplicate removed from after them ("... For
 // Companies" -> "... For") or by a source query that simply ended that way.
 function trimDanglingWords(text) {
   const words = String(text).split(/\s+/).filter(Boolean);
@@ -374,7 +374,7 @@ function trimDanglingWords(text) {
 }
 
 // Prepositions and conjunctions that can never legitimately OPEN a title.
-// Deliberately excludes articles — "The Complete Guide to X" is a fine title,
+// Deliberately excludes articles - "The Complete Guide to X" is a fine title,
 // so "the"/"a"/"an" are left alone.
 const NON_LEADING_WORDS = new Set('and or but nor for of to in into on at by from with as per via vs'.split(' '));
 
@@ -390,7 +390,7 @@ function trimTitleEdges(text) {
   return words.join(' ').trim();
 }
 
-// Path 1 — brand history: this brand's own top-clicking crawled pages,
+// Path 1 - brand history: this brand's own top-clicking crawled pages,
 // ranked by topical overlap with the cluster then by real clicks, rewritten
 // for the new keyword using that specific page's own title pattern.
 function titleFromBrandHistory(cluster, brand, crawlPages) {
@@ -430,9 +430,9 @@ function brandQueries(brand, cached) {
   return analytics.topQueries(brand.id, 9999, 1000);
 }
 
-// Path 2 — query derivation: the highest-impression real GSC query string
+// Path 2 - query derivation: the highest-impression real GSC query string
 // that belongs to this cluster (shares a distinctive token with the primary
-// or supporting keywords), cleaned up and capitalised but not reworded —
+// or supporting keywords), cleaned up and capitalised but not reworded - 
 // it's literally what real searchers typed.
 function titleFromTopQuery(cluster, brand, cachedQueries) {
   const queries = brandQueries(brand, cachedQueries);
@@ -444,7 +444,7 @@ function titleFromTopQuery(cluster, brand, cachedQueries) {
       const overlap = qTokens.filter((t) => clusterTokens.has(t)).length;
       // Same on-topic requirement the headings use: every distinctive token
       // must belong to this cluster. Partial overlap was picking queries that
-      // merely shared a word — a cluster about "web development services usa"
+      // merely shared a word - a cluster about "web development services usa"
       // was titled "Web Design and Web Development Services Atlanta", naming
       // a city the page has nothing to do with.
       const onTopic = qTokens.length > 0 && qTokens.every((t) => clusterTokens.has(t));
@@ -454,7 +454,7 @@ function titleFromTopQuery(cluster, brand, cachedQueries) {
     .sort((a, b) => (b.overlap - a.overlap) || (b.q.impressions - a.q.impressions));
   if (!scored.length) return [];
 
-  // Every on-topic query, cleaned, in preference order — the caller picks the
+  // Every on-topic query, cleaned, in preference order - the caller picks the
   // first that fits. Returning only scored[0] is how a 71-character query
   // became the recommended title on the live brand: the brief then warned about
   // the very title it had just chosen, while shorter, equally on-topic
@@ -477,8 +477,8 @@ function recommendedTitle(cluster, brand, crawlPages, cachedQueries) {
   // real searcher phrasing, then the vertical template. The first one that FITS
   // wins. Previously each path returned a single candidate and the first
   // non-null won outright, so an over-long title from a high-priority path was
-  // emitted with a warning attached while shorter candidates — including the
-  // always-short template — were never considered. A 60-character limit the
+  // emitted with a warning attached while shorter candidates - including the
+  // always-short template - were never considered. A 60-character limit the
   // generator knows about is a limit it should meet, not report on.
   const candidates = [
     ...titleFromBrandHistory(cluster, brand, crawlPages || []),
@@ -523,7 +523,7 @@ const HEADING_INTRO_TEMPLATES = {
 
 // Question-shaped real queries read naturally as headings ("How Much Does X
 // Cost?"); a bare noun-phrase query doesn't, so it's framed as "About: <query>"
-// instead of being forced into a fake question — still the real query text,
+// instead of being forced into a fake question - still the real query text,
 // just not mislabeled as something it isn't.
 const WH_STARTERS = new Set(['what', 'why', 'how', 'when', 'where', 'which', 'who', 'is', 'are', 'can', 'does', 'do', 'should']);
 
@@ -592,7 +592,7 @@ function templatedIntroHeadings(cluster, brand) {
 // Two headings are "the same section" when their distinctive tokens match as a
 // set, regardless of word order or filler. This is what stops the brief
 // emitting "Website Design Usa", "Website Design In Usa" and
-// "Website Design Services Usa" as three separate sections — which is exactly
+// "Website Design Services Usa" as three separate sections - which is exactly
 // what the live brand's stored brief did, giving a writer six of nine headings
 // that all meant the same thing.
 // The distinctive, stemmed tokens a heading is "about".
@@ -601,7 +601,7 @@ function headingTokens(heading) {
 }
 
 // Two tokens count as the same concept when one is a prefix of the other and
-// the shared prefix is long enough to be meaningful — "web"/"website",
+// the shared prefix is long enough to be meaningful - "web"/"website",
 // "develop"/"development". Light stemming alone leaves those apart, which is
 // why "Web Development Services USA" and "Website Development Services in USA"
 // both survived the first pass of this fix.
@@ -614,7 +614,7 @@ function tokensMatch(a, b) {
 }
 
 // Two headings are the same section when their token sets agree on BOTH
-// sides — matches measured against the LARGER set, not the smaller.
+// sides - matches measured against the LARGER set, not the smaller.
 //
 // Pure containment was too aggressive: "Web Development Services USA"
 // ({web, develop}) is fully contained in "Web Design and Web Development
@@ -633,7 +633,7 @@ function isSameSection(aTokens, bTokens) {
 }
 
 // `seedTokens` pre-loads the deduper with token sets that must not be repeated
-// but are not themselves headings — in practice the recommended title. The
+// but are not themselves headings - in practice the recommended title. The
 // title and the intro headings are both derived from the same ranked query
 // list, so they collided constantly: the live brand's brief opened with the H2
 // "Web Design and Development Company in USA" directly beneath the identical
@@ -662,7 +662,7 @@ function dedupeHeadings(headings, seedTokens = []) {
 //
 // Sub-clusters are groups of keywords that are genuinely distinct from each
 // other within the topic, so each one is a real section. Supporting keywords
-// are just the cluster's members sorted by impressions — adjacent entries are
+// are just the cluster's members sorted by impressions - adjacent entries are
 // usually rephrasings, which is why using them directly produced duplicate
 // headings.
 function bodyHeadings(cluster) {
@@ -675,7 +675,7 @@ function bodyHeadings(cluster) {
   }
   // Fallback: the cluster's own supporting keywords, cleaned the same way the
   // title is, and with any keyword that merely restates the primary one
-  // dropped — a section heading that says the same thing as the page's title
+  // dropped - a section heading that says the same thing as the page's title
   // is not a section, and it used to consume up to six of the nine slots.
   const primaryTokens = new Set(distinctiveTokens(cluster.primaryKeyword).map((t) => clustering.stem(t, 'en')));
   const headings = cluster.supportingKeywords
@@ -719,7 +719,7 @@ function suggestedHeadings(cluster, brand, cachedQueries, recommendedTitleText) 
 // only real baseline available without fetching anyone else's page: the
 // median and 85th percentile of the brand's own indexable content pages.
 // This is a "match what already works on this site" range, not a
-// "match what's currently ranking" range — the honest distinction is
+// "match what's currently ranking" range - the honest distinction is
 // called out in the brief's UI, not hidden.
 function wordCountRange(crawlPages) {
   const counts = crawlPages
@@ -729,7 +729,7 @@ function wordCountRange(crawlPages) {
   if (counts.length < 3) return null;
   const pct = (p) => counts[Math.min(counts.length - 1, Math.floor(p * (counts.length - 1)))];
   // `low` used to be the median, so the "range" was [median, p85] and the
-  // floor was always "at least as long as your average page" — not a range
+  // floor was always "at least as long as your average page" - not a range
   // around a target at all. It now spans p40-p85 with the median called out
   // separately as the target, which is what a writer actually needs.
   return {
@@ -738,14 +738,14 @@ function wordCountRange(crawlPages) {
     target: pct(0.6),
     median: pct(0.5),
     sampleSize: counts.length,
-    basis: 'This brand\'s own crawled content pages — what already works on this site, NOT what currently ranks for this keyword. Check the live SERP before treating it as a target.',
+    basis: 'This brand\'s own crawled content pages - what already works on this site, NOT what currently ranks for this keyword. Check the live SERP before treating it as a target.',
   };
 }
 
 // ------------------------------------------------------- internal link suggestions
 function internalLinkSuggestions(cluster, crawlPages, recommendationRows) {
   // Improving an existing page: reuse the linking agent's own recommendations
-  // that already target that URL — no guessing needed, it already crawled this.
+  // that already target that URL - no guessing needed, it already crawled this.
   if (cluster.existingPage && recommendationRows && recommendationRows.length) {
     const targeted = recommendationRows
       .filter((r) => r.target_url === cluster.existingPage)
@@ -783,24 +783,24 @@ function internalLinkSuggestions(cluster, crawlPages, recommendationRows) {
 // Not previously generated at all, despite the CTR-gap opportunity type
 // existing specifically to tell people to rewrite it. Built deterministically
 // from the cluster's own primary keyword, intent and the brand's configured
-// CTA, and length-checked — a template, and labelled as one, but a complete
+// CTA, and length-checked - a template, and labelled as one, but a complete
 // starting point rather than a blank field.
 const META_TEMPLATES = {
   transactional: (kw, brandName) => `Compare options and pricing for ${kw}. See what's included, how quickly you can start, and what it costs${brandName ? ` with ${brandName}` : ''}.`,
   commercial: (kw, brandName) => `Looking for ${kw}? See what to look for, how the options compare, and how${brandName ? ` ${brandName}` : ' we'} can help you choose.`,
-  local: (kw) => `Need ${kw}? See service areas, what's covered and how to get started — with local support and a direct line to the team.`,
+  local: (kw) => `Need ${kw}? See service areas, what's covered and how to get started - with local support and a direct line to the team.`,
   // Extended past the 110-character floor: the shorter original wording put any
   // keyword under ~12 characters below the minimum, so the generator warned
   // about its own output for every short keyword.
-  informational: (kw) => `A practical guide to ${kw}: what it means, how it works, and what to do next — clear answers, no jargon, and the steps worth taking first.`,
-  // Was `"${kw} — find what you need and get in touch."`, which is structurally
-  // under the 110-character floor for any short keyword — so the generator
+  informational: (kw) => `A practical guide to ${kw}: what it means, how it works, and what to do next - clear answers, no jargon, and the steps worth taking first.`,
+  // Was `"${kw} - find what you need and get in touch."`, which is structurally
+  // under the 110-character floor for any short keyword - so the generator
   // reliably warned about a description it had just written itself.
-  navigational: (kw, brandName) => `${kw} — everything in one place${brandName ? ` from ${brandName}` : ''}: the key pages, contact details and next steps, so you can find what you need and get in touch quickly.`,
+  navigational: (kw, brandName) => `${kw} - everything in one place${brandName ? ` from ${brandName}` : ''}: the key pages, contact details and next steps, so you can find what you need and get in touch quickly.`,
 };
 
 // Trims an over-long description at a sentence or word boundary. The generator
-// used to length-check its own output, warn, and then emit it anyway — leaving
+// used to length-check its own output, warn, and then emit it anyway - leaving
 // the SEO team to hand-trim something the tool could have trimmed itself.
 function trimToLength(text, max) {
   const s = String(text || '').trim();
@@ -810,8 +810,8 @@ function trimToLength(text, max) {
   // Only cut at a sentence boundary if doing so keeps most of the text.
   if (sentenceEnd >= max * 0.6) return cut.slice(0, sentenceEnd + 1).trim();
   const lastSpace = cut.lastIndexOf(' ');
-  const body = (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).replace(/[,;:\s—–-]+$/, '');
-  // Already ends a sentence — an ellipsis on top of a full stop just looks
+  const body = (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).replace(/[,;:\s–—-]+$/, '');
+  // Already ends a sentence - an ellipsis on top of a full stop just looks
   // like a mistake.
   return /[.!?]$/.test(body) ? body : `${body}…`;
 }
@@ -857,7 +857,7 @@ function recommendedCta(cluster, brand) {
     return { text: null, configured: false };
   }
   // Matched against the same normalised intent key used for the title/
-  // headings, not the raw display strings — see normaliseIntent()'s comment.
+  // headings, not the raw display strings - see normaliseIntent()'s comment.
   const key = normaliseIntent(cluster.intent);
   const rule = (cta.rules || []).find((r) => String(r.pageType || '').toLowerCase() === key);
   return { text: (rule && rule.cta) || cta.default || null, configured: true };
@@ -889,7 +889,7 @@ function build(brand, cluster) {
   //
   // The page type, title shape, headings and CTA all descend from the
   // cluster's intent label. When that label is a weak guess, every one of
-  // them inherits the guess — which is how a national keyword ended up with
+  // them inherits the guess - which is how a national keyword ended up with
   // the title "... In Usa Near You" and the heading "Why Work With a Local
   // Team". The brief now carries the warning to the surface instead of
   // presenting derived fields with the same confidence as measured ones.
@@ -900,7 +900,7 @@ function build(brand, cluster) {
     warnings.push({
       field: 'searchIntent',
       severity: 'high',
-      message: `Search intent was classified as "${cluster.intent}" with low confidence${cluster.intentCoverage != null ? ` (only ${Math.round(cluster.intentCoverage * 100)}% of the cluster's keywords carry that signal)` : ''}. The recommended page type, title shape and headings all follow from it — check the live SERP for this keyword before using them.`,
+      message: `Search intent was classified as "${cluster.intent}" with low confidence${cluster.intentCoverage != null ? ` (only ${Math.round(cluster.intentCoverage * 100)}% of the cluster's keywords carry that signal)` : ''}. The recommended page type, title shape and headings all follow from it - check the live SERP for this keyword before using them.`,
     });
   }
   if (cluster.needsReview) {
@@ -921,24 +921,24 @@ function build(brand, cluster) {
   } else if (!services.matched.length) {
     // Configured but nothing matched is a different finding from not configured
     // at all, and it used to render as a silently empty section.
-    warnings.push({ field: 'relevantServices', severity: 'low', message: 'None of this brand\'s configured services share a topic with this keyword. Either this page sells something not yet on the service list, or the cluster is off-portfolio — worth checking before commissioning it.' });
+    warnings.push({ field: 'relevantServices', severity: 'low', message: 'None of this brand\'s configured services share a topic with this keyword. Either this page sells something not yet on the service list, or the cluster is off-portfolio - worth checking before commissioning it.' });
   }
   if (!cta.configured) {
     warnings.push({ field: 'callToAction', severity: 'low', message: 'No CTA rules are configured for this brand, so a generic one is shown. Add them in brand settings.' });
   }
   // Both of these fields silently rendered as empty while fieldSources still
-  // claimed they were 'data' — the reader had no way to tell "measured zero"
+  // claimed they were 'data' - the reader had no way to tell "measured zero"
   // from "could not be measured".
   if (!words) {
     warnings.push({ field: 'wordCountRange', severity: 'low', message: 'No word-count range could be measured: this brand has fewer than three crawled content pages. Run the internal-linking crawl to establish a baseline.' });
   }
   if (!links.links.length) {
-    warnings.push({ field: 'internalLinks', severity: 'medium', message: 'No internal link sources could be identified — no crawled page shares a topic with this cluster. A new page with no inbound internal links will struggle to be discovered or to rank; identify link sources manually before publishing.' });
+    warnings.push({ field: 'internalLinks', severity: 'medium', message: 'No internal link sources could be identified - no crawled page shares a topic with this cluster. A new page with no inbound internal links will struggle to be discovered or to rank; identify link sources manually before publishing.' });
   }
 
   return {
     // Stored briefs are frozen JSON with no version marker, so a brief written
-    // before a field existed renders as undefined in a view that expects it —
+    // before a field existed renders as undefined in a view that expects it - 
     // which is the state the live brand's stored briefs are in. Stamping the
     // version lets a reader (and the view) tell an old shape from a new one.
     schemaVersion: SCHEMA_VERSION,
@@ -991,9 +991,9 @@ function build(brand, cluster) {
     internalLinks: links,
     relevantServices: services,
     callToAction: cta,
-    // Explicitly unavailable rather than guessed — see file header.
-    questionsToAnswer: { available: false, reason: 'Needs live Google search results (e.g. "People Also Ask") — no free data source provides this.' },
-    competitorCoverage: { available: false, reason: 'Needs to see competitors\' actual ranking pages — no free data source provides this.' },
+    // Explicitly unavailable rather than guessed - see file header.
+    questionsToAnswer: { available: false, reason: 'Needs live Google search results (e.g. "People Also Ask") - no free data source provides this.' },
+    competitorCoverage: { available: false, reason: 'Needs to see competitors\' actual ranking pages - no free data source provides this.' },
     // Which fields are templated wording vs derived from real data, so a UI
     // (or a human) can tell "Recommended Title" (always a template filled
     // in with the primary keyword) apart from "Word Count Range" (measured

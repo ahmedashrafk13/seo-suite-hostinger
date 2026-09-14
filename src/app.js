@@ -21,14 +21,14 @@ const app = express();
 const PORT = config.PORT;
 
 // A tunnel or reverse proxy terminates TLS, so Express must be told to read
-// X-Forwarded-Proto — otherwise `secure` cookies are never sent and nobody can
+// X-Forwarded-Proto - otherwise `secure` cookies are never sent and nobody can
 // stay signed in. It also decides whether HSTS is safe to send.
 const BEHIND_PROXY = process.env.TRUST_PROXY === '1' || process.env.NODE_ENV === 'production';
 if (BEHIND_PROXY) app.set('trust proxy', 1);
 
 // Cache-busting stamp for the stylesheet. Browsers cache /css/style.css hard,
 // so a CSS change could sit on disk while the tab kept rendering the previous
-// layout — indistinguishable from "the fix didn't work". The stamp is the
+// layout - indistinguishable from "the fix didn't work". The stamp is the
 // file's modification time, so the URL changes exactly when the file does.
 // In production it is read once at boot; in development it is re-read per
 // request so an edit shows up on the next refresh without a restart.
@@ -57,14 +57,14 @@ const BOOT_ASSET_VERSION = assetVersion();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'views'));
 // Set before anything else answers, so the static handler's responses carry
-// them too — a header middleware mounted after express.static would not apply
+// them too - a header middleware mounted after express.static would not apply
 // to /css/style.css or /js/chart-assets.js at all.
 app.use(securityHeaders({ behindProxy: BEHIND_PROXY }));
 
 // Every reference to these files carries ?v=<mtime>, so the bytes at a given
 // URL never change and a year-long immutable cache is safe. Without maxAge the
 // browser revalidated the stylesheet and the chart loader on every navigation
-// — a round trip in front of first paint on each page, which is exactly the
+// - a round trip in front of first paint on each page, which is exactly the
 // kind of thing that puts LCP over budget on a slow connection.
 app.use(express.static(path.join(__dirname, '..', 'public'), {
   maxAge: '365d',
@@ -82,14 +82,14 @@ app.use(express.urlencoded({ extended: true, limit: '5mb' })); // keyword pastes
 app.use(express.json({ limit: '5mb' }));
 
 // Sessions live in SQLite, not in memory. With the default MemoryStore every
-// restart signed the whole team out — tolerable for one developer, not for a
+// restart signed the whole team out - tolerable for one developer, not for a
 // team on a live URL who would be logged out by a deploy or a crash-restart.
 // That matters more on shared hosting, not less: Passenger stops the app
 // whenever it goes idle, so a memory-backed session would rarely survive an
 // afternoon.
 //
 // The store writes to the connection db.js already owns rather than opening its
-// own — see lib/sessionStore.js for why connect-sqlite3 was replaced.
+// own - see lib/sessionStore.js for why connect-sqlite3 was replaced.
 const SqliteSessionStore = require('./lib/sessionStore');
 
 app.use(session({
@@ -119,7 +119,7 @@ app.use((req, res, next) => {
       res.locals.currentUser = user;
       // A team shares the data of its owner. Resolving that here means every
       // existing `WHERE user_id = ?` query scopes to the whole team without
-      // being rewritten — while req.actorId still identifies the person, so
+      // being rewritten - while req.actorId still identifies the person, so
       // approvals and assignments record who actually acted.
       req.actorId = user.id;
       req.dataUserId = team.dataOwnerId(user);
@@ -145,7 +145,7 @@ app.use((req, res, next) => {
   // re-implemented per view.
   res.locals.fmtInt = (n) => Math.round(Number(n) || 0).toLocaleString('en-US');
   res.locals.fmtPct = (n, dp = 1) => `${(Number(n) || 0).toFixed(dp)}%`;
-  res.locals.fmtPos = (n) => (n == null ? '—' : Number(n).toFixed(1));
+  res.locals.fmtPos = (n) => (n == null ? '-' : Number(n).toFixed(1));
   // Seconds → "2m 14s", matching how GA4 prints average session duration.
   res.locals.fmtDuration = (secs) => {
     const s = Math.round(Number(secs) || 0);
@@ -153,8 +153,8 @@ app.use((req, res, next) => {
     const m = Math.floor(s / 60);
     return m ? `${m}m ${s % 60}s` : `${s}s`;
   };
-  res.locals.fmtDate = (s) => (s ? String(s).slice(0, 10) : '—');
-  res.locals.fmtDateTime = (s) => (s ? String(s).slice(0, 16).replace('T', ' ') : '—');
+  res.locals.fmtDate = (s) => (s ? String(s).slice(0, 10) : '-');
+  res.locals.fmtDateTime = (s) => (s ? String(s).slice(0, 16).replace('T', ' ') : '-');
   res.locals.assetVersion = process.env.NODE_ENV === 'production' ? BOOT_ASSET_VERSION : assetVersion();
   res.locals.severityMeta = notify.severityMeta;
   // Run status → an actual badge class. Several views used the raw status as
@@ -170,7 +170,7 @@ app.use((req, res, next) => {
     timeout: 'critical',
   }[String(status || '').toLowerCase()] || 'neutral');
   res.locals.shortUrl = (u, max = 60) => {
-    if (!u) return '—';
+    if (!u) return ' - ';
     try {
       const url = new URL(u);
       const p = url.pathname + (url.search || '');
@@ -196,7 +196,7 @@ function requireAuth(req, res, next) {
     return res.redirect('/login');
   }
   // A member awaiting approval is authenticated but has no workspace yet.
-  // Blocking here — not in each route — is what guarantees no client data can
+  // Blocking here - not in each route - is what guarantees no client data can
   // leak to an unapproved account through a route someone forgets to guard.
   if (res.locals.currentUser.status !== 'active') return res.redirect('/pending');
 
@@ -224,12 +224,12 @@ app.set('requireAdmin', requireAdmin);
 // Brands are needed by the sidebar's brand switcher on every authed page.
 app.use((req, res, next) => {
   if (res.locals.currentUser) {
-    // Scoped to req.dataUserId — the team's data owner — not to the signed-in
+    // Scoped to req.dataUserId - the team's data owner - not to the signed-in
     // member's own id. A team shares the owner's workspace (see lib/team.js),
     // and all ~130 data queries in the routes already resolve through
     // dataUserId. This middleware used currentUser.id, so every member who was
     // not the owner got an empty brand switcher and three zeroed counters
-    // sitting next to page bodies full of the team's real data — the sidebar
+    // sitting next to page bodies full of the team's real data - the sidebar
     // disagreeing with the page it framed.
     const dataUserId = req.dataUserId;
     res.locals.navBrands = db.prepare('SELECT id, name FROM brands WHERE user_id=? AND active=1 ORDER BY name')
@@ -264,6 +264,13 @@ app.get('/', (req, res) => res.redirect(res.locals.currentUser ? '/dashboard' : 
 // a session, and must not be redirected to the login page.
 app.use('/internal/cron', require('./routes/cron'));
 
+// Lead ingest is called by someone else's software - a form handler, a CRM, a
+// Zapier step - which authenticates with a key in a header and has no session.
+// It is mounted here, ABOVE csrf.verify, for exactly the reason the cron route
+// is: there is no session to hold a CSRF token, so the verifier below would
+// reject every post. See routes/leadsApi.js.
+app.use('/api/leads', require('./routes/leadsApi'));
+
 // Everything below authenticates by session, so from here on a state-changing
 // request must carry the session's CSRF token. Mounted after the cron route
 // deliberately: cron authenticates with a shared secret and has no session to
@@ -273,6 +280,10 @@ app.use(csrf.verify);
 // A cheap liveness URL. Hostinger's uptime monitor (or any external pinger)
 // hitting this every few minutes also has the side effect of keeping Passenger
 // from idling the app out between cron ticks.
+// A weekly report shared with a client. No session, no login, GET only - the
+// token in the URL is the whole credential. See routes/share.js.
+app.use('/r', require('./routes/share'));
+
 app.get('/healthz', (req, res) => {
   res.type('text/plain').send(`ok ${db.engineName || 'sqlite'}\n`);
 });
@@ -287,9 +298,14 @@ app.use('/audit', requireAuth, require('./routes/audit'));
 app.use('/pagespeed', requireAuth, require('./routes/pagespeed'));
 app.use('/linking', requireAuth, require('./routes/linking'));
 app.use('/keywords', requireAuth, require('./routes/keywords'));
+// Mounted on its own path rather than under /keywords: that router matches a
+// bare "/:id" as a clustering run id, so any sibling path added there has to
+// be declared above it or it 404s (see the comment in routes/keywords.js).
+app.use('/keyword-planner', requireAuth, require('./routes/keywordPlanner'));
 app.use('/alerts', requireAuth, require('./routes/alerts'));
 app.use('/tasks', requireAuth, require('./routes/tasks'));
 app.use('/reports', requireAuth, require('./routes/reports'));
+app.use('/leads', requireAuth, require('./routes/leads'));
 app.use('/settings', requireAuth, require('./routes/settings'));
 app.use('/team', requireAuth, require('./routes/team'));
 app.use('/onboarding', requireAuth, require('./routes/onboarding'));
@@ -299,8 +315,8 @@ app.use('/ai-seo', requireAuth, require('./routes/aiseo'));
 
 app.use((req, res) => {
   res.status(404).render('error', {
-    title: 'Not found', active: null,
-    message: `No page at ${req.path}.`,
+    title: 'Page not found', active: null, status: 404,
+    message: `There is no page at ${req.path}. It may have been renamed, or the link that brought you here may be out of date.`,
   });
 });
 
@@ -314,7 +330,7 @@ app.use((err, req, res, next) => {
 
   // Raw err.message used to be rendered in production. The messages here come
   // from SQLite, googleapis and nodemailer, and carry absolute paths, SQL, and
-  // in the worst case a fragment of a request that contained a credential —
+  // in the worst case a fragment of a request that contained a credential - 
   // none of which belongs on a page that an unapproved account can reach.
   const message = isProd
     ? `Something went wrong on our side. Quote reference ${ref} if you report this.`
@@ -322,7 +338,7 @@ app.use((err, req, res, next) => {
 
   // If the failure happened before the view-globals middleware ran (a session
   // store error, say), these locals are missing and error.ejs would itself
-  // throw on `currentUser` — turning a handled 500 into an unhandled one with
+  // throw on `currentUser` - turning a handled 500 into an unhandled one with
   // no page at all.
   if (res.locals.currentUser === undefined) res.locals.currentUser = null;
   if (!res.locals.perms) {
@@ -381,7 +397,7 @@ const server = app.listen(PORT, () => {
   // The crawlers ship in two implementations: the original Python programs and
   // JavaScript ports that need nothing but Node. A machine can have several
   // Python installs with only one carrying the packages, and shared hosting
-  // often has none at all — so report which implementation will actually be
+  // often has none at all - so report which implementation will actually be
   // used rather than letting the first audit surprise someone.
   try {
     toolRunner.runtimeStatus().forEach((s) => {
@@ -398,10 +414,10 @@ const server = app.listen(PORT, () => {
     process.exit(1);
   }
   if (process.env.NODE_ENV !== 'production') {
-    console.log('  Note: NODE_ENV is not "production" — error pages will show stack traces.');
+    console.log('  Note: NODE_ENV is not "production" - error pages will show stack traces.');
   }
   if (process.env.SIGNUP_REQUIRES_INVITE !== '1') {
-    console.log('  Note: sign-up is open — anyone who reaches this URL can create their own workspace.');
+    console.log('  Note: sign-up is open - anyone who reaches this URL can create their own workspace.');
     console.log('        Set SIGNUP_REQUIRES_INVITE=1 once your team has joined.');
   }
 
@@ -417,7 +433,7 @@ const server = app.listen(PORT, () => {
   // gives no sign of it.
   if (!config.INPROCESS_CRON) {
     if (!config.CRON_TOKEN) {
-      console.log('  Note: CRON_TOKEN is not set — scheduled alerts, sync, reports and backups cannot run.');
+      console.log('  Note: CRON_TOKEN is not set - scheduled alerts, sync, reports and backups cannot run.');
       console.log('        See DEPLOY-HOSTINGER.md ("Scheduled jobs") to finish the setup.');
     } else if (scheduler.neverRan()) {
       console.log('  Note: no scheduled job has run yet. If this deploy is more than an hour old,');

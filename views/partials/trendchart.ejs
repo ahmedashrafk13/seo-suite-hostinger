@@ -6,7 +6,8 @@
    lower=better). */
 const _pts = (typeof points !== 'undefined' ? points : []).filter((p) => p && p.value != null);
 const _label = typeof label !== 'undefined' ? label : '';
-const _color = typeof color !== 'undefined' ? color : '#1e4d6b';
+/* null lets the chart take --viz-1 for the current theme at draw time. */
+const _color = typeof color !== 'undefined' ? color : null;
 const _fmt = typeof fmt !== 'undefined' ? fmt : 'int';
 const _invert = typeof invert !== 'undefined' ? invert : false;
 function _fmtV(v) {
@@ -49,7 +50,7 @@ const _canGroup = _pts.length >= 10;
         return Math.round(v).toLocaleString('en-US');
       }
       // Sums for volume metrics (clicks/impressions), averages for rate/
-      // position metrics — a client-side re-bucket needs no extra server call.
+      // position metrics - a client-side re-bucket needs no extra server call.
       function bucketize(mode) {
         if (mode === 'day') return { labels: dailyDates, values: dailyValues };
         var buckets = {}, order = [];
@@ -80,27 +81,47 @@ const _canGroup = _pts.length >= 10;
           }),
         };
       }
-      function render() {
-        var chart = new ApexCharts(document.querySelector('#<%= _uid %>'), {
+      var chart = null;
+      function options(categories, values) {
+        var t = window.ChartTheme.get();
+        return {
           chart: {
             type: 'area', height: 160, toolbar: { show: false }, sparkline: { enabled: false },
-            fontFamily: 'inherit', animations: { easing: 'easeinout', speed: 400 },
+            fontFamily: t.font, foreColor: t.text3, animations: { easing: 'easeinout', speed: 400 },
           },
-          series: [{ name: <%- JSON.stringify(_label) %>, data: dailyValues }],
+          series: [{ name: <%- JSON.stringify(_label) %>, data: values }],
           xaxis: {
-            categories: dailyDates, labels: { style: { fontSize: '11px', colors: '#9aa2b4' }, rotate: 0 },
+            categories: categories,
+            labels: { style: { fontSize: '11px', colors: t.muted, fontFamily: t.font }, rotate: 0 },
             axisBorder: { show: false }, axisTicks: { show: false }, tooltip: { enabled: false },
           },
-          yaxis: { labels: { style: { fontSize: '11px', colors: '#9aa2b4' }, formatter: fmtV } },
-          grid: { borderColor: 'var(--border, #e5e9f0)', strokeDashArray: 3, padding: { left: 8, right: 8 } },
+          yaxis: { labels: { style: { fontSize: '11px', colors: t.muted, fontFamily: t.font }, formatter: fmtV } },
+          grid: { borderColor: t.border, strokeDashArray: 3, padding: { left: 8, right: 8 } },
           stroke: { curve: 'smooth', width: 2.5 },
-          colors: [color],
-          fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.32, opacityTo: 0.02, stops: [0, 95] } },
+          colors: [color || t.series[0]],
+          fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: t.dark ? 0.38 : 0.26, opacityTo: 0.02, stops: [0, 95] } },
           markers: { size: 0, hover: { size: 5 } },
           dataLabels: { enabled: false },
-          tooltip: { theme: 'light', y: { formatter: fmtV } },
-        });
+          tooltip: { theme: t.mode, y: { formatter: fmtV } },
+        };
+      }
+      function render() {
+        chart = new ApexCharts(document.querySelector('#<%= _uid %>'), options(dailyDates, dailyValues));
         chart.render();
+        // On a theme flip, restyle only. Re-sending series here would undo
+        // whatever granularity (day/week/month) the reader had selected.
+        window.ChartTheme.onThemeChange(function (t) {
+          if (!chart) return;
+          chart.updateOptions({
+            chart: { foreColor: t.text3 },
+            grid: { borderColor: t.border },
+            colors: [<%- JSON.stringify(_color) %> || t.series[0]],
+            tooltip: { theme: t.mode },
+            fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: t.dark ? 0.38 : 0.26, opacityTo: 0.02, stops: [0, 95] } },
+            xaxis: { labels: { style: { fontSize: '11px', colors: t.muted, fontFamily: t.font }, rotate: 0 } },
+            yaxis: { labels: { style: { fontSize: '11px', colors: t.muted, fontFamily: t.font }, formatter: fmtV } }
+          }, false, false);
+        });
 
         var granEl = document.getElementById('<%= _uid %>-gran');
         if (granEl) {
@@ -116,8 +137,8 @@ const _canGroup = _pts.length >= 10;
         }
       }
       // Fetches ApexCharts only if a trend chart is actually on the page, and
-      // says so plainly if the library cannot be reached — the old code
-      // retried every 60ms forever and showed an empty box.
+      // says so plainly if the library cannot be reached. The old code retried
+      // every 60ms forever and showed an empty box.
       window.ChartAssets.need('apex').then(render).catch(function () {
         window.ChartAssets.unavailable('#<%= _uid %>', 'This trend chart');
       });

@@ -79,7 +79,7 @@ router.get('/', async (req, res, next) => {
 // An agency does not add clients one at a time by hand. This reads every
 // Search Console property on the connected account, pairs each with its GA4
 // property where the match is confident, and creates the missing ones in one
-// pass — which is what makes the suite genuinely multi-client rather than
+// pass - which is what makes the suite genuinely multi-client rather than
 // multi-client-in-principle.
 router.get('/import', async (req, res, next) => {
   try {
@@ -172,7 +172,7 @@ router.post('/import', async (req, res, next) => {
 
     const parts = [];
     if (created.length) parts.push(`Added ${created.length} site${created.length === 1 ? '' : 's'}: ${created.map((c) => c.name).join(', ')}. Their first ${days}-day sync is running now.`);
-    if (skipped.length) parts.push(`Skipped — ${skipped.join('; ')}.`);
+    if (skipped.length) parts.push(`Skipped - ${skipped.join('; ')}.`);
     res.redirect('/brands?msg=' + encodeURIComponent(parts.join(' ')));
   } catch (err) { next(err); }
 });
@@ -229,7 +229,7 @@ router.post('/create', async (req, res, next) => {
       })
       .catch((e) => console.error(`[brands] initial sync for ${brand.name} failed:`, e.message));
 
-    res.redirect('/brands?msg=' + encodeURIComponent(`"${name}" created. The first data sync is running now — it usually takes under a minute.`));
+    res.redirect('/brands?msg=' + encodeURIComponent(`"${name}" created. The first data sync is running now - it usually takes under a minute.`));
   } catch (err) { next(err); }
 });
 
@@ -272,14 +272,14 @@ router.post('/:id/update', async (req, res, next) => {
 // One-time-per-brand inputs the Content Brief Agent needs and cannot derive
 // from any synced data: what the brand sells, and how it asks for the sale.
 // Plain-language textarea input, parsed into the JSON shape contentBrief.js
-// reads — so nobody has to hand-write JSON to use this.
+// reads - so nobody has to hand-write JSON to use this.
 router.post('/:id/content-settings', (req, res, next) => {
   try {
     const userId = req.dataUserId;
     const brand = db.prepare('SELECT * FROM brands WHERE id=? AND user_id=?').get(req.params.id, userId);
     if (!brand) return res.redirect('/brands?error=' + encodeURIComponent('Brand not found.'));
 
-    // "Service name: keyword one, keyword two" — the keyword part is optional.
+    // "Service name: keyword one, keyword two" - the keyword part is optional.
     const services = String(req.body.services || '').split('\n').map((line) => line.trim()).filter(Boolean)
       .map((line) => {
         const [name, kw] = line.split(':');
@@ -300,7 +300,7 @@ router.post('/:id/content-settings', (req, res, next) => {
     const ctaDefault = String(req.body.cta_default || '').trim();
     const cta = (ctaDefault || rules.length) ? { default: ctaDefault || null, rules } : null;
 
-    // Vertical/locale config — drives intent classification, page-type
+    // Vertical/locale config - drives intent classification, page-type
     // taxonomy and title templates. Unset/invalid falls back to 'other',
     // which reproduces today's services-oriented behaviour unchanged.
     const verticalRaw = String(req.body.vertical || '').trim().toLowerCase();
@@ -322,10 +322,62 @@ router.post('/:id/content-settings', (req, res, next) => {
 //
 // Agency admins only. A member who could read these could lift a client's paid
 // Semrush subscription, which is a different class of secret from the brand
-// settings beside it — so this is gated harder than the rest of the page.
+// settings beside it - so this is gated harder than the rest of the page.
 //
 // The form posts one vendor at a time. A blank field clears that field and the
 // brand falls back to the agency's .env key, which is what the form promises.
+// REPORT BRANDING
+//
+// These five fields decide what a client sees on a shared report (lib/
+// reportShares.js) and on the print view. They existed as columns before
+// anything wrote to them; this is that form.
+//
+// The logo is a URL, not an upload. Shared hosting gives this app no reliable
+// writable asset directory and no CDN, and an uploaded image would have to be
+// served back through Express on a page a client loads - so the logo lives
+// wherever the agency's site already serves it. It is required to be https,
+// because the report page is https and a mixed-content image silently does not
+// render, which looks like a broken report rather than a rejected setting.
+router.post('/:id/report-branding', (req, res, next) => {
+  try {
+    const brand = db.prepare('SELECT * FROM brands WHERE id=? AND user_id=?')
+      .get(req.params.id, req.dataUserId);
+    if (!brand) return res.redirect('/brands?error=' + encodeURIComponent('Brand not found.'));
+    if (!res.locals.perms || !res.locals.perms.canWrite) {
+      return res.redirect(`/brands/${brand.id}?error=` + encodeURIComponent('You do not have permission to change this.'));
+    }
+
+    const trim = (v, max) => {
+      const out = String(v || '').trim();
+      return out ? out.slice(0, max) : null;
+    };
+
+    let logo = trim(req.body.report_logo_url, 500);
+    if (logo && !/^https:\/\//i.test(logo)) {
+      return res.redirect(`/brands/${brand.id}?error=` + encodeURIComponent(
+        'The logo URL must start with https:// - an http image does not load on the report page and the report looks broken rather than unbranded.'
+      ));
+    }
+
+    // Only a hex colour is accepted. Anything else is either a typo or a CSS
+    // value being injected into a stylesheet on a page served to a client, and
+    // there is no version of this field where a free-text value is wanted.
+    let accent = trim(req.body.report_accent, 9);
+    if (accent && !/^#[0-9a-f]{3,8}$/i.test(accent)) {
+      return res.redirect(`/brands/${brand.id}?error=` + encodeURIComponent(
+        'The accent colour must be a hex value such as #1e4d6b.'
+      ));
+    }
+
+    db.prepare(`UPDATE brands SET report_company=?, report_logo_url=?, report_accent=?,
+        report_footer=?, report_contact=? WHERE id=?`)
+      .run(trim(req.body.report_company, 160), logo, accent,
+        trim(req.body.report_footer, 400), trim(req.body.report_contact, 300), brand.id);
+
+    return res.redirect(`/brands/${brand.id}?msg=` + encodeURIComponent('Report branding saved.'));
+  } catch (err) { return next(err); }
+});
+
 router.post('/:id/data-sources', (req, res, next) => {
   try {
     const brand = db.prepare('SELECT * FROM brands WHERE id=? AND user_id=?')
@@ -384,7 +436,7 @@ router.post('/:id/delete', (req, res) => {
 //
 // Credentials the audit and internal-linking crawlers present to a site that
 // will not serve its pages anonymously. Stored per brand so a scheduled crawl
-// authenticates the same way a manual one does — see lib/crawlAuth.js for why
+// authenticates the same way a manual one does - see lib/crawlAuth.js for why
 // crawling a login wall anonymously is worse than not crawling at all.
 router.post('/:id/crawl-access', (req, res, next) => {
   try {
@@ -427,7 +479,7 @@ router.post('/:id/crawl-access', (req, res, next) => {
         ));
       }
       return res.redirect(`/brands/${brand.id}?error=` + encodeURIComponent(
-        'Nothing to save — enter a cookie, a basic-auth username, or at least one header.'
+        'Nothing to save - enter a cookie, a basic-auth username, or at least one header.'
       ));
     }
     crawlAuth.save(brand.id, merged);
@@ -475,7 +527,7 @@ router.get('/:id', (req, res, next) => {
       });
 
     // Every table the sync writes to, in sync order, each with the screen it
-    // surfaces on — so "we pulled it" and "you can see it" stay in step. Keep
+    // surfaces on - so "we pulled it" and "you can see it" stay in step. Keep
     // this list aligned with the task list in lib/sync.js syncBrand().
     const DATA_TABLES = [
       { table: 'gsc_daily', label: 'Site-level clicks, impressions, CTR, position', where: 'Performance → KPI row & trends' },
@@ -510,7 +562,7 @@ router.get('/:id', (req, res, next) => {
       brand,
       crawlAccess: crawlAuth.statusForBrand(brand.id),
       // Per-client data-vendor credentials. `status()` never returns a secret
-      // value — only whether each vendor is configured and from where.
+      // value - only whether each vendor is configured and from where.
       dataSources: dataCredentials.status(brand.id),
       credentialSecretSet: dataCredentials.secretConfigured(),
       coverage: sync.dataCoverage(brand.id),

@@ -67,7 +67,7 @@ router.post('/install-deps', (req, res) => {
   if (r.ok) {
     return res.redirect('/audit?msg=' + encodeURIComponent(
       r.alreadySatisfied
-        ? 'Dependencies were already installed — audits are ready to run.'
+        ? 'Dependencies were already installed - audits are ready to run.'
         : `Installed. Audits will now run with ${r.bin}.`
     ));
   }
@@ -190,7 +190,7 @@ router.post('/:id/create-tasks', (req, res, next) => {
     const r = tasksLib.fromAuditRun(run, brand, { minTier: req.body.min_tier || 'warning' });
     res.redirect(`/audit/${run.id}?msg=` + encodeURIComponent(
       r.created ? `${r.created} task${r.created === 1 ? '' : 's'} created from ${r.considered} failing check(s).`
-        : `No new tasks — all ${r.considered || 0} failing check(s) already have one.`
+        : `No new tasks - all ${r.considered || 0} failing check(s) already have one.`
     ));
   } catch (err) { next(err); }
 });
@@ -224,7 +224,7 @@ router.get('/:id/json', (req, res) => {
   res.type('application/json').send(run.json_result);
 });
 
-// Findings as CSV: severity, affected URL, issue type, recommended action —
+// Findings as CSV: severity, affected URL, issue type, recommended action - 
 // exactly the deliverable shape asked for.
 router.get('/:id/csv', async (req, res) => {
   const run = db.prepare('SELECT * FROM audit_runs WHERE id=? AND user_id=?')

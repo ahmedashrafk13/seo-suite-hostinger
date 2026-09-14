@@ -4,7 +4,7 @@
 // The application was written against better-sqlite3, which is a native addon:
 // installing it either downloads a prebuilt binary matching the exact
 // platform/Node-ABI pair, or compiles one with node-gyp. On Hostinger's shared
-// Node hosting neither is guaranteed — there is no compiler toolchain, and a
+// Node hosting neither is guaranteed - there is no compiler toolchain, and a
 // Node version bump on their side can invalidate a prebuild that worked
 // yesterday. A native module that fails to load takes the whole app down at
 // require() time, before a single route is registered.
@@ -12,8 +12,8 @@
 // So the engine is not assumed. This module exposes exactly the better-sqlite3
 // surface the application uses and backs it with whichever engine is available:
 //
-//   better-sqlite3    native, fastest — used when it loads cleanly
-//   node-sqlite3-wasm WebAssembly, no compiler, no ABI coupling — always works
+//   better-sqlite3    native, fastest - used when it loads cleanly
+//   node-sqlite3-wasm WebAssembly, no compiler, no ABI coupling - always works
 //
 // Both are real SQLite (the wasm build is SQLite 3.53.4), so the SQL, the
 // schema and the query results are identical. Nothing in src/ had to be
@@ -24,11 +24,11 @@
 //   1. Statement lifetime. node-sqlite3-wasm is not garbage-collected: a
 //      prepared statement that is never finalized leaks WASM heap. The app
 //      calls db.prepare() inside request handlers ~500 times, so statements are
-//      cached by SQL text and reused instead — which fixes the leak and is
+//      cached by SQL text and reused instead - which fixes the leak and is
 //      faster than re-preparing. Safe here because the app only ever uses
 //      get/all/run, each of which runs the statement to completion before
 //      returning (no open cursors to invalidate).
-//   2. Binding style. better-sqlite3 takes varargs — stmt.get(a, b) — while
+//   2. Binding style. better-sqlite3 takes varargs - stmt.get(a, b) - while
 //      node-sqlite3-wasm takes a single array. The adapter collects varargs.
 //   3. lastInsertRowid. node-sqlite3-wasm returns BigInt past 2^53; the app
 //      feeds that value straight back into queries and into res.redirect(), so
@@ -150,7 +150,7 @@ function narrowRow(row) {
 //
 // node-sqlite3-wasm's VFS implements SQLite's file locking with an atomic
 // mkdir of "<database>.lock". That works, but the directory is only removed by
-// the process that created it — so a process killed mid-write (SIGKILL, an OOM
+// the process that created it - so a process killed mid-write (SIGKILL, an OOM
 // kill, or Passenger stopping an idle app) leaves the directory behind and
 // EVERY later connection fails with "database is locked", permanently. The app
 // does not recover on restart; it stays broken until someone deletes a
@@ -185,7 +185,7 @@ const LOCK_HEARTBEAT_MS = Number(process.env.SQLITE_LOCK_HEARTBEAT_MS || 10000);
 //
 // That last point breaks the age heuristic below. A lock legitimately held by a
 // live process looks arbitrarily old, so clearing on age alone DELETES A LIVE
-// PROCESS'S LOCK — after which two processes write the same file with no mutex
+// PROCESS'S LOCK - after which two processes write the same file with no mutex
 // between them. That is not a theoretical risk: it corrupted this database,
 // destroying the content_briefs B-tree root page while every other table
 // survived.
@@ -247,7 +247,7 @@ function clearStaleLock(dbPath) {
   try {
     st = fsMod.statSync(lockDir);
   } catch {
-    return false;               // no lock present — the normal case
+    return false;               // no lock present - the normal case
   }
   if (!st.isDirectory()) return false;
   // Ownership beats age. A live owner's lock is never stale no matter how old
@@ -256,14 +256,14 @@ function clearStaleLock(dbPath) {
   if (live.length) {
     console.warn(
       `[db] another live process (pid ${live.join(', ')}) has this database open; leaving its lock alone. `
-      + 'This engine has no cross-process write safety, so concurrent writes can corrupt the file — '
+      + 'This engine has no cross-process write safety, so concurrent writes can corrupt the file - '
       + 'run one writer at a time.'
     );
     return false;
   }
   // The age check is only a FALLBACK for when there is no ownership record to
   // consult. If the owners directory is readable and lists no live process,
-  // the lock is definitively abandoned however young it looks — without this,
+  // the lock is definitively abandoned however young it looks - without this,
   // a crash left the app unable to start for LOCK_STALE_MS, which is exactly
   // the "database is locked" loop the recovery above exists to prevent.
   if (ownershipIsReadable(dbPath)) {
@@ -328,7 +328,7 @@ class SqliteDatabase {
   // Keeps the engine's lock directory as young as it actually is.
   //
   // clearStaleLock decides staleness from the lock's mtime, and that heuristic
-  // is correct in spirit — a lock nobody is refreshing belongs to a process
+  // is correct in spirit - a lock nobody is refreshing belongs to a process
   // that is gone. The problem is that the engine stamps the mtime once at
   // mkdir and never touches it again, so a lock held by a perfectly healthy
   // process ages into looking abandoned, and another process then deletes it
@@ -391,7 +391,7 @@ class SqliteDatabase {
 
   // better-sqlite3's transaction() returns a callable that wraps the function
   // in BEGIN/COMMIT and rolls back on throw. Nested calls must not issue a
-  // second BEGIN — SQLite rejects that — so depth is tracked and inner levels
+  // second BEGIN - SQLite rejects that - so depth is tracked and inner levels
   // use SAVEPOINTs, matching better-sqlite3's own behaviour.
   transaction(fn) {
     const self = this;
@@ -421,7 +421,7 @@ class SqliteDatabase {
   // better-sqlite3 exposes the SQLite online backup API and returns a promise.
   // The wasm build does not, so VACUUM INTO is used: it is likewise safe on a
   // live database (it takes a read transaction for the duration) and produces a
-  // compacted, fully self-contained copy — which is what a backup wants.
+  // compacted, fully self-contained copy - which is what a backup wants.
   backup(destination) {
     if (!this.isWasm) return this._db.backup(destination);
     return new Promise((resolve, reject) => {
@@ -457,8 +457,8 @@ class SqliteDatabase {
 // Journal mode.
 //
 // WAL is the right mode for a native build: readers do not block the writer.
-// The wasm build cannot use it — WAL needs shared memory across processes,
-// which the JavaScript VFS does not implement — and silently stays in the
+// The wasm build cannot use it - WAL needs shared memory across processes,
+// which the JavaScript VFS does not implement - and silently stays in the
 // previous mode if asked. Rather than assume, the mode is set and then read
 // back, falling back to TRUNCATE (the fastest rollback journal) when WAL did
 // not take. Getting this wrong is not cosmetic: a database left in WAL mode
@@ -469,9 +469,9 @@ class SqliteDatabase {
 //
 // This is not optional here. better-sqlite3 sets a 5-second busy timeout by
 // default; node-sqlite3-wasm sets NONE, so a second writer fails instantly with
-// "database is locked". That is exactly the shape of this deployment — the web
+// "database is locked". That is exactly the shape of this deployment - the web
 // app under Passenger (which may run more than one process) plus `npm run cron`
-// plus the backup job, all writing the same file — so without this the app
+// plus the backup job, all writing the same file - so without this the app
 // works in testing and throws intermittently in production. It surfaced
 // immediately when two of the app's own verification scripts ran back to back.
 //

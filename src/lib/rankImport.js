@@ -1,4 +1,4 @@
-// RANK TRACKER IMPORT — real positions, from the tool that actually measures them.
+// RANK TRACKER IMPORT - real positions, from the tool that actually measures them.
 //
 // WHY THIS EXISTS
 // Search Console's average position is the only ranking figure this suite has
@@ -6,7 +6,7 @@
 // that produced an impression. A keyword that ranks 3rd in Manchester and 40th
 // nationally arrives as one number near 20 that describes neither, and a client
 // who checks their own phone sees something the dashboard cannot corroborate.
-// That is not a flaw in Search Console — it is what the metric means — so the
+// That is not a flaw in Search Console - it is what the metric means - so the
 // fix is to import the measurement from a tool that fixes location and device,
 // and to keep the two apart at every layer. See the header on rank_positions
 // in src/db.js.
@@ -22,7 +22,7 @@
 //   1. Every exporter names its columns differently ("Keyword"/"Query"/
 //      "Search term", "Position"/"Rank"/"Pos"). So the mapping is derived from
 //      a synonym table, reported back to the user, and overridable.
-//   2. Half of them export WIDE — one row per keyword, one column per capture
+//   2. Half of them export WIDE - one row per keyword, one column per capture
 //      date. A long-format-only importer reads those files as a single row of
 //      nonsense. Both shapes are detected and handled.
 //   3. "Not ranking" is exported as blank, "-", ">100", "101+" or 0 depending
@@ -170,11 +170,11 @@ function detectProvider(headers) {
 // "Not in the top 100" is exported as blank, '-', '>100', '101+', '100+' or 0.
 // Every one of those means "not found", and storing 0 for it would rank an
 // invisible keyword above the site's best result. So they all become null, and
-// the caller counts them as unranked rather than discarding the row — the fact
+// the caller counts them as unranked rather than discarding the row - the fact
 // that a tracked keyword is not ranking is itself the finding.
 function parsePosition(value) {
   const s = String(value == null ? '' : value).trim().toLowerCase();
-  if (!s || s === '-' || s === '—' || s === 'n/a' || s === 'na' || s === 'null'
+  if (!s || s === '-' || s === ' - ' || s === 'n/a' || s === 'na' || s === 'null'
     || s === 'not ranked' || s === 'not found' || s === 'nr') {
     return { position: null, unranked: true };
   }
@@ -207,7 +207,7 @@ function normaliseEngine(value) {
 }
 
 // --------------------------------------------------------------- the import
-// `defaultDate` is used when the file carries no date at all — a "current
+// `defaultDate` is used when the file carries no date at all - a "current
 // rankings" export, which several tools produce. It defaults to today, and the
 // UI makes it editable, because importing last Friday's export as though it
 // were measured today puts a four-day-old rank on today's line.
@@ -382,7 +382,7 @@ function segments(brandId) {
 // capture's position, and the movement between them.
 //
 // UNRANKED IS NOT ZERO, AND MOVEMENT INTO OR OUT OF IT IS NOT A NUMBER.
-// A keyword that went from 8 to not-found has not "moved 93 places" — it left
+// A keyword that went from 8 to not-found has not "moved 93 places" - it left
 // the measured range. So `delta` is null in that case and `event` says what
 // happened, which is the difference between a report that reads correctly and
 // one that shows a tidy number for an unmeasurable change.

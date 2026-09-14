@@ -1,7 +1,7 @@
 // Password hashing that does not depend on a compiler.
 //
 // `bcrypt` is a native addon and fails to install on a host without build
-// tools, which on shared hosting takes down the whole `npm install` — so the
+// tools, which on shared hosting takes down the whole `npm install` - so the
 // pure-JavaScript `bcryptjs` is the baseline. It implements the same algorithm
 // and the same $2a$/$2b$ hash format, so hashes written by either library
 // verify against the other and existing user passwords keep working unchanged.

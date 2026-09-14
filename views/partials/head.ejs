@@ -1,20 +1,54 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><%= typeof title !== 'undefined' && title ? title + ' · SEO Suite' : 'SEO Automation Suite' %></title>
-<%
-/* The charting libraries used to be loaded here on every page — 660 KB of
-   JavaScript on all ~60 views, when only dashboard.ejs and performance.ejs
-   draw a chart. They are now fetched on demand by the chart partials
-   themselves, through /js/chart-assets.js. See that file's header.
+<meta name="description" content="<%= typeof metaDescription !== 'undefined' && metaDescription ? metaDescription : 'Search Console and GA4 reporting, technical audits, internal linking and AI search visibility for the brands you manage.' %>">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f7f7f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f0e" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="<%= typeof title !== 'undefined' && title ? title : 'SEO Automation Suite' %>">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SEO Suite">
 
-   chart-assets.js is deliberately NOT deferred: the chart partials are inline
-   <script> blocks in the body, and a deferred loader would not have defined
-   window.ChartAssets by the time they run. It is ~4 KB, defines one object and
-   touches no DOM at parse time, so it costs nothing to run early. */
+<%
+/* THEME BOOT - must run before first paint.
+   The stored theme is applied to <html> synchronously here, in the head. Do
+   this any later (in a deferred script, or in app.js at the end of the body)
+   and a dark-mode user gets a full white page for one frame on every single
+   navigation. Density is applied from the same store for the same reason. */
+%>
+<script>
+  (function () {
+    try {
+      /* LIGHT IS THE DEFAULT, not the OS setting. An absent key used to mean
+         "follow the system", so anyone on a dark-mode machine got a dark app
+         they never asked for. "System" is still available - it is now stored
+         explicitly as 'system' rather than signalled by the key's absence, so
+         choosing it is a decision the app records instead of a gap it infers. */
+      var t = localStorage.getItem('seosuite:theme');
+      if (t !== 'system') document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
+      var d = localStorage.getItem('seosuite:density');
+      if (d === 'compact') document.documentElement.setAttribute('data-density', d);
+      if (localStorage.getItem('seosuite:rail') === '1') document.documentElement.classList.add('boot-rail');
+    } catch (e) {}
+  })();
+</script>
+
+<%
+/* Charting libraries are NOT loaded here. They used to be, costing 660 KB of
+   JavaScript on all ~60 views when only two of them draw a chart; the chart
+   partials now fetch them on demand through /js/chart-assets.js.
+
+   chart-assets.js is deliberately not deferred: the chart partials are inline
+   <script> blocks in the body and a deferred loader would not have defined
+   window.ChartAssets by the time they run. It is ~4 KB and touches no DOM at
+   parse time, so running it early costs nothing. */
 %>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;450;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="/css/style.css?v=<%= typeof assetVersion !== 'undefined' ? assetVersion : '1' %>">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%232563eb'/></svg>">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/favicon.svg">
 <script src="/js/chart-assets.js?v=<%= typeof assetVersion !== 'undefined' ? assetVersion : '1' %>"></script>
+<script src="/js/app.js?v=<%= typeof assetVersion !== 'undefined' ? assetVersion : '1' %>" defer></script>

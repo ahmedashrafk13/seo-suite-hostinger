@@ -1,7 +1,7 @@
 // Task management.
 //
 // Tasks are the system's output. Alerts, audits, linking crawls and the
-// opportunity engine all converge here as concrete, assignable work — which is
+// opportunity engine all converge here as concrete, assignable work - which is
 // the whole point of the operating rule: the automation identifies, analyses,
 // recommends and creates tasks, and a human decides and executes.
 //
@@ -30,7 +30,7 @@ const STATUSES = [
   { value: 'backlog', label: 'Backlog', description: 'Identified, not started' },
   { value: 'in_progress', label: 'In progress', description: 'Someone is working on it' },
   { value: 'awaiting_approval', label: 'Awaiting SEO approval', description: 'Work is ready but needs sign-off before it goes live' },
-  { value: 'blocked', label: 'Blocked', description: 'Cannot proceed — waiting on something external' },
+  { value: 'blocked', label: 'Blocked', description: 'Cannot proceed - waiting on something external' },
   { value: 'done', label: 'Done', description: 'Completed and verified' },
   { value: 'dismissed', label: 'Dismissed', description: 'Reviewed and deliberately not doing' },
 ];
@@ -83,7 +83,7 @@ function upsertTask({
   if (dedupeKey) {
     const existing = db.prepare('SELECT * FROM tasks WHERE dedupe_key = ?').get(dedupeKey);
     if (existing) {
-      // Never resurrect a task someone has already closed out — that would
+      // Never resurrect a task someone has already closed out - that would
       // undo a deliberate human decision on every scheduler tick.
       if (existing.status === 'done' || existing.status === 'dismissed') {
         return { task: existing, created: false, skipped: 'already closed' };
@@ -91,11 +91,11 @@ function upsertTask({
       // The title has to be refreshed along with the detail, or it goes stale
       // and contradicts its own body. A re-run that finds 149 orphan pages was
       // updating the detail while leaving the title reading "Link to 60 orphan
-      // pages" — and the title is the part anyone actually reads in a list.
+      // pages" - and the title is the part anyone actually reads in a list.
       //
       // Human edits win: `update()` logs an `edited` event, so a task whose
       // title or detail someone has deliberately rewritten keeps that wording
-      // — only severity/priority/evidence/affected_url are refreshed. Only
+      // - only severity/priority/evidence/affected_url are refreshed. Only
       // guarding the title (and still overwriting a hand-edited detail) would
       // contradict the same "human edits win" claim it makes.
       const manuallyEdited = db.prepare(
@@ -137,8 +137,8 @@ function upsertTask({
 //
 // upsertTask creates and refreshes findings, but nothing ever retired one. A
 // task therefore outlived the finding that produced it: when a re-run no
-// longer detected the problem — because it was fixed, or because it was a
-// false positive that a later version of the engine stopped emitting — the
+// longer detected the problem - because it was fixed, or because it was a
+// false positive that a later version of the engine stopped emitting - the
 // task stayed in the backlog forever. Over weeks that turns the backlog into a
 // list nobody trusts, and it is the single most likely reason a team stops
 // using this.
@@ -148,14 +148,14 @@ function upsertTask({
 // source and brand whose key is absent is no longer supported by evidence.
 //
 // What it deliberately does NOT do:
-//   - It never touches a task somebody has started. `backlog` tasks are
+//  - It never touches a task somebody has started. `backlog` tasks are
 //     auto-resolved; `in_progress`, `awaiting_approval` and `blocked` ones are
 //     only annotated, because a human has invested work and silently closing
 //     that is worse than a stale row.
-//   - It never touches `done` or `dismissed` tasks.
-//   - It never touches tasks from another source, so a linking re-run cannot
+//  - It never touches `done` or `dismissed` tasks.
+//  - It never touches tasks from another source, so a linking re-run cannot
 //     retire an audit finding.
-//   - It is scoped to a brand, so one brand's run cannot affect another's.
+//  - It is scoped to a brand, so one brand's run cannot affect another's.
 //
 // Every change is written to the task event log with the run reference, so
 // "why did this disappear?" is always answerable.
@@ -193,7 +193,7 @@ function reconcile(userId, brandId, source, currentDedupeKeys, {
   gone.forEach((t) => {
     if (ANNOTATE_ONLY_STATUSES.includes(t.status)) {
       logEvent(t.id, userId, 'stale',
-        `This finding was not detected in the latest run. ${note} Someone is already working on it, so it has been left open — close it manually if it is no longer needed.`);
+        `This finding was not detected in the latest run. ${note} Someone is already working on it, so it has been left open - close it manually if it is no longer needed.`);
       db.prepare("UPDATE tasks SET updated_at=datetime('now') WHERE id=?").run(t.id);
       annotated += 1;
       return;
@@ -236,7 +236,7 @@ function setStatus(taskId, userId, status, note) {
     completed_at=${completedAt}, updated_at=datetime('now') WHERE id=?`)
     .run(status, status === 'done' || status === 'dismissed' ? (note || null) : null, taskId);
 
-  logEvent(taskId, userId, 'status', `${task.status} → ${status}${note ? ` — ${note}` : ''}`);
+  logEvent(taskId, userId, 'status', `${task.status} → ${status}${note ? ` - ${note}` : ''}`);
   return { ok: true, task: db.prepare('SELECT * FROM tasks WHERE id=?').get(taskId) };
 }
 
@@ -293,11 +293,12 @@ function get(taskId, userId) {
 function list(userId, { brandId, status, source, severity, assignee, search, onlyOpen, approval, overdue, limit = 500 } = {}) {
   const where = ['t.user_id = ?'];
   const args = [userId];
-  if (brandId) { where.push('t.brand_id = ?'); args.push(brandId); }
+  if (brandId === NO_BRAND) { where.push('t.brand_id IS NULL'); }
+  else if (brandId) { where.push('t.brand_id = ?'); args.push(brandId); }
   if (status) { where.push('t.status = ?'); args.push(status); }
   if (onlyOpen) { where.push(`t.status IN (${OPEN_STATUSES.map(() => '?').join(',')})`); args.push(...OPEN_STATUSES); }
   // Approval and overdue are counted by counts() and shown on the board's stat
-  // tiles, so they have to be filterable too — otherwise "21 need approval" is
+  // tiles, so they have to be filterable too - otherwise "21 need approval" is
   // a number with no way to see which 21, and clicking it lands on an empty
   // board (those tasks sit in Backlog, not in the Awaiting-approval column).
   if (approval === 'pending') {
@@ -324,9 +325,34 @@ function list(userId, { brandId, status, source, severity, assignee, search, onl
     LIMIT ?`).all(...args);
 }
 
+// The brand filter has three states, not two: a specific brand, every brand,
+// and the tasks that belong to no brand at all. That last group is real - an
+// audit or a linking run can be pointed at a URL with no brand behind it - and
+// it used to be unreachable, because a missing value and "no brand" were both
+// represented as null.
+const NO_BRAND = 'none';
+
+function parseBrandFilter(raw) {
+  const v = String(raw == null ? '' : raw).trim();
+  if (!v) return null;                       // no filter: every brand
+  if (v === NO_BRAND) return NO_BRAND;       // only tasks with brand_id IS NULL
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+// Renders the brand condition for both counts() and list(). Returns a SQL
+// fragment and the arguments it consumes, so callers cannot get the two out of
+// step.
+function brandClause(brandId, col) {
+  if (brandId === NO_BRAND) return { sql: `AND ${col} IS NULL`, args: [] };
+  if (brandId) return { sql: `AND ${col} = ?`, args: [brandId] };
+  return { sql: '', args: [] };
+}
+
 function counts(userId, brandId) {
-  const where = brandId ? 'AND brand_id = ?' : '';
-  const args = brandId ? [userId, brandId] : [userId];
+  const clause = brandClause(brandId, 'brand_id');
+  const where = clause.sql;
+  const args = [userId, ...clause.args];
   const rows = db.prepare(`SELECT status, COUNT(*) n FROM tasks WHERE user_id=? ${where} GROUP BY status`).all(...args);
   const out = { total: 0 };
   STATUSES.forEach((s) => { out[s.value] = 0; });
@@ -417,8 +443,8 @@ function fromAlertEvent(event, brand) {
 
 // Turns failing technical-audit findings into tasks, one per failing check.
 //
-// Item extraction goes through csvStore.normaliseAuditFindings — the SAME
-// function the audit-result page uses to render its "Failing checks" table —
+// Item extraction goes through csvStore.normaliseAuditFindings - the SAME
+// function the audit-result page uses to render its "Failing checks" table - 
 // instead of re-deriving items here with a narrower field list. The raw
 // finding items don't always use the key names `url`/`note`; normalise
 // handles the `page`/`link`/`detail`/`status`/`title` fallbacks too, and this
@@ -472,7 +498,7 @@ function fromAuditRun(run, brand, { minTier = 'warning', maxTasks = 40 } = {}) {
 // Turns a PageSpeed Insights report into tasks: one per category
 // (performance/accessibility/best-practices/seo) that scored below "good",
 // listing its top failing checks. One task per category rather than one per
-// Lighthouse audit — a "poor" performance score often fails a dozen
+// Lighthouse audit - a "poor" performance score often fails a dozen
 // individual audits, and a task per audit would flood the board.
 function fromPsiReport(row, report, brand) {
   const userId = brand ? brand.user_id : row.user_id;
@@ -505,7 +531,7 @@ function fromPsiReport(row, report, brand) {
     const detail = [
       `${cat.title} scored ${cat.score}/100 (${cat.band}) on ${strategy}.`,
       '',
-      ...top.map((a) => `  • ${a.title}${a.displayValue ? ` — ${a.displayValue}` : ''}`),
+      ...top.map((a) => `  • ${a.title}${a.displayValue ? ` - ${a.displayValue}` : ''}`),
       ...(failing.length > top.length ? [`  … and ${failing.length - top.length} more.`] : []),
       '',
       `Source: PageSpeed Insights report #${row.id} on ${String(row.created_at || '').slice(0, 16)} for ${url}.`,
@@ -514,7 +540,7 @@ function fromPsiReport(row, report, brand) {
     const r = upsertTask({
       userId,
       brandId,
-      title: `Fix ${failing.length} ${cat.title.toLowerCase()} issue${failing.length === 1 ? '' : 's'} (${strategy}) — ${url.replace(/^https?:\/\/[^/]+/, '') || '/'}`,
+      title: `Fix ${failing.length} ${cat.title.toLowerCase()} issue${failing.length === 1 ? '' : 's'} (${strategy}) - ${url.replace(/^https?:\/\/[^/]+/, '') || '/'}`,
       detail,
       source: 'pagespeed',
       sourceRef: `pagespeed:${row.id}:${cat.id}`,
@@ -524,7 +550,7 @@ function fromPsiReport(row, report, brand) {
       evidence: {
         reportId: row.id, url, strategy, categoryId: cat.id, score: cat.score,
         failingCount: failing.length,
-        items: top.map((a) => ({ url, note: `${a.title}${a.displayValue ? ` — ${a.displayValue}` : ''}` })),
+        items: top.map((a) => ({ url, note: `${a.title}${a.displayValue ? ` - ${a.displayValue}` : ''}` })),
       },
       dedupeKey,
     });
@@ -614,7 +640,7 @@ function fromLinkingRun(run, brand, { maxTasks = 30 } = {}) {
         items: orphans.slice(0, 50).map((o) => ({
           url: o.url,
           note: [o.title, o.gsc_impressions ? `${o.gsc_impressions} impressions (GSC)` : null]
-            .filter(Boolean).join(' — '),
+            .filter(Boolean).join(' - '),
         })),
         exampleUrls: orphans.slice(0, 50).map((o) => o.url),
       },
@@ -663,12 +689,12 @@ function fromLinkingRun(run, brand, { maxTasks = 30 } = {}) {
         broken: broken.slice(0, 50),
         runId: run.id,
         // `items` mirrors the audit engine's shape (url + note) so the task
-        // page and export can render both sources the same way — the note
+        // page and export can render both sources the same way - the note
         // here is the HTTP status/classification plus which page(s) link to it.
         items: broken.slice(0, 50).map((b) => ({
           url: b.url,
           note: [b.status, b.classification, b.linked_from ? `linked from: ${b.linked_from}` : null]
-            .filter(Boolean).join(' — '),
+            .filter(Boolean).join(' - '),
         })),
         exampleUrls: broken.slice(0, 50).map((b) => b.url),
       },
@@ -685,6 +711,7 @@ module.exports = {
   STATUSES, OPEN_STATUSES, SOURCES, APPROVAL_RULES, SEVERITY_PRIORITY,
   classifyApproval, upsertTask, setStatus, approve, revokeApproval,
   update, remove, get, list, counts, assignees, logEvent,
+  parseBrandFilter, NO_BRAND,
   assignTask, recordNotification, notificationsFor,
   fromAlertEvent, fromAuditRun, fromLinkingRun, fromPsiReport,
   reconcile, RECONCILABLE_STATUSES, ANNOTATE_ONLY_STATUSES,

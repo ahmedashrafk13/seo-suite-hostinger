@@ -93,7 +93,7 @@ async function runSubscription(sub, brand) {
           f.dedupe || null);
       eventId = res.lastInsertRowid;
     } catch (err) {
-      // Already raised in this period — not an error, just nothing new to say.
+      // Already raised in this period - not an error, just nothing new to say.
       if (String(err.message).includes('UNIQUE')) continue;
       throw err;
     }
@@ -260,7 +260,7 @@ function applyRecommendedDefaults(userId, brand) {
   recommended.forEach((key) => {
     const def = catalog.get(key);
     if (!def) return;
-    // uptime is always available — the probe runs on every sync.
+    // uptime is always available - the probe runs on every sync.
     if (def.requires !== 'uptime' && !caps[def.requires]) return;
     saveSubscription(userId, brand.id, key, {
       enabled: 1, params: {}, frequency: def.defaultFrequency,
@@ -295,14 +295,14 @@ function start() {
   // one cron expression serves hourly through monthly alerts.
   const schedule = process.env.ALERT_CRON || '7 * * * *';
   const valid = cron.validate(schedule);
-  if (!valid) console.error(`[alerts] invalid ALERT_CRON "${schedule}" — falling back to hourly.`);
+  if (!valid) console.error(`[alerts] invalid ALERT_CRON "${schedule}" - falling back to hourly.`);
   const finalSchedule = valid ? schedule : '7 * * * *';
 
   cron.schedule(finalSchedule, () => {
     console.log('[alerts] evaluating due subscriptions…');
     runAll().then((r) => {
       const fired = r.reduce((a, x) => a + (x.fired || 0), 0);
-      console.log(`[alerts] done — ${r.length} brand(s), ${fired} alert(s) fired.`);
+      console.log(`[alerts] done - ${r.length} brand(s), ${fired} alert(s) fired.`);
     }).catch((e) => console.error('[alerts] run failed:', e.message));
   });
   console.log(`[alerts] scheduler started (${finalSchedule}); per-alert cadence applied per subscription.`);

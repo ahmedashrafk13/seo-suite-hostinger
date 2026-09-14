@@ -10,7 +10,7 @@
 // The views carry ~20 inline <script> blocks, ~660 inline style attributes and
 // ~28 inline event handlers. A nonce covers the script blocks but not the
 // handlers (nonces do not apply to attributes), so a strict policy would need
-// 'unsafe-hashes' plus a hash per handler — a policy that breaks silently on
+// 'unsafe-hashes' plus a hash per handler - a policy that breaks silently on
 // the next markup edit and gets switched off in a hurry. What is set instead
 // keeps 'unsafe-inline' for scripts and styles and spends the policy on the
 // directives that still bite with inline code allowed:
@@ -33,7 +33,7 @@ const FONTS_FILES = 'https://fonts.gstatic.com';
 
 const POLICY = [
   "default-src 'self'",
-  // 'unsafe-inline' is load-bearing here — see the note above.
+  // 'unsafe-inline' is load-bearing here - see the note above.
   `script-src 'self' 'unsafe-inline' ${CDN}`,
   `style-src 'self' 'unsafe-inline' ${FONTS_CSS} ${CDN}`,
   `font-src 'self' ${FONTS_FILES} data:`,

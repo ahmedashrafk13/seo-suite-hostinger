@@ -6,7 +6,7 @@ const _rows = typeof rows !== 'undefined' ? rows : [];
 const _nameKey = typeof nameKey !== 'undefined' ? nameKey : 'entity';
 const _valueKey = typeof valueKey !== 'undefined' ? valueKey : 'clicks';
 const _codeType = typeof codeType !== 'undefined' ? codeType : 'alpha3';
-const _color = typeof color !== 'undefined' ? color : '#1e4d6b';
+const _color = typeof color !== 'undefined' ? color : null;
 const _uid = `wm${Math.random().toString(36).slice(2, 9)}`;
 const _values = {};
 _rows.forEach((r) => { _values[r[_nameKey]] = Number(r[_valueKey]) || 0; });
@@ -15,7 +15,7 @@ _rows.forEach((r) => { _values[r[_nameKey]] = Number(r[_valueKey]) || 0; });
   <div id="<%= _uid %>" class="worldmap" style="height:340px"></div>
   <div class="worldmap-legend">
     <span>Low</span>
-    <span class="worldmap-legend-bar" style="background:linear-gradient(90deg, #eef2ff, <%= _color %>)"></span>
+    <span class="worldmap-legend-bar" style="background:linear-gradient(90deg, var(--surface-3), var(--viz-1))"></span>
     <span>High</span>
   </div>
 </div>
@@ -24,6 +24,7 @@ _rows.forEach((r) => { _values[r[_nameKey]] = Number(r[_valueKey]) || 0; });
     var raw = <%- JSON.stringify(_values) %>;
     var codeType = <%- JSON.stringify(_codeType) %>;
     function draw() {
+      var _t = window.ChartTheme.get();
       var values = {};
       var max = 1;
       Object.keys(raw).forEach(function (k) {
@@ -41,13 +42,13 @@ _rows.forEach((r) => { _values[r[_nameKey]] = Number(r[_valueKey]) || 0; });
         series: {
           regions: [{
             values: values,
-            scale: ['#eef2ff', <%- JSON.stringify(_color) %>],
+            scale: [_t.surface3, <%- JSON.stringify(_color) %> || _t.series[0]],
             normalizeFunction: 'polynomial',
           }],
         },
         regionStyle: {
-          initial: { fill: '#e5e9f0' },
-          hover: { fill: <%- JSON.stringify(_color) %>, cursor: 'pointer' },
+          initial: { fill: _t.surface3 },
+          hover: { fill: <%- JSON.stringify(_color) %> || _t.series[0], cursor: 'pointer' },
         },
         onRegionTooltipShow: function (event, tooltip, code) {
           var v = values[code];

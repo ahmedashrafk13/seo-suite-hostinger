@@ -6,6 +6,12 @@
 <%- include('partials/sidebar') %>
 <%- include('partials/topbar') %>
 
+<%- include('partials/pagehead', {
+      heading: "Connect Google",
+      lede: "One Google account supplies Search Console and GA4 for every brand in this workspace."
+    }) %>
+
+
 <% if (!googleConfigured) { %>
   <div class="notice error">
     <span class="notice-icon">&#9888;</span>
@@ -21,7 +27,7 @@
     <div class="notice-body">
       <strong>Reconnect needed for Keyword Planner.</strong>
       This Google account was connected before Keyword Planner access was added, and Google does not
-      grant a new permission to an existing connection. Search Console and GA4 keep working as they are —
+      grant a new permission to an existing connection. Search Console and GA4 keep working as they are - 
       only keyword volumes are affected.
       <a href="/auth/google">Reconnect Google account</a> to grant it.
     </div>
@@ -30,7 +36,7 @@
 <% errors.forEach(function(e){ %>
   <div class="notice warn">
     <span class="notice-icon">&#9888;</span>
-    <div class="notice-body">Could not load your Google property list — <%= e %></div>
+    <div class="notice-body">Could not load your Google property list - <%= e %></div>
   </div>
 <% }) %>
 
@@ -287,8 +293,8 @@
           <% brands.forEach(function(b){ %>
             <tr>
               <td><a href="/brands/<%= b.id %>"><%= b.name %></a></td>
-              <td class="mono" style="font-size:12px"><%= b.gsc_property || '—' %></td>
-              <td class="mono" style="font-size:12px"><%= b.ga4_property_name || b.ga4_property_id || '—' %></td>
+              <td class="mono" style="font-size:12px"><%= b.gsc_property || ' - ' %></td>
+              <td class="mono" style="font-size:12px"><%= b.ga4_property_name || b.ga4_property_id || ' - ' %></td>
             </tr>
           <% }) %>
         </tbody>

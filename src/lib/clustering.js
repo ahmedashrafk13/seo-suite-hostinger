@@ -9,24 +9,24 @@
 // Real SERP-overlap clustering is the gold standard but needs a paid SERP API
 // on every keyword. This runs on data we already have, with no external calls:
 //
-//  1. Normalise  — lowercase, strip punctuation, drop stopwords, light stemming
+//  1. Normalise - lowercase, strip punctuation, drop stopwords, light stemming
 //                  so "web designer" and "web designers" share a token.
-//  2. Signature  — each keyword reduces to its set of content-bearing tokens.
-//  3. Cluster    — agglomerative merge on token overlap, with a rule that two
+//  2. Signature - each keyword reduces to its set of content-bearing tokens.
+//  3. Cluster   - agglomerative merge on token overlap, with a rule that two
 //                  keywords only join if they share a "head" term. This is what
 //                  stops "web design cost" and "logo design cost" collapsing
 //                  into one cluster purely because they share "design cost".
-//  4. Anchor     — where the brand has GSC data, keywords that Google already
+//  4. Anchor    - where the brand has GSC data, keywords that Google already
 //                  answers with the SAME URL are pulled together regardless of
 //                  wording. This is real behavioural evidence and it overrides
 //                  the lexical guess, which is what makes the output usable
 //                  rather than merely tidy.
-//  5. Label      — the highest-volume (or shortest, as a fallback) member
+//  5. Label     - the highest-volume (or shortest, as a fallback) member
 //                  becomes the primary keyword; the rest are supporting.
-//  6. Intent     — modifier patterns classify commercial / transactional /
+//  6. Intent    - modifier patterns classify commercial / transactional /
 //                  informational / navigational / local intent.
-//  7. Page type  — derived from intent plus cluster shape.
-//  8. Existing vs new — if one URL already owns most of the cluster's
+//  7. Page type - derived from intent plus cluster shape.
+//  8. Existing vs new - if one URL already owns most of the cluster's
 //                  impressions, recommend improving it; otherwise a new page.
 const db = require('../db');
 const A = require('./analytics');
@@ -36,7 +36,7 @@ const places = require('./places');
 //
 // The original stemmer/stopword list was English-only suffix stripping
 // applied unconditionally to every brand. For a non-English brand that is
-// actively harmful — e.g. Spanish "casas" losing its final "s" under the
+// actively harmful - e.g. Spanish "casas" losing its final "s" under the
 // English rule set collapses it with an unrelated word, and English
 // stopwords ("the", "for") don't even occur in Spanish/French/German text
 // so they were previously inert-but-wrong rather than helpful for those
@@ -47,7 +47,7 @@ const places = require('./places');
 //
 // Coverage: en, es, fr, de get light suffix-stripping stemming and a
 // stopword list. Any OTHER locale (it, pt, ja, ar, zh, ...) gets NO
-// stemming (identity function) and NO stopword filtering — this is the
+// stemming (identity function) and NO stopword filtering - this is the
 // explicit, documented fallback: applying a wrong-language rule is worse
 // than applying none, so unsupported locales just compare exact word forms.
 // This is a deliberate scope limit, not an oversight: full multi-language
@@ -73,7 +73,7 @@ const STOPWORDS = STOPWORDS_EN;
 
 function stopwordsFor(locale) {
   const lang = normalizeLocale(locale);
-  // Unsupported locale: an empty set, not the English list — English filler
+  // Unsupported locale: an empty set, not the English list - English filler
   // words are just ordinary content tokens in other languages and dropping
   // them would silently discard real signal, not noise.
   return STOPWORDS_BY_LOCALE[lang] || new Set();
@@ -117,8 +117,8 @@ function tokenize(keyword, locale = 'en') {
 //
 // Vertical support: the patterns below started life encoding one business
 // type (services/agencies) as if it were universal. They still ARE the
-// default/fallback set — that behaviour must not change for any brand that
-// hasn't configured a vertical — but a brand can now opt into vertical-aware
+// default/fallback set - that behaviour must not change for any brand that
+// hasn't configured a vertical - but a brand can now opt into vertical-aware
 // additions via `brand.vertical`. Unknown/unset vertical ('other' or falsy)
 // reproduces the original patterns exactly.
 //
@@ -127,7 +127,7 @@ function tokenize(keyword, locale = 'en') {
 // It's replaced with locale-agnostic heuristics: "near me"-style phrases, a
 // postal/ZIP code shape, and a city-agnostic "near/in <word(s)>" pattern
 // (excluding common non-place nouns that would otherwise misfire, e.g.
-// "in stock", "in bulk"). This is a broadened regex heuristic, not NER — it
+// "in stock", "in bulk"). This is a broadened regex heuristic, not NER - it
 // will still both over- and under-fire on some phrasing; see the module
 // header limitations note for what's explicitly out of scope.
 const LOCAL_IN_EXCLUSIONS = new Set(`
@@ -141,7 +141,7 @@ const LOCAL_IN_EXCLUSIONS = new Set(`
 // This was a live defect: "website design services in usa" matched the
 // "in <word>" pattern, was labelled Local with high confidence, and the
 // content brief then recommended a "Location landing page with NAP details,
-// local proof and a map" for a national keyword — producing the title
+// local proof and a map" for a national keyword - producing the title
 // "... In Usa Near You" and the heading "Why Work With a Local Team". Nine of
 // twenty-six clusters on the live brand were mislabelled this way.
 //
@@ -164,7 +164,7 @@ const NON_LOCAL_PLACE_SCOPE = new Set(`
 `.trim().split(/\s+/));
 
 // A single "in <place>" match is weak evidence on its own. Local intent is
-// confirmed when the cluster ALSO shows a genuinely local signal — a "near me"
+// confirmed when the cluster ALSO shows a genuinely local signal - a "near me"
 // style phrase, a postcode, or a city term from the brand's configured
 // market. Without corroboration the "in <place>" hit is treated as a weak
 // signal (half weight) rather than proof, which stops a single preposition
@@ -197,7 +197,7 @@ function hasLocalInPattern(keyword, placeWhitelist) {
       // seeds the whitelist with "united" and "states", which would make
       // every national keyword ("web design united states") read as Local
       // intent and send the content brief off to recommend a location page
-      // with NAP details and a map — the same failure the `in usa` fix
+      // with NAP details and a map - the same failure the `in usa` fix
       // addressed, reached by a different route.
       if (place.length > 2 && !isNonLocalScope(place) && keyword.includes(place)) return true;
     }
@@ -220,14 +220,14 @@ function hasLocalInPattern(keyword, placeWhitelist) {
 //     access, `warmMarketPlaces` asks OpenStreetMap's free, keyless
 //     Nominatim search API for real settlement names near/matching that
 //     market string, and merges them into the whitelist. This is entirely
-//     optional — no API key, no required config — and is fire-and-forget:
+//     optional - no API key, no required config - and is fire-and-forget:
 //     nothing in the request path awaits it, so a slow/blocked/offline
 //     network never delays or fails a clustering run. If it fails for any
 //     reason (offline box, rate limit, DNS blocked), the baseline token
 //     split from step 1 is what's already cached and used instead.
 //
 // If a paid/keyed geocoding provider is ever wired up elsewhere in this
-// codebase (grepped for GEOCODE/google maps/mapbox at the time of writing —
+// codebase (grepped for GEOCODE/google maps/mapbox at the time of writing - 
 // none exists yet, only Google Business Profile's own API in sync.js /
 // alertCatalog.js, which is a different surface and not a general geocoder),
 // this is the seam to plug it into: replace/augment `warmMarketPlaces`.
@@ -242,7 +242,7 @@ function marketTokens(market) {
 }
 
 // Best-effort, non-blocking. Callers should NOT await this on a request
-// path that needs to stay fast/offline-safe — call it fire-and-forget after
+// path that needs to stay fast/offline-safe - call it fire-and-forget after
 // a run so the NEXT run for that market benefits from richer place names.
 async function warmMarketPlaces(market, { timeoutMs = 4000 } = {}) {
   if (!market) return;
@@ -271,7 +271,7 @@ async function warmMarketPlaces(market, { timeoutMs = 4000 } = {}) {
     });
     marketPlaceCache.set(key, names);
   } catch {
-    // Offline / blocked / DNS failure / timeout: fine — the token-split
+    // Offline / blocked / DNS failure / timeout: fine - the token-split
     // fallback set above is already cached and remains in use.
   }
 }
@@ -361,49 +361,49 @@ const PAGE_TYPE_TAXONOMY = {
     'Commercial investigation': 'Comparison, listicle or category page with a clear shortlist and CTA',
     Local: 'Location landing page with NAP details, local proof and a map',
     Informational: 'Blog post or guide answering the question directly, with an in-content CTA',
-    Navigational: 'Existing utility page — usually needs no new content',
+    Navigational: 'Existing utility page - usually needs no new content',
   },
   ecommerce: {
     Transactional: 'Product page (PDP) with price, stock status and add-to-cart',
     'Commercial investigation': 'Category page (PLP) or buying guide with a comparison table',
     Local: 'Store locator page with hours, address and a map',
     Informational: 'Buying guide answering the question directly, with links to relevant products',
-    Navigational: 'Existing utility page — usually needs no new content',
+    Navigational: 'Existing utility page - usually needs no new content',
   },
   saas: {
     Transactional: 'Pricing page with plans and a free-trial/demo CTA',
     'Commercial investigation': 'Comparison/alternatives page with a feature matrix',
     Local: 'Integration page or regional landing page, if applicable',
     Informational: 'Blog post or guide answering the question directly, with an in-content CTA',
-    Navigational: 'Existing utility page — usually needs no new content',
+    Navigational: 'Existing utility page - usually needs no new content',
   },
   marketplace: {
     Transactional: 'Listing/category page with pricing and a clear buy/enquire path',
     'Commercial investigation': 'Comparison or category page with a clear shortlist and CTA',
     Local: 'Location or store-locator page with a map',
     Informational: 'Buying guide answering the question directly, with links to relevant listings',
-    Navigational: 'Existing utility page — usually needs no new content',
+    Navigational: 'Existing utility page - usually needs no new content',
   },
   local_service: {
     Transactional: 'Service page with pricing and a direct booking/enquiry form',
     'Commercial investigation': 'Comparison, listicle or category page with a clear shortlist and CTA',
     Local: 'Location landing page with NAP details, local proof and a map',
     Informational: 'Blog post or guide answering the question directly, with an in-content CTA',
-    Navigational: 'Existing utility page — usually needs no new content',
+    Navigational: 'Existing utility page - usually needs no new content',
   },
   professional_services: {
     Transactional: 'Service page with pricing/engagement details and a direct enquiry form',
     'Commercial investigation': 'Comparison, listicle or category page with a clear shortlist and CTA',
     Local: 'Location landing page with NAP details, local proof and a map',
     Informational: 'Blog post or guide answering the question directly, with an in-content CTA',
-    Navigational: 'Existing utility page — usually needs no new content',
+    Navigational: 'Existing utility page - usually needs no new content',
   },
   publisher_content: {
     Transactional: 'Product/affiliate roundup page with clear picks and links',
     'Commercial investigation': 'Roundup or listicle page ranking the available options',
     Local: 'Location-focused editorial page, if applicable',
     Informational: 'In-depth editorial guide or article answering the question directly',
-    Navigational: 'Existing utility page — usually needs no new content',
+    Navigational: 'Existing utility page - usually needs no new content',
   },
 };
 
@@ -413,11 +413,11 @@ function suggestedPageType(intent, vertical) {
 }
 
 // `vertical` and `market` are optional and default to the original, generic
-// behaviour — existing callers that don't pass them keep working exactly as
+// behaviour - existing callers that don't pass them keep working exactly as
 // before. Note the intent regex patterns themselves (buy/best/how/etc.) are
 // still English-only; making those genuinely multilingual is out of scope
 // for this pass (it needs per-language phrase lists, not a mechanical
-// change) and is a known, explicit limitation — non-English brands still
+// change) and is a known, explicit limitation - non-English brands still
 // get usable clustering/stemming/local-detection, but intent labelling
 // quality will be lower until that's addressed.
 // Confidence is derived from COVERAGE and MARGIN, not from the pattern's
@@ -427,7 +427,7 @@ function suggestedPageType(intent, vertical) {
 // `score >= 2`. Since the weights are 4 and 5, any pattern matching half the
 // keywords automatically scored >= 2, so on the live brand 20 of 26 clusters
 // reported "high" confidence. That number was measuring "did half of these
-// keywords contain a common word", then presenting it as certainty — and the
+// keywords contain a common word", then presenting it as certainty - and the
 // content brief consumed it as if it were.
 //
 // Coverage and weight now do separate jobs: weight still decides WHICH intent
@@ -448,7 +448,7 @@ function classifyIntent(keywords, vertical = 'other', market = null) {
   const coverages = new Map();
 
   // Tracked separately so Local can be corroborated rather than trusted on a
-  // bare "in <word>" match — see NON_LOCAL_PLACE_SCOPE above.
+  // bare "in <word>" match - see NON_LOCAL_PLACE_SCOPE above.
   let strongLocalHits = 0;
   let weakLocalHits = 0;
 
@@ -486,7 +486,7 @@ function classifyIntent(keywords, vertical = 'other', market = null) {
       intent: 'Informational',
       confidence: 'low',
       coverage: 0,
-      pageType: `${suggestedPageType('Informational', vertical)} — no strong intent modifier present, so verify against the live SERP before committing`,
+      pageType: `${suggestedPageType('Informational', vertical)} - no strong intent modifier present, so verify against the live SERP before committing`,
     };
   }
 
@@ -510,7 +510,7 @@ function classifyIntent(keywords, vertical = 'other', market = null) {
     // Low confidence is stated in the page-type string itself, because that
     // string is what gets read downstream and pasted into briefs.
     pageType: confidence === 'low'
-      ? `${pageType} — intent signal is weak (${Math.round(coverage * 100)}% of keywords), so verify against the live SERP before committing`
+      ? `${pageType} - intent signal is weak (${Math.round(coverage * 100)}% of keywords), so verify against the live SERP before committing`
       : pageType,
     alternatives: ranked.slice(1, 3).map(([i]) => i),
   };
@@ -533,7 +533,7 @@ function jaccard(a, b) {
 // small business" scores 0.29 on Jaccard and falls below the 0.4 threshold,
 // so the long tail lands in singleton clusters while the head term sits alone.
 // Containment scores that same pair at 1.0, because the short keyword is
-// wholly inside the long one — which is the actual relationship.
+// wholly inside the long one - which is the actual relationship.
 //
 // Used only as a FALLBACK alongside the shared-head-term rule, so it widens
 // recall for genuine long tails without letting two unrelated keywords merge
@@ -545,7 +545,7 @@ function overlapCoefficient(a, b) {
   return smaller === 0 ? 0 : shared / smaller;
 }
 
-// Mean pairwise Jaccard across a member list — how internally coherent a
+// Mean pairwise Jaccard across a member list - how internally coherent a
 // cluster actually is. Sampled above 40 members so this stays O(1)-ish on
 // large inputs rather than quadratic.
 function cohesion(members) {
@@ -580,7 +580,7 @@ function buildClusters(items, {
   items.forEach((it) => { it.headSet = headTokens(it); });
 
   // Seed one cluster per keyword, then merge greedily from the most
-  // "central" keywords outward — highest volume first, so the biggest term
+  // "central" keywords outward - highest volume first, so the biggest term
   // anchors the cluster rather than whichever happened to be first in the list.
   const order = [...items].sort((a, b) => (b.impressions - a.impressions) || (a.keyword.length - b.keyword.length));
   const clusters = [];
@@ -594,7 +594,7 @@ function buildClusters(items, {
     // Gather every eligible candidate WITH its similarity, rather than
     // absorbing them in list order. A seed can legitimately match hundreds of
     // keywords on a site that ranks broadly for one topic, and taking them
-    // first-come produced a 244-keyword cluster on the live brand — an
+    // first-come produced a 244-keyword cluster on the live brand - an
     // unusable planning unit that no page can be written against.
     //
     // Capping at `maxClusterSize` and keeping the CLOSEST members means the
@@ -614,12 +614,12 @@ function buildClusters(items, {
       //
       // "web development services usa" and "web development services atlanta"
       // share the head "web development" and score highly on Jaccard, so they
-      // used to land in one cluster — and the content brief then titled the
+      // used to land in one cluster - and the content brief then titled the
       // national page "... Services Atlanta". Different places mean different
       // pages targeting different SERPs, and no lexical score should be able
       // to override that.
       if (seed.placeKey !== cand.placeKey) return;
-      // The shared-head rule is enforced for containment matches too — it is
+      // The shared-head rule is enforced for containment matches too - it is
       // what stops "web design cost" and "logo design cost" merging on
       // "design cost" alone.
       if (requireSharedHead && seed.headSet.size && cand.headSet.size) {
@@ -646,8 +646,8 @@ function buildClusters(items, {
 
 // Step 4: merge clusters whose keywords Google already answers with the same
 // URL. Behavioural evidence beats lexical similarity.
-// Merging on the dominant ranking URL is sound in principle — Google answering
-// two phrasings with the same page is real behavioural evidence — but it was
+// Merging on the dominant ranking URL is sound in principle - Google answering
+// two phrasings with the same page is real behavioural evidence - but it was
 // unbounded, and on a small site one strong blog post ranks for hundreds of
 // variants. On the live brand that collapsed 244 of 500 keywords (49% of the
 // input) into a single cluster labelled "website development company". Nothing
@@ -655,11 +655,11 @@ function buildClusters(items, {
 // downstream just title-cased the first few members as headings.
 //
 // Two guards, both of which preserve the behaviour that made this useful:
-//   maxMergedSize — a merged cluster stops absorbing beyond a workable page's
+//   maxMergedSize - a merged cluster stops absorbing beyond a workable page's
 //     worth of keywords. The evidence that two groups share a ranking URL is
 //     still recorded (they keep the same existingPage), they simply stay
 //     separate planning units.
-//   minMergedCohesion — a merge is rejected outright if it would drop mean
+//   minMergedCohesion - a merge is rejected outright if it would drop mean
 //     pairwise similarity below a floor, i.e. if the only thing the members
 //     have in common is that one over-ranking URL.
 const MAX_MERGED_CLUSTER_SIZE = 30;
@@ -734,7 +734,7 @@ function buildSubClusters(members, { minSimilarity = 0.4 } = {}) {
   const groups = buildClusters(members, { minSimilarity: stricter, containmentThreshold: 0.9 })
     .filter((g) => g.length > 0);
   // A split that yields one group, or one group per keyword, has told us
-  // nothing — fall back to no sub-clusters rather than fake structure.
+  // nothing - fall back to no sub-clusters rather than fake structure.
   if (groups.length < 2 || groups.length > members.length * 0.7) return null;
   return groups
     .sort((a, b) => b.reduce((s, m) => s + m.impressions, 0) - a.reduce((s, m) => s + m.impressions, 0))
@@ -784,6 +784,20 @@ function cluster(input, {
       impressions: Number((typeof raw === 'object' && raw.impressions) || 0),
       clicks: Number((typeof raw === 'object' && raw.clicks) || 0),
       position: (typeof raw === 'object' && raw.position != null) ? Number(raw.position) : null,
+      // Google Keyword Planner, attached by the caller before clustering (this
+      // function is synchronous and must stay that way - see routes/keywords).
+      //
+      // WHY IT MATTERS HERE. Every other number in this file comes from Search
+      // Console, which by definition only knows keywords the site ALREADY
+      // ranks for. Ranking a cluster by impressions therefore ranks it by
+      // where the site is today, and a topic it has never covered scores zero
+      // no matter how much demand exists - exactly the cluster worth writing.
+      // Keyword Planner volume is the demand side, independent of current
+      // rankings, so a cluster can be judged on the market rather than on the
+      // site's own history. Null when no Ads account is connected.
+      volume: (typeof raw === 'object' && raw.volume != null) ? Number(raw.volume) : null,
+      cpc: (typeof raw === 'object' && raw.cpc != null) ? Number(raw.cpc) : null,
+      competition: (typeof raw === 'object' && raw.competition) || null,
     });
   });
 
@@ -827,7 +841,28 @@ function cluster(input, {
 
   let groups = buildClusters(items, { minSimilarity });
   groups = mergeByRankingUrl(groups, urlForKeyword);
+  // Cluster order: search volume when the run was enriched, impressions
+  // otherwise.
+  //
+  // This is the whole point of attaching Keyword Planner data. Impressions
+  // rank clusters by what the site already ranks for, so the topic with the
+  // most untapped demand - the one you would actually commission - sorts last
+  // with a zero. Volume ranks them by the market. Impressions stay as the
+  // tie-break and the fallback, so an un-enriched run behaves exactly as
+  // before.
+  const groupVolume = (g) => {
+    let sum = 0;
+    let any = false;
+    g.forEach((m) => { if (m.volume != null) { sum += m.volume; any = true; } });
+    return any ? sum : null;
+  };
   groups.sort((a, b) => {
+    const av = groupVolume(a);
+    const bv = groupVolume(b);
+    if (av != null || bv != null) {
+      const d = (bv == null ? -1 : bv) - (av == null ? -1 : av);
+      if (d) return d;
+    }
     const ai = a.reduce((s, m) => s + m.impressions, 0);
     const bi = b.reduce((s, m) => s + m.impressions, 0);
     return (bi - ai) || (b.length - a.length);
@@ -841,10 +876,18 @@ function cluster(input, {
   groups = groups.slice(0, maxClusters);
 
   const clusters = groups.map((members, i) => {
-    // Primary keyword: most impressions, then most clicks, then shortest —
-    // the shortest term is usually the head term of the topic.
+    // Primary keyword: highest search volume where it is known, then most
+    // impressions, then most clicks, then shortest - the shortest term is
+    // usually the head term of the topic.
+    //
+    // Volume leads for the same reason it leads the cluster order: the head
+    // term of a topic the site has not covered has no impressions at all, so
+    // an impressions-first sort would name the cluster after whichever
+    // long-tail variant happens to rank today.
     const sorted = [...members].sort((a, b) =>
-      (b.impressions - a.impressions) || (b.clicks - a.clicks) || (a.keyword.length - b.keyword.length));
+      ((b.volume == null ? -1 : b.volume) - (a.volume == null ? -1 : a.volume))
+      || (b.impressions - a.impressions) || (b.clicks - a.clicks)
+      || (a.keyword.length - b.keyword.length));
     const primary = sorted[0];
     const supporting = sorted.slice(1);
     const keywords = sorted.map((m) => m.keyword);
@@ -852,6 +895,24 @@ function cluster(input, {
 
     const totalImpressions = members.reduce((s, m) => s + m.impressions, 0);
     const totalClicks = members.reduce((s, m) => s + m.clicks, 0);
+
+    // ---- Keyword Planner roll-up (null unless the caller enriched) --------
+    // Summed over the members that HAVE a volume, with the count reported
+    // alongside: a cluster of twelve keywords where Google returned data for
+    // three is not a 3-keyword cluster, and a total that hides that would be
+    // read as the whole topic's demand.
+    const withVolume = members.filter((m) => m.volume != null);
+    const totalVolume = withVolume.length
+      ? withVolume.reduce((s, m) => s + m.volume, 0) : null;
+    const bids = members.map((m) => m.cpc).filter((c) => c != null && c > 0);
+    // The top-of-page bid is what the market pays for a click on this topic.
+    // Max rather than mean: one expensive commercial term in an otherwise
+    // informational cluster is a signal, and averaging it away hides it.
+    const maxCpc = bids.length ? Math.max(...bids) : null;
+    // Monthly value of owning the topic outright, at Google's own click price.
+    // Explicitly a ceiling, not a forecast - nobody takes 100% of a SERP.
+    const trafficValue = (totalVolume != null && maxCpc != null)
+      ? Math.round(totalVolume * maxCpc) : null;
     const positions = members.map((m) => m.position).filter((p) => p != null && p > 0);
     const avgPosition = positions.length ? positions.reduce((a, b) => a + b, 0) / positions.length : null;
 
@@ -887,7 +948,7 @@ function cluster(input, {
       recommendation = 'Consolidate existing pages';
       recommendationReason = `${existing.competingUrls} different URLs already split these keywords, with no clear owner (the leading URL takes only ${Math.round(existing.share * 100)}% of impressions). Choose one canonical page before adding more content.`;
     } else if (avgPosition != null && avgPosition <= 3) {
-      recommendation = 'Existing page — already strong';
+      recommendation = 'Existing page - already strong';
       recommendationReason = `${existing.url} already ranks at position ${avgPosition.toFixed(1)} for this cluster. Protect it rather than rewriting it.`;
     } else {
       recommendation = 'Improve existing page';
@@ -903,6 +964,19 @@ function cluster(input, {
       primaryKeyword: primary.keyword,
       supportingKeywords: supporting.map((m) => m.keyword),
       keywordCount: members.length,
+      // Keyword Planner roll-up. All null when the run was not enriched, so
+      // every consumer can test one field and render the column or not.
+      searchVolume: totalVolume,
+      volumeKeywords: withVolume.length,
+      topCpc: maxCpc,
+      trafficValue,
+      // Per-keyword volume, for the brief and the result table. Kept on the
+      // cluster rather than looked up again later: the run is a snapshot, and
+      // re-fetching would quietly disagree with the totals above it.
+      keywordVolumes: withVolume.length
+        ? sorted.filter((m) => m.volume != null)
+          .map((m) => ({ keyword: m.keyword, volume: m.volume, cpc: m.cpc, competition: m.competition }))
+        : null,
       intent: intent.intent,
       intentConfidence: intent.confidence,
       intentCoverage: intent.coverage,
@@ -947,7 +1021,7 @@ function cluster(input, {
   // grouping rather than a merge: clusters that Google answers with the SAME
   // URL are tagged with a shared topicId. They stay separate planning units
   // (each can become its own page), but the backlog treats the topic as one
-  // piece of work — see clustersToTasks.
+  // piece of work - see clustersToTasks.
   const topicByUrl = new Map();
   clusters.forEach((c) => {
     if (!c.existingPage) { c.topicId = null; return; }
@@ -1082,7 +1156,7 @@ function listRuns(userId, brandId) {
     WHERE k.user_id=? ${where} ORDER BY k.id DESC LIMIT 50`).all(...args);
 }
 
-// Turns clusters into content tasks — the bridge from analysis to backlog.
+// Turns clusters into content tasks - the bridge from analysis to backlog.
 function clustersToTasks(runId, userId, brandId, result, tasksLib, { maxTasks = 25, reconcile = true } = {}) {
   let created = 0;
   const emittedKeys = [];
@@ -1090,7 +1164,7 @@ function clustersToTasks(runId, userId, brandId, result, tasksLib, { maxTasks = 
   // One task per TOPIC, not per cluster. Sibling clusters (same dominant
   // ranking URL) describe one body of work on one page; filing them
   // separately would put ten near-identical rows in the backlog.
-  const eligible = result.clusters.filter((c) => c.recommendation !== 'Existing page — already strong');
+  const eligible = result.clusters.filter((c) => c.recommendation !== 'Existing page - already strong');
   const byTopic = new Map();
   eligible.forEach((c) => {
     const key = c.topicId || `c${c.id}`;
@@ -1121,11 +1195,11 @@ function clustersToTasks(runId, userId, brandId, result, tasksLib, { maxTasks = 
             ...c.subClusters.map((s) => `  • ${s.label} (${s.keywordCount} keywords, ${Math.round(s.impressions).toLocaleString('en-US')} impressions)`)]
           : []),
         ...(siblings.length
-          ? ['', `Related clusters ranking with the same URL (${siblings.length}) — plan these together, not as separate pages:`,
+          ? ['', `Related clusters ranking with the same URL (${siblings.length}) - plan these together, not as separate pages:`,
             ...siblings.map((s) => `  • ${s.primaryKeyword} (${s.keywordCount} keywords)`)]
           : []),
-        ...(c.needsReview ? ['', 'NOTE: these keywords are only loosely related (low cohesion) — review the grouping before commissioning.'] : []),
-        ...(c.intentConfidence === 'low' ? ['', 'NOTE: search intent for this cluster is a weak guess — confirm against the live SERP before choosing a page type.'] : []),
+        ...(c.needsReview ? ['', 'NOTE: these keywords are only loosely related (low cohesion) - review the grouping before commissioning.'] : []),
+        ...(c.intentConfidence === 'low' ? ['', 'NOTE: search intent for this cluster is a weak guess - confirm against the live SERP before choosing a page type.'] : []),
         '',
         `Recommendation: ${c.recommendation}`,
         c.recommendationReason,

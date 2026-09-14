@@ -1,4 +1,4 @@
-// SERVER LOG ANALYSIS — what the crawlers actually did, from the only source
+// SERVER LOG ANALYSIS - what the crawlers actually did, from the only source
 // that records it.
 //
 // WHY THIS IS THE MOST VALUABLE FREE DATA SOURCE LEFT
@@ -8,26 +8,26 @@
 // actually requested, when, and what it got back. It answers questions nothing
 // else here can:
 //
-//   - Where is crawl budget going? (Usually: faceted URLs, parameters,
+//  - Where is crawl budget going? (Usually: faceted URLs, parameters,
 //     pagination and a redirect chain nobody knew was there.)
-//   - Which important pages has Googlebot not fetched in weeks? That is the
+//  - Which important pages has Googlebot not fetched in weeks? That is the
 //     real definition of an orphan, and it is invisible to a link crawl.
-//   - Is Googlebot getting 404s or 5xxs that a browser never sees?
-//   - Are the AI retrieval fetchers reaching the site at all? The readiness
+//  - Is Googlebot getting 404s or 5xxs that a browser never sees?
+//  - Are the AI retrieval fetchers reaching the site at all? The readiness
 //     check in aiseo/ tests whether they COULD; the log says whether they DID.
 //
 // And it needs no credential. On Hostinger the file is in hPanel under
 // "Access logs"; on any other host it is /var/log/nginx/access.log or the
 // domain's logs directory.
 //
-// WHY THE COUNTERS AND NOT THE LINES — see the header on log_bot_daily in
+// WHY THE COUNTERS AND NOT THE LINES - see the header on log_bot_daily in
 // src/db.js. In short: a month of logs is millions of lines and this database
 // is a single-writer WebAssembly SQLite on shared hosting. The parse streams
 // and only aggregates are stored.
 //
 // THE ONE THING THAT WOULD MAKE THIS LIE, AND WHAT IS DONE ABOUT IT
 // A user agent string is self-declared. Roughly a third of the traffic calling
-// itself Googlebot in a typical log is not Google — it is scrapers, SEO tools
+// itself Googlebot in a typical log is not Google - it is scrapers, SEO tools
 // and the occasional attacker. A "Googlebot crawled you 40,000 times" figure
 // built from the UA alone is therefore wrong by a wide and unpredictable
 // margin, and it is wrong in the direction that makes a site look healthier
@@ -47,7 +47,7 @@ const db = require('../db');
 // Three formats cover essentially all shared hosting and the two common
 // reverse proxies. Each is a named regex rather than a field-position split,
 // because the combined format's referrer and user-agent are quoted strings
-// that can themselves contain spaces — the reason a naive split(' ') gets the
+// that can themselves contain spaces - the reason a naive split(' ') gets the
 // user agent wrong on every line.
 const FORMATS = [
   {
@@ -131,7 +131,7 @@ function parseLine(fmt, line) {
 // Matched on the user agent, then verified where verification is possible.
 // `verify` names the mechanism:
 //   'ip-range'  the crawler publishes its IP ranges (Google, Bing, OpenAI,
-//               Anthropic, Perplexity) — checked against the loaded ranges.
+//               Anthropic, Perplexity) - checked against the loaded ranges.
 //   'rdns'      only reverse DNS can confirm it, which needs a lookup per IP
 //               and is therefore done for a sample, not every line.
 //   null        no published mechanism; the UA is taken at face value and the
@@ -150,7 +150,7 @@ const BOTS = [
   { key: 'baiduspider', label: 'Baiduspider', re: /baiduspider/i, verify: 'rdns', group: 'search' },
   { key: 'applebot', label: 'Applebot', re: /applebot(?!-extended)/i, verify: 'rdns', group: 'search' },
   { key: 'applebot-extended', label: 'Applebot-Extended (Apple AI training)', re: /applebot-extended/i, verify: 'rdns', group: 'ai-training' },
-  // The retrieval fetchers — the ones that matter for being cited in an answer.
+  // The retrieval fetchers - the ones that matter for being cited in an answer.
   { key: 'oai-searchbot', label: 'OAI-SearchBot (ChatGPT search index)', re: /oai-searchbot/i, verify: 'ip-range', group: 'ai-retrieval', important: true },
   { key: 'chatgpt-user', label: 'ChatGPT-User (live fetch)', re: /chatgpt-user/i, verify: 'ip-range', group: 'ai-retrieval', important: true },
   { key: 'gptbot', label: 'GPTBot (OpenAI training)', re: /gptbot/i, verify: 'ip-range', group: 'ai-training' },
@@ -195,8 +195,8 @@ function botMeta(key) {
 // --------------------------------------------------------- IP range checking
 // The published ranges, as loaded by lib/botRanges.js. Passed in rather than
 // fetched here so a parse can run entirely offline: with no ranges available
-// every verifiable bot is counted as unverified, which is the honest reading —
-// "we could not confirm this was Google" — rather than a silent pass.
+// every verifiable bot is counted as unverified, which is the honest reading - 
+// "we could not confirm this was Google" - rather than a silent pass.
 function ipToNumber(ip) {
   const parts = String(ip || '').split('.');
   if (parts.length !== 4) return null;
@@ -211,7 +211,7 @@ function ipToNumber(ip) {
 
 // Only IPv4 is range-checked. IPv6 crawler traffic is real and growing, and
 // pretending otherwise would be the silent-failure pattern this file exists to
-// avoid — so an IPv6 hit from a verifiable bot is counted as unverified and the
+// avoid - so an IPv6 hit from a verifiable bot is counted as unverified and the
 // UI says how many that was.
 function makeRangeChecker(ranges) {
   const v4 = [];
@@ -219,7 +219,7 @@ function makeRangeChecker(ranges) {
   (ranges || []).forEach((entry) => {
     const cidr = String(entry.cidr || entry || '');
     if (cidr.includes(':')) {
-      // Compared as a string prefix on the first three hextets — coarse, and
+      // Compared as a string prefix on the first three hextets - coarse, and
       // deliberately labelled as such by the caller.
       v6Prefixes.push({ prefix: cidr.split('::')[0].toLowerCase(), owner: entry.owner || null });
       return;
@@ -257,7 +257,7 @@ function makeRangeChecker(ranges) {
 
 // Reverse-then-forward DNS, the method Google, Bing and Yandex all document.
 // A reverse lookup alone is forgeable; the forward confirmation is what makes
-// it proof. Used on a SAMPLE of IPs, never per line — a DNS round trip per log
+// it proof. Used on a SAMPLE of IPs, never per line - a DNS round trip per log
 // line would take hours.
 function verifyByRdns(ip, allowedSuffixes) {
   return new Promise((resolve) => {
@@ -278,7 +278,7 @@ function verifyByRdns(ip, allowedSuffixes) {
 // ==========================================================================
 //
 // Query strings are kept but truncated, and the parameter NAMES are what get
-// grouped, because the finding is never "?page=47 was crawled 9 times" — it is
+// grouped, because the finding is never "?page=47 was crawled 9 times" - it is
 // "31% of Googlebot's budget went to URLs carrying ?page". A per-value grouping
 // buries that under ten thousand rows.
 function normalisePath(raw, { keepQuery = true } = {}) {
@@ -335,7 +335,7 @@ function bumpUrlStats(brandId) {
 // Parses text and writes the aggregates.
 //
 // `ranges` is the loaded IP-range list (see lib/botRanges.js). Omitting it does
-// not fail the import — every otherwise-verifiable bot is simply counted as
+// not fail the import - every otherwise-verifiable bot is simply counted as
 // unverified, and the result says how many, so the reader knows the numbers are
 // UA-only rather than believing they are verified.
 function importText(userId, brand, text, {
@@ -603,7 +603,7 @@ function findings(brandId, { bot = 'googlebot', sitemapUrls = null } = {}) {
       severity: 'low',
       title: `${((assetHits / totalHits) * 100).toFixed(0)}% of the crawl was static assets`,
       summary: `${assetHits.toLocaleString('en-US')} of ${totalHits.toLocaleString('en-US')} requests were CSS, JS, images or fonts.`,
-      action: 'Normal in itself — the crawler renders pages. Worth attention only if the asset URLs are cache-busted on every deploy, which makes every build look like a new set of files to crawl.',
+      action: 'Normal in itself - the crawler renders pages. Worth attention only if the asset URLs are cache-busted on every deploy, which makes every build look like a new set of files to crawl.',
       rows: all.filter((r) => isAsset(r.path)).sort((x, y) => y.hits - x.hits).slice(0, 15),
     });
   }
@@ -626,7 +626,7 @@ function findings(brandId, { bot = 'googlebot', sitemapUrls = null } = {}) {
         key: 'never_crawled',
         severity: missing.length / sitemapUrls.length >= 0.2 ? 'high' : 'medium',
         title: `${missing.length} sitemap URL(s) were never requested by ${bot}`,
-        summary: `Of ${sitemapUrls.length} URLs in the sitemap, ${missing.length} appear nowhere in ${cov.days} day(s) of logs. This is the strongest available evidence of a discovery problem — stronger than an internal-link orphan check, because it reflects what the crawler did rather than what it could have done.`,
+        summary: `Of ${sitemapUrls.length} URLs in the sitemap, ${missing.length} appear nowhere in ${cov.days} day(s) of logs. This is the strongest available evidence of a discovery problem - stronger than an internal-link orphan check, because it reflects what the crawler did rather than what it could have done.`,
         action: 'Check these are internally linked from a crawlable page, are not blocked in robots.txt, and are in a sitemap the property actually has submitted. Then submit the important ones for indexing.',
         rows: missing.slice(0, 40).map((u) => ({ path: u, hits: 0 })),
       });
