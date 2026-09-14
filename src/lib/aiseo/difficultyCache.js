@@ -5,7 +5,7 @@
 // keyword through ./serpLite.js, which paces itself to one request every
 // 1.4 seconds. Inside a research run somebody is waiting on, that pacing put a
 // hard ceiling of a dozen keywords on what could be scored, and every other
-// keyword rendered as an em dash. The data was never the constraint — the
+// keyword rendered as an em dash. The data was never the constraint - the
 // place the work was being done was.
 //
 // So the work moves. A score is computed once, stored against (keyword,
@@ -19,7 +19,7 @@
 // top ten, how many are authoritative, how many match the query in the title.
 // That composition changes over weeks, not hours, so a 45-day life is generous
 // without being stale. Failures are cached too, for far longer than nothing
-// and far shorter than a success — a keyword whose SERP came back empty must
+// and far shorter than a success - a keyword whose SERP came back empty must
 // not be re-fetched on every run, and must not be written off permanently
 // either.
 //
@@ -39,7 +39,7 @@ const FRESH_DAYS = Number(process.env.KD_CACHE_FRESH_DAYS || 45);
 const FAILURE_RETRY_DAYS = Number(process.env.KD_CACHE_FAILURE_RETRY_DAYS || 3);
 
 // A queue row that has failed this many times is left alone. Without it, a
-// keyword that is permanently unscoreable — a SERP that always returns empty —
+// keyword that is permanently unscoreable - a SERP that always returns empty - 
 // would be retried nightly forever, spending the whole backfill budget on the
 // one thing that cannot succeed.
 const MAX_ATTEMPTS = 4;
@@ -190,7 +190,7 @@ async function scoreOne(keyword, market) {
 
   // A throttle is not a result. serpLite reports a rate-limited fetch as
   // ok:false, and writing that to the cache as "no competition found" would
-  // poison the keyword with a low difficulty for the next 45 days — the exact
+  // poison the keyword with a low difficulty for the next 45 days - the exact
   // failure mode this whole feature exists to avoid.
   if (serp && serp.ok === false && /rate-limit|throttl|anomaly|429/i.test(String(serp.error || ''))) {
     const err = new Error(`throttled: ${serp.error}`);

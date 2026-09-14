@@ -9,7 +9,7 @@
   <div class="card">
     <div class="card-body">
       <p class="hint mt-0">
-        <strong>Every tracking element on one board</strong> — crawlability and indexation, Core Web Vitals,
+        <strong>Every tracking element on one board</strong> - crawlability and indexation, Core Web Vitals,
         speed and TTFB, SSL and security headers, redirect chains, canonicals, structured data, JavaScript
         rendering, server-side crawl signals, mobile usability, titles and meta descriptions, heading structure,
         content quality and cannibalisation, internal linking, image optimisation, URL structure, and AI
@@ -36,17 +36,17 @@
           <label class="field">
             <span>Scope</span>
             <select name="scope">
-              <option value="sample" selected>Sampled — a deliberate 12-URL cross-section</option>
-              <option value="sitewide">Sitewide — every URL in the sitemap and every page with traffic</option>
+              <option value="sample" selected>Sampled - a deliberate 12-URL cross-section</option>
+              <option value="sitewide">Sitewide - every URL in the sitemap and every page with traffic</option>
             </select>
           </label>
           <label class="field">
             <span>Sample size for page-scoped checks</span>
             <select name="sample_size">
-              <option value="6">6 — fast</option>
-              <option value="12" selected>12 — default</option>
+              <option value="6">6 - fast</option>
+              <option value="12" selected>12 - default</option>
               <option value="20">20</option>
-              <option value="30">30 — slow</option>
+              <option value="30">30 - slow</option>
             </select>
           </label>
           <label class="field">
@@ -55,14 +55,14 @@
               <option value="500">500 URLs</option>
               <option value="1500">1,500 URLs</option>
               <option value="3000" selected>3,000 URLs</option>
-              <option value="10000">10,000 URLs — slow</option>
+              <option value="10000">10,000 URLs - slow</option>
             </select>
           </label>
         </div>
         <p class="hint mt-0">
           <strong>A sample answers "is there a problem"; it cannot answer "which pages".</strong>
-          Sampled scope runs every check against the same deliberate 12-URL cross-section — the homepage, the
-          highest-impression pages, and one page per sitemap section — which is enough to detect a templating
+          Sampled scope runs every check against the same deliberate 12-URL cross-section - the homepage, the
+          highest-impression pages, and one page per sitemap section - which is enough to detect a templating
           fault and cheap enough to run nightly.
           Sitewide scope additionally hands the FULL URL set to the checks that can absorb it: broken pages,
           canonical health and title/meta duplication. The rest keep the sample, because running PageSpeed
@@ -83,7 +83,7 @@
           <label>Restrict to specific checks <span class="muted">(leave all unticked for a full sweep)</span></label>
           <% grouped.forEach(function (g) { %>
             <div style="margin-bottom:8px">
-              <div class="nav-section" style="padding-left:0"><%= g.group %></div>
+              <div class="section-label"><%= g.group %></div>
               <div class="checkbox-row" style="flex-wrap:wrap;gap:10px">
                 <% g.items.forEach(function (c) {
                      const av = availability.find(function (a) { return a.key === c.key; }); %>
@@ -91,7 +91,7 @@
                     <input type="checkbox" name="checks" value="<%= c.key %>" <%= av && av.available ? '' : 'disabled' %>>
                     <%= c.element %>
                     <% if (av && !av.available) { %>
-                      <span class="muted">— needs <%= av.missing.map(function (m) { return m.label; }).join(', ') %></span>
+                      <span class="muted"> - needs <%= av.missing.map(function (m) { return m.label; }).join(', ') %></span>
                     <% } %>
                   </label>
                 <% }) %>
@@ -159,14 +159,14 @@
             <tr>
               <td><code><%= m.metric_key %></code></td>
               <td class="truncate muted" style="max-width:220px"><%= m.url ? shortUrl(m.url, 44) : 'site-wide' %></td>
-              <td><%= m.value == null ? '—' : m.value %></td>
+              <td><%= m.value == null ? ' - ' : m.value %></td>
               <td>
                 <span class="badge <%= m.status === 'good' ? 'good' : (m.status === 'warn' ? 'medium' : (m.status === 'fail' ? 'critical' : 'neutral')) %>">
                   <%= m.status || 'unknown' %>
                 </span>
               </td>
               <td class="muted"><%= fmtDateTime(m.captured_at) %></td>
-              <td class="muted" style="font-size:11px"><%= m.detail || '—' %></td>
+              <td class="muted" style="font-size:11px"><%= m.detail || ' - ' %></td>
             </tr>
           <% }) %>
           </tbody>
@@ -174,7 +174,7 @@
       </div>
       <p class="hint" style="margin-bottom:0">
         Each row's history is available as JSON at
-        <code>/ai-seo/monitoring/series/&lt;metric&gt;?brand=<%= brand.id %></code> — which is also what the
+        <code>/ai-seo/monitoring/series/&lt;metric&gt;?brand=<%= brand.id %></code> - which is also what the
         alert engine reads when it decides a metric has regressed.
       </p>
     </div>

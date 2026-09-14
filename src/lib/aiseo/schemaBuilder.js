@@ -1,4 +1,4 @@
-// SCHEMA BUILDER — the FINAL block, per type, ready to paste.
+// SCHEMA BUILDER - the FINAL block, per type, ready to paste.
 //
 // WHAT WAS ASKED FOR AND WHY IT NEEDED A NEW MODULE
 // ./schemaAuto.js already generated schema, but it generated FRAGMENTS with
@@ -7,12 +7,12 @@
 // product page. Two things follow from that:
 //
 //   1. A block containing `"datePublished": null` is not pasteable. Google
-//      treats an explicit null as a malformed value — worse than an absent
+//      treats an explicit null as a malformed value - worse than an absent
 //      property, which it simply ignores. So a fragment with nulls was more
 //      dangerous than no output.
 //   2. Nine separate half-blocks with no guidance on how to combine them is
 //      not a deliverable. Real sites emit ONE @graph with cross-referenced
-//      @id values, because that is how an entity graph is expressed — a
+//      @id values, because that is how an entity graph is expressed - a
 //      standalone Article block with a standalone Organization block beside it
 //      states two unlinked facts instead of "this article was published by
 //      this organisation".
@@ -133,7 +133,7 @@ const BUILDERS = {
     const fm = factMap(ctx.facts);
     const placeholders = [];
     if (!fm.get('logo_url')) placeholders.push(ph('logo.url', 'an absolute HTTPS URL to a square image, at least 112×112px', 'declare logo_url on the brand hub', false));
-    if (!fm.get('social_profiles')) placeholders.push(ph('sameAs', 'an array of absolute profile URLs (LinkedIn, X, Facebook, Crunchbase, Wikidata)', 'declare social_profiles on the brand hub — this is the strongest entity-disambiguation signal in markup', false));
+    if (!fm.get('social_profiles')) placeholders.push(ph('sameAs', 'an array of absolute profile URLs (LinkedIn, X, Facebook, Crunchbase, Wikidata)', 'declare social_profiles on the brand hub - this is the strongest entity-disambiguation signal in markup', false));
     if (!fm.get('what_we_do')) placeholders.push(ph('description', 'one or two sentences stating what the organisation does', 'declare what_we_do on the brand hub', false));
     if (!fm.get('legal_name')) placeholders.push(ph('name', 'the registered legal name', 'declare legal_name on the brand hub; the trading name is used until then', false));
     return {
@@ -157,7 +157,7 @@ const BUILDERS = {
       },
       placeholders: [
         ph('potentialAction', '{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"' + (origin || 'https://example.com') + '/?s={search_term_string}"},"query-input":"required name=search_term_string"}',
-          'add ONLY if the site has a working search endpoint at that URL — claiming a sitelinks search box the site cannot serve is worse than omitting it', false),
+          'add ONLY if the site has a working search endpoint at that URL - claiming a sitelinks search box the site cannot serve is worse than omitting it', false),
       ],
       basis: 'the site origin and the brand name',
       notes: 'Sitewide, like Organization.',
@@ -183,14 +183,14 @@ const BUILDERS = {
       },
       placeholders: trail.length > 2
         ? [ph('itemListElement[n].item', 'the absolute URL of each intermediate level',
-          `read from the site's own navigation — the trail text ("${trail.slice(0, -1).join(' › ')}") does not carry URLs, and a guessed one links to a 404`, true)]
+          `read from the site's own navigation - the trail text ("${trail.slice(0, -1).join(' › ')}") does not carry URLs, and a guessed one links to a 404`, true)]
         : [],
       basis: `read from the page's ${ctx.doc.breadcrumbTrail.source} breadcrumbs`,
     };
   },
 
   Service(ctx) {
-    const name = (ctx.doc.h1s[0] || ctx.doc.title || '').split(/\s+[|–—·]\s+/)[0].trim();
+    const name = (ctx.doc.h1s[0] || ctx.doc.title || '').split(/\s+[|–—·-]\s+/)[0].trim();
     const fm = factMap(ctx.facts);
     return {
       jsonld: {
@@ -208,7 +208,7 @@ const BUILDERS = {
         ...(ctx.doc.metaDesc ? [] : [ph('description', 'one or two sentences describing the service', 'write a meta description for this page; the same sentence serves both', false)]),
         ...(fm.get('service_area') ? [] : [ph('areaServed', 'a country, region or city name, or an array of them', 'declare service_area on the brand hub', false)]),
         ph('offers', '{"@type":"Offer","priceCurrency":"GBP","price":"1200","priceSpecification":{"@type":"PriceSpecification","minPrice":"1200"}}',
-          'add only if a real price or minimum is published on the page. Omit it entirely for "contact us for a quote" — an Offer with no price is worse than no Offer.', false),
+          'add only if a real price or minimum is published on the page. Omit it entirely for "contact us for a quote" - an Offer with no price is worse than no Offer.', false),
       ],
       basis: `the page's H1 and meta description, classified as a ${ctx.pageType.label} by ${ctx.pageType.evidence.filter((e) => e.type === 'service').length} signal(s)`,
       notes: 'Service has no rich result. It is worth emitting because it states plainly what the business does and for whom, which is what an AI answer engine reads to decide the brand is relevant.',
@@ -216,7 +216,7 @@ const BUILDERS = {
   },
 
   Product(ctx) {
-    const name = (ctx.doc.h1s[0] || ctx.doc.title || '').split(/\s+[|–—·]\s+/)[0].trim();
+    const name = (ctx.doc.h1s[0] || ctx.doc.title || '').split(/\s+[|–—·-]\s+/)[0].trim();
     const text = String(ctx.doc.mainText || '');
     const skuMatch = /\b(?:sku|mpn|part\s*(?:no|number)|product\s*code)\b\s*[:#]?\s*([\w-]{3,})/i.exec(text);
     const priceMatch = /([$£€¥₹])\s?(\d[\d,]*(?:\.\d{2})?)/.exec(text);
@@ -245,19 +245,19 @@ const BUILDERS = {
       placeholders: [
         ...(priceMatch ? [] : [ph('offers', '{"@type":"Offer","price":"99.00","priceCurrency":"USD","availability":"https://schema.org/InStock","url":"<this page>"}',
           'no price could be read from the page. Product is INELIGIBLE for a rich result without offers, review or aggregateRating.', true)]),
-        ...(availability || !priceMatch ? [] : [ph('offers.availability', 'https://schema.org/InStock or /OutOfStock', 'read from live stock state — a hardcoded InStock on a sold-out product is a policy problem', true)]),
+        ...(availability || !priceMatch ? [] : [ph('offers.availability', 'https://schema.org/InStock or /OutOfStock', 'read from live stock state - a hardcoded InStock on a sold-out product is a policy problem', true)]),
         ...(ctx.doc.openGraph.image ? [] : [ph('image', 'an array of absolute image URLs, 1200px on the long edge, in 16×9, 4×3 and 1×1 crops', 'the product photography on this page', true)]),
         ...(skuMatch ? [] : [ph('sku / gtin13 / mpn', 'the product identifier as a string', 'the product record in the catalogue', false)]),
         ph('aggregateRating', '{"@type":"AggregateRating","ratingValue":"4.6","reviewCount":"128"}',
           'ONLY from ratings genuinely collected AND displayed on this page. Inventing an aggregateRating is the most commonly penalised structured-data abuse there is.', false),
       ],
       basis: `commerce apparatus detected: ${ctx.pageType.commerce.found.map((f) => f.key).join(', ') || 'none'}`,
-      notes: 'Generated only because a purchase control, SKU or variant selector is present on the page. A price alone is not enough — service and pricing pages quote prices too.',
+      notes: 'Generated only because a purchase control, SKU or variant selector is present on the page. A price alone is not enough - service and pricing pages quote prices too.',
     };
   },
 
   Course(ctx) {
-    const name = (ctx.doc.h1s[0] || ctx.doc.title || '').split(/\s+[|–—·]\s+/)[0].trim();
+    const name = (ctx.doc.h1s[0] || ctx.doc.title || '').split(/\s+[|–—·-]\s+/)[0].trim();
     const fm = factMap(ctx.facts);
     return {
       jsonld: {
@@ -311,11 +311,11 @@ const BUILDERS = {
         ...(published ? [ph('dateModified', 'ISO 8601 with a timezone offset, e.g. 2026-08-29T09:30:00+01:00',
           `a date was read from the page (${published}) and used for BOTH datePublished and dateModified. Split them if the article has been revised.`, false)]
           : [ph('datePublished / dateModified', 'ISO 8601 with a timezone offset, e.g. 2026-08-29T09:30:00+01:00',
-            'no date is visible on the page. Publish one — an AI answer engine cannot judge currency without it, and a correct undated page loses to a dated one.', true)]),
+            'no date is visible on the page. Publish one - an AI answer engine cannot judge currency without it, and a correct undated page loses to a dated one.', true)]),
         ...(ctx.doc.openGraph.image ? [] : [ph('image', 'an array of absolute image URLs, at least 1200px wide', 'the article hero image', true)]),
       ],
       basis: `${ctx.doc.wordCount} words classified as ${ctx.pageType.label}`,
-      notes: headline.length >= 110 ? 'headline was truncated to 110 characters — Google truncates beyond that.' : null,
+      notes: headline.length >= 110 ? 'headline was truncated to 110 characters - Google truncates beyond that.' : null,
     };
   },
 
@@ -323,7 +323,7 @@ const BUILDERS = {
     // Question/answer pairs taken from the DOM in document order, so the answer
     // is the prose that actually follows its heading. This is the fix for the
     // old pairing-by-position approach, which could attach the wrong answer
-    // text — a policy violation, not a cosmetic error.
+    // text - a policy violation, not a cosmetic error.
     const pairs = [];
     if (ctx.doc.$) {
       const $ = ctx.doc.$;
@@ -380,8 +380,8 @@ const BUILDERS = {
         })),
       },
       placeholders: [],
-      basis: `${pairs.length} question/answer pair${pairs.length === 1 ? '' : 's'} read from the page in document order — each answer is the prose that follows its own heading`,
-      notes: 'Every question and answer here is VISIBLE on the page, which is the policy requirement. Verify the extracted answer text matches what a reader sees before publishing — the walk stops at the next heading of the same or higher level, which is right for normal markup and can over-collect where a section has no closing heading. FAQ rich results are now shown only for authoritative government and health sites; the markup remains valuable because AI answer engines read it.',
+      basis: `${pairs.length} question/answer pair${pairs.length === 1 ? '' : 's'} read from the page in document order - each answer is the prose that follows its own heading`,
+      notes: 'Every question and answer here is VISIBLE on the page, which is the policy requirement. Verify the extracted answer text matches what a reader sees before publishing - the walk stops at the next heading of the same or higher level, which is right for normal markup and can over-collect where a section has no closing heading. FAQ rich results are now shown only for authoritative government and health sites; the markup remains valuable because AI answer engines read it.',
       verifyRequired: true,
     };
   },
@@ -417,7 +417,7 @@ const BUILDERS = {
         ...(fm.get('street_address') ? [] : [ph('address', '{"@type":"PostalAddress","streetAddress":"…","addressLocality":"…","postalCode":"…","addressCountry":"GB"}',
           'REQUIRED. Declare street_address, city, region, postal_code and country on the brand hub. A string address validates but is far weaker for local matching.', true)]),
         ph('openingHoursSpecification', '[{"@type":"OpeningHoursSpecification","dayOfWeek":["Monday","Tuesday"],"opens":"09:00","closes":"17:30"}]',
-          `read from the hours published on the page${/\bmon|\bopening hours/i.test(text) ? ' — hours language was detected in the content but cannot be parsed reliably enough to assert' : ''}`, false),
+          `read from the hours published on the page${/\bmon|\bopening hours/i.test(text) ? ' - hours language was detected in the content but cannot be parsed reliably enough to assert' : ''}`, false),
         ph('geo', '{"@type":"GeoCoordinates","latitude":51.5074,"longitude":-0.1278}', 'the coordinates of the premises', false),
         ph('priceRange', 'a short string such as "££" or "$$-$$$"', 'the typical spend at this location', false),
       ],
@@ -469,7 +469,7 @@ const BUILDERS = {
         '@type': 'CollectionPage',
         '@id': webPageId(ctx.doc.url),
         url: String(ctx.doc.url).split('#')[0],
-        name: (ctx.doc.h1s[0] || ctx.doc.title || '').split(/\s+[|–—·]\s+/)[0] || undefined,
+        name: (ctx.doc.h1s[0] || ctx.doc.title || '').split(/\s+[|–—·-]\s+/)[0] || undefined,
         isPartOf: originOf(ctx.doc.url) ? { '@id': `${originOf(ctx.doc.url)}/#website` } : undefined,
         mainEntity: {
           '@type': 'ItemList',
@@ -522,7 +522,7 @@ const OFFER_ORDER = [
 // Builds every block the page type permits, plus the combined @graph.
 //
 // `wantedTypes` lets a user ask for a specific type explicitly. A request for
-// a type the page type forbids is HONOURED but flagged — the practitioner may
+// a type the page type forbids is HONOURED but flagged - the practitioner may
 // know something the classifier does not, and refusing outright would make the
 // feature unusable on an edge case. What it will not do is generate a
 // forbidden type unasked, which is the actual bug.
@@ -568,8 +568,8 @@ function build({ doc, brand = null, facts = [], wantedTypes = [], pageType = nul
       return;
     }
 
-    // A SECONDARY type — one on the page type's `also` list rather than its
-    // primary list — is only offered when it can be produced complete.
+    // A SECONDARY type - one on the page type's `also` list rather than its
+    // primary list - is only offered when it can be produced complete.
     // Offering a LocalBusiness block with no address on every service page is
     // noise: the practitioner cannot paste it, and it pushes the blocks they
     // CAN paste down the page. A primary type is always offered, incomplete or
@@ -611,7 +611,7 @@ function build({ doc, brand = null, facts = [], wantedTypes = [], pageType = nul
     });
   });
 
-  // The combined @graph — one script tag, cross-referenced by @id. This is what
+  // The combined @graph - one script tag, cross-referenced by @id. This is what
   // actually goes on the page.
   const graphNodes = blocks
     // Organization and WebSite belong in the sitewide layout, so they are

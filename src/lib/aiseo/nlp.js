@@ -4,7 +4,7 @@
 // twice. That matters more than it sounds: the on-page scorer, the freshness
 // detector, the competitor gap analysis and the reputation scanner all need
 // "how similar are these two texts", "what entities does this mention" and
-// "how readable is this" — and if each asked an AI model instead, the same
+// "how readable is this" - and if each asked an AI model instead, the same
 // page would score differently on Tuesday, the spend cap would be gone in an
 // afternoon, and nobody could explain a score to a client.
 //
@@ -45,7 +45,7 @@ function contentWords(text) {
   return words(text).filter((w) => w.length > 2 && !STOPWORDS.has(w));
 }
 
-// Light English suffix stripping. Not a real stemmer — deliberately. An
+// Light English suffix stripping. Not a real stemmer - deliberately. An
 // aggressive stemmer collapses "certification" and "certified" onto "certif",
 // which is right for recall and wrong for the entity-coverage report a human
 // reads, where those are different words a page may be missing.
@@ -103,7 +103,7 @@ function termFrequency(text) {
 
 // Cosine similarity over raw term frequencies, L2-normalised. Used for
 // "does this draft cover what the competitors cover" and "has this page's
-// topic drifted", both of which want direction, not magnitude — a 400-word
+// topic drifted", both of which want direction, not magnitude - a 400-word
 // page and a 4,000-word page about the same thing should score as similar.
 function cosine(tfA, tfB) {
   let dot = 0;
@@ -132,7 +132,7 @@ function jaccard(setA, setB) {
 // This is the measure behind intent-drift detection. Two candidates were
 // considered and rejected: comparing top-10 query lists (misses a shift that
 // happens below the top 10, which is where it starts) and KL divergence
-// (undefined when a query appears in one window and not the other — which is
+// (undefined when a query appears in one window and not the other - which is
 // exactly the case drift produces). JSD is symmetric, always finite, and
 // bounded at 1 bit, so a threshold means the same thing on every brand.
 function jensenShannon(mapA, mapB) {
@@ -166,7 +166,7 @@ function sentences(text) {
 
 // Syllable count, the heuristic Flesch implementations conventionally use:
 // vowel groups, minus silent trailing 'e', floor of 1. It is approximate, and
-// that is fine — Flesch itself is a rough instrument, and every SEO tool that
+// that is fine - Flesch itself is a rough instrument, and every SEO tool that
 // reports it uses the same approximation, so the numbers are comparable.
 function syllables(word) {
   const w = String(word || '').toLowerCase().replace(/[^a-z]/g, '');
@@ -181,7 +181,7 @@ function syllables(word) {
 // Reported together because they answer different questions and a single
 // number invites the wrong edit. Reading Ease says how hard the prose is;
 // Grade says how many years of schooling it assumes. A page can score badly
-// on Ease purely for having long technical terms it cannot avoid — a
+// on Ease purely for having long technical terms it cannot avoid - a
 // compliance page naming "Basel III capital adequacy requirements" is not
 // improved by removing the term.
 function readability(text) {
@@ -207,7 +207,7 @@ function readability(text) {
 }
 
 // A crude passive-voice count: "was/were/is/are/been + past participle".
-// Flagged as a hint, not an error — passive voice is correct in plenty of
+// Flagged as a hint, not an error - passive voice is correct in plenty of
 // technical and regulatory writing.
 function countPassive(sents) {
   const rx = /\b(?:is|are|was|were|be|been|being)\s+(?:\w+ly\s+)?(\w+(?:ed|en))\b/i;
@@ -218,7 +218,7 @@ function countPassive(sents) {
 //
 // Named-entity extraction without a model: runs of capitalised words that are
 // not sentence-initial-only, plus acronyms, plus recognised numeric/date/money
-// patterns. Deliberately conservative — a false entity in the report sends
+// patterns. Deliberately conservative - a false entity in the report sends
 // someone to add a term that does not exist.
 function entities(text) {
   const found = new Map();
@@ -271,7 +271,7 @@ function entities(text) {
 // Why per-100-words and not a raw count: a 3,000-word page naturally names
 // more things than a 500-word one, so a raw count ranks long pages as
 // authoritative regardless of substance. Density asks whether the page is
-// ABOUT specific, nameable things — which is what an AI retrieval system
+// ABOUT specific, nameable things - which is what an AI retrieval system
 // needs in order to decide the page answers a specific question.
 function entityDensity(text) {
   const w = words(text).length;
@@ -292,7 +292,7 @@ function entityDensity(text) {
 //
 // "Citability" is the property that decides whether an AI answer engine can
 // lift a passage from a page and attribute it. It is not the same as ranking
-// well, and it is not a vibe — it decomposes into things that are countable.
+// well, and it is not a vibe - it decomposes into things that are countable.
 //
 // The signals, and why each one is here:
 //   selfContained  A passage that starts with "This means that…" cannot be
@@ -301,7 +301,7 @@ function entityDensity(text) {
 //   directAnswer   A passage that answers its heading's question in its first
 //                  sentence is extractable; one that builds up to the answer
 //                  in paragraph four is not.
-//   attributable   Concrete facts — figures, dates, named sources — are what
+//   attributable   Concrete facts - figures, dates, named sources - are what
 //                  makes a passage worth citing rather than paraphrasing.
 //   structured     Lists, tables and definition lists survive chunking intact.
 //   scannable      Passages of 40-120 words are the size a citation uses. A
@@ -386,8 +386,8 @@ function citability(doc) {
 // A lexicon rather than a model, for one specific reason: the scanner reads
 // hundreds of Reddit comments and news headlines per run, and sending those to
 // a paid model would exhaust the spend cap on the least valuable part of the
-// job. The AI layer is used for the part that needs judgement — deciding
-// whether a negative mention is a factual claim that needs correcting — on the
+// job. The AI layer is used for the part that needs judgement - deciding
+// whether a negative mention is a factual claim that needs correcting - on the
 // handful of items this stage flags.
 const POSITIVE = new Set(`
 great excellent amazing awesome love loved loving best fantastic wonderful
@@ -431,7 +431,7 @@ function sentiment(text) {
     if (!polarity) return;
     hits += 1;
     let weight = 1;
-    // Look back two tokens for a negator or intensifier — "not great" must not
+    // Look back two tokens for a negator or intensifier - "not great" must not
     // count as positive, and "absolutely terrible" is worse than "terrible".
     for (let back = 1; back <= 2; back += 1) {
       const prev = toks[i - back];

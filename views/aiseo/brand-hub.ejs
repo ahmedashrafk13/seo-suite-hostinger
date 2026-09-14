@@ -10,7 +10,7 @@
 /* The fixed set of facts an AI engine needs in order to answer "what is this
    company, and can I trust it". Fixed rather than free-form because "what is
    missing" must not depend on what someone happened to think of. Extra facts
-   can still be added — the last rows are blank. */
+   can still be added - the last rows are blank. */
 const FIELDS = [
   { key: 'legal_name', label: 'Registered legal name', section: 'identity', help: 'Links the brand to public records. A trading name alone often cannot be verified.' },
   { key: 'organization_type', label: 'Schema.org organisation type', section: 'identity', help: 'Organization, LocalBusiness, EducationalOrganization, FinancialService, ProfessionalService…' },
@@ -21,7 +21,7 @@ const FIELDS = [
   { key: 'pricing_basis', label: 'How pricing works', section: 'operations', help: 'Assistants are asked about cost constantly. Silence here is filled by a forum post or a competitor.' },
   { key: 'accreditations', label: 'Accreditations or registrations', section: 'trust', help: 'The verifiable trust signal an engine can check against a register.' },
   { key: 'regulated_by', label: 'Regulated by', section: 'trust' },
-  { key: 'social_profiles', label: 'Official profile URLs', section: 'trust', help: 'Space or comma separated. Feeds sameAs — the strongest entity-disambiguation signal in markup.' },
+  { key: 'social_profiles', label: 'Official profile URLs', section: 'trust', help: 'Space or comma separated. Feeds sameAs - the strongest entity-disambiguation signal in markup.' },
   { key: 'logo_url', label: 'Logo URL', section: 'trust' },
   { key: 'support_email', label: 'Contact email', section: 'contact' },
   { key: 'phone', label: 'Phone', section: 'contact' },
@@ -48,7 +48,7 @@ const extras = ((review && review.facts) || []).filter(function (f) {
       <p class="hint" style="margin-bottom:0">
         <strong>About llms.txt, plainly:</strong> it is an emerging convention, it is not a ranking factor
         anywhere, and Google has stated it does not use it. Some retrieval pipelines do read it, it costs
-        nothing, and writing one forces the canonical facts to be settled. That is the whole case for it —
+        nothing, and writing one forces the canonical facts to be settled. That is the whole case for it - 
         this suite reports its absence as an opportunity, never as an error.
       </p>
     </div>
@@ -70,7 +70,7 @@ const extras = ((review && review.facts) || []).filter(function (f) {
       <div class="stat">
         <div class="label">llms.txt live on the site</div>
         <div class="value sm"><%= review.live.present ? 'yes' : 'no' %></div>
-        <div class="meta"><%= review.live.url %><%= review.live.present ? ' · ' + fmtInt(review.live.bytes) + ' bytes' : ' · HTTP ' + (review.live.status || '—') %></div>
+        <div class="meta"><%= review.live.url %><%= review.live.present ? ' · ' + fmtInt(review.live.bytes) + ' bytes' : ' · HTTP ' + (review.live.status || ' - ') %></div>
       </div>
       <div class="stat">
         <div class="label">Pages in the content map</div>
@@ -143,7 +143,7 @@ const extras = ((review && review.facts) || []).filter(function (f) {
             </tbody>
           </table></div>
           <p class="hint">
-            Emptying a value <strong>removes</strong> the fact rather than storing a blank — an emptied field
+            Emptying a value <strong>removes</strong> the fact rather than storing a blank - an emptied field
             means "we no longer assert this", and a blank line in llms.txt asserts nothing usefully.
           </p>
           <div class="btn-row">
@@ -169,7 +169,7 @@ const extras = ((review && review.facts) || []).filter(function (f) {
           <% if (d.missing && d.missing.length) { %>
             <h4>Basics it says are absent</h4>
             <ul class="meta-list">
-              <% d.missing.forEach(function (m) { %><li><strong><%= m.fact %></strong> — <%= m.whyItMatters %></li><% }) %>
+              <% d.missing.forEach(function (m) { %><li><strong><%= m.fact %></strong> - <%= m.whyItMatters %></li><% }) %>
             </ul>
           <% } %>
           <% if (d.unverifiable && d.unverifiable.length) { %>
@@ -186,7 +186,7 @@ const extras = ((review && review.facts) || []).filter(function (f) {
           <% if (d.vague && d.vague.length) { %>
             <h4>Too vague to be useful</h4>
             <ul class="meta-list">
-              <% d.vague.forEach(function (v) { %><li><strong><%= v.factKey %></strong> — <%= v.problem %></li><% }) %>
+              <% d.vague.forEach(function (v) { %><li><strong><%= v.factKey %></strong> - <%= v.problem %></li><% }) %>
             </ul>
           <% } %>
         <% } %>
@@ -204,7 +204,7 @@ const extras = ((review && review.facts) || []).filter(function (f) {
           <strong>The content map is built from the sitemap, not from Search Console.</strong>
           It used to be the top pages by clicks over 90 days, and that was wrong for what this file is for in two
           ways. <em>Coverage:</em> Search Console only knows the pages Google has already shown, so a new section,
-          a page that has never ranked, and every page on a site with no GSC history were all absent — and a
+          a page that has never ranked, and every page on a site with no GSC history were all absent - and a
           retrieval system reading the file concluded they did not exist. <em>Structure:</em> a flat
           "most-visited pages" list expresses no architecture, whereas the sitemap's own URL paths are the site's
           declared sections. Search Console is still used, but only to ORDER pages within each section and to

@@ -1,4 +1,4 @@
-// THE AI SEO SUITE — routes
+// THE AI SEO SUITE - routes
 //
 // Nine analyses, one router. They share a shape: a form page listing past
 // runs, a POST that launches one in the background, a result page that polls
@@ -6,8 +6,8 @@
 // tasks, export JSON, delete, re-run). That shape is built once in
 // `feature()` below rather than nine times.
 //
-// Features with genuinely extra surface — competitor management, brand facts
-// and llms.txt, the metric series behind the tracking board — add their own
+// Features with genuinely extra surface - competitor management, brand facts
+// and llms.txt, the metric series behind the tracking board - add their own
 // routes on top.
 const express = require('express');
 const db = require('../db');
@@ -159,7 +159,7 @@ function feature({
     if (needsBrand && !brand) {
       return fail(brands.length
         ? 'Choose which brand to analyse.'
-        : 'Add a brand first — these analyses run against a brand\'s site.');
+        : 'Add a brand first - these analyses run against a brand\'s site.');
     }
 
     let args;
@@ -199,7 +199,7 @@ function feature({
       const brands = brandsFor(userId);
       if (hydrate && run.status === 'completed' && run.result) {
         // A hydration failure must never take down the report it was meant to
-        // improve — the stored run is still perfectly renderable without it.
+        // improve - the stored run is still perfectly renderable without it.
         try { hydrate(run); } catch (err) { console.error(`[aiseo] hydrate ${kind} failed:`, err.message); }
       }
       res.render(resultView, {
@@ -239,7 +239,7 @@ function feature({
       return res.redirect(`${req.baseUrl}${base}/${run.id}?msg=${encodeURIComponent(
         r.created
           ? `${r.created} task${r.created === 1 ? '' : 's'} created.`
-          : 'No new tasks — every actionable finding here already has one.',
+          : 'No new tasks - every actionable finding here already has one.',
       )}`);
     } catch (err) {
       return res.redirect(`${req.baseUrl}${base}/${run.id}?error=${encodeURIComponent(`Could not create tasks: ${err.message}`)}`);
@@ -290,7 +290,7 @@ feature({
   navKey: 'research',
   // Fills in difficulties scored by the background job since this run
   // finished. Without it, a run would show the dozen keywords it could afford
-  // to score inline and nothing else, forever — even once the backfill had
+  // to score inline and nothing else, forever - even once the backfill had
   // scored every remaining keyword. Read-only, from the cache; it never
   // rewrites the stored run.
   hydrate: (run) => {
@@ -361,8 +361,8 @@ feature({
   }),
 });
 
-// Saves the brand's seed topics from the research form, so the next run — and
-// the scheduled one — has something to expand from without retyping.
+// Saves the brand's seed topics from the research form, so the next run - and
+// the scheduled one - has something to expand from without retyping.
 router.post('/research/seeds', (req, res) => {
   if (!requireWrite(req, res)) return;
   const brand = db.prepare('SELECT * FROM brands WHERE id=? AND user_id=?').get(req.body.brand_id, req.dataUserId);
@@ -387,7 +387,7 @@ feature({
     const draft = String(req.body.draft || '').trim();
     if (!url && !draft) throw new Error('Give a URL to score, or paste a draft.');
     const keyword = String(req.body.keyword || '').trim();
-    if (!keyword) throw new Error('Give the target term this page is meant to rank for — the score is relative to it.');
+    if (!keyword) throw new Error('Give the target term this page is meant to rank for - the score is relative to it.');
     return {
       url: url || null,
       draftHtml: draft || null,
@@ -489,7 +489,7 @@ router.get('/brand-hub/llms.txt', async (req, res, next) => {
     if (!brand) return res.status(404).type('text/plain').send('Brand not found.\n');
     const facts = db.prepare('SELECT * FROM brand_facts WHERE brand_id=? ORDER BY sort_order, fact_key').all(brand.id);
     // The content map is now read from the site's sitemap, which is a network
-    // call — hence the async handler. `gsc=0` renders the file without using
+    // call - hence the async handler. `gsc=0` renders the file without using
     // Search Console to order pages within each section, which is what a
     // reviewer wants when checking that coverage is complete rather than
     // traffic-weighted.
@@ -562,8 +562,8 @@ feature({
 // -------------------------------------- 4b. AI readiness, WHOLE SITE
 //
 // A separate feature rather than a flag on /readiness. The two answer different
-// questions — "can an AI fetcher read THIS page" against the eight-point
-// checklist for the whole property — and their result pages share almost
+// questions - "can an AI fetcher read THIS page" against the eight-point
+// checklist for the whole property - and their result pages share almost
 // nothing, so folding them together would mean one template with two disjoint
 // halves and a run of one rendering as the other.
 feature({
@@ -614,7 +614,7 @@ feature({
       minRelevance: Math.min(0.6, Math.max(0.01, parseFloat(req.body.min_relevance) || 0.08)),
       // Anchor phrases the practitioner wants used, in addition to the ones
       // read off the target page. Still only offered where they appear verbatim
-      // in a source page — a supplied phrase is not licence to invent one.
+      // in a source page - a supplied phrase is not licence to invent one.
       extraPhrases: String(req.body.extra_phrases || '')
         .split(/[\n;]+/).map((x) => x.trim()).filter((x) => x.length > 3).slice(0, 12),
     };
@@ -626,7 +626,7 @@ feature({
 });
 
 // A CSV of the opportunity rows, in exactly the three columns asked for plus
-// the sentence — because the anchor is unusable without knowing where it is.
+// the sentence - because the anchor is unusable without knowing where it is.
 router.get('/link-opportunities/:id/csv', (req, res) => {
   const run = store.get(req.params.id, req.dataUserId);
   if (!run || run.kind !== 'link_opportunities') return res.status(404).type('text/plain').send('Run not found.\n');
@@ -686,7 +686,7 @@ feature({
 // The answer side of keyword research. ./research.js produces the questions
 // people put to an assistant; this checks who is actually in the retrieval
 // pool for them, which is the population a grounded assistant draws its
-// citations from. Deliberately NOT presented as a citation rate — see the
+// citations from. Deliberately NOT presented as a citation rate - see the
 // header of lib/aiseo/promptCitations.js for what is and is not knowable
 // without a citation-tracking credential.
 feature({
@@ -779,7 +779,7 @@ router.post('/competitors/add', (req, res) => {
     if (!lines.length) return res.redirect(`${back}&error=${encodeURIComponent('Enter at least one domain.')}`);
     let added = 0;
     lines.slice(0, 20).forEach((line) => {
-      // "example.com | Their label" — the label is optional.
+      // "example.com | Their label" - the label is optional.
       const [domain, label] = line.split('|').map((s) => s.trim());
       competitive.add({ userId, brandId: brand.id, domain, label: label || null });
       added += 1;
@@ -878,7 +878,7 @@ router.post('/freshness/:id/schedule', (req, res) => {
   res.redirect(`${req.baseUrl}/freshness/${run.id}?msg=${encodeURIComponent(
     r.created
       ? `${r.created} refresh task${r.created === 1 ? '' : 's'} scheduled at ${capacity} per week.`
-      : `No new tasks — all ${r.scheduled} flagged page(s) already have one.`,
+      : `No new tasks - all ${r.scheduled} flagged page(s) already have one.`,
   )}`);
 });
 

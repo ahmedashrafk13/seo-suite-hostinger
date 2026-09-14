@@ -46,7 +46,7 @@ const VERDICTS = {
     <div class="stat">
       <div class="label">Stale</div>
       <div class="value"><%= r.counts.stale %></div>
-      <div class="meta"><%= r.counts.oldButHealthy %> old but still growing — deliberately not flagged</div>
+      <div class="meta"><%= r.counts.oldButHealthy %> old but still growing - deliberately not flagged</div>
     </div>
   </div>
 
@@ -67,7 +67,7 @@ const VERDICTS = {
       <div class="notice-body">
         <strong>Sitemap dates are unusable for this site:</strong> <%= r.lastmod.reason %>.
         Ages below therefore come from each page's own schema, <code>&lt;time&gt;</code> element or visible
-        "last updated" line, and are reported as unknown where none exists — rather than being treated as recent.
+        "last updated" line, and are reported as unknown where none exists - rather than being treated as recent.
       </div>
     </div>
   <% } %>
@@ -80,7 +80,7 @@ const VERDICTS = {
     <div class="card-body">
       <form method="POST" action="/ai-seo/freshness/<%= run.id %>/schedule"><%- csrfField %>
         <p class="hint mt-0">
-          Creates one dated task per flagged page — drift first, then decay, then age, and within each by the
+          Creates one dated task per flagged page - drift first, then decay, then age, and within each by the
           impressions at stake. Due dates are staggered by your weekly capacity, because twelve tasks all due
           the same day is the same as none of them having a due date.
         </p>
@@ -124,7 +124,7 @@ const VERDICTS = {
                     <%= p.decay.relativeClickChange > 0 ? '+' : '' %><%= p.decay.relativeClickChange %>pp
                   </span>
                   <div class="muted" style="font-size:11px">page <%= p.decay.clickChange %>% / site <%= p.decay.siteClickChange %>%</div>
-                <% } else { %>—<% } %>
+                <% } else { %> - <% } %>
               </td>
               <td>
                 <% if (p.drift && p.drift.measurable && p.drift.divergence != null) { %>
@@ -134,13 +134,13 @@ const VERDICTS = {
                   <% } %>
                 <% } else if (p.drift) { %>
                   <span class="muted" title="<%= p.drift.reason || '' %>">n/a</span>
-                <% } else { %>—<% } %>
+                <% } else { %> - <% } %>
               </td>
               <td>
-                <%= p.ageDays == null ? '—' : p.ageDays + 'd' %>
+                <%= p.ageDays == null ? ' - ' : p.ageDays + 'd' %>
                 <% if (p.dateSource) { %><div class="muted" style="font-size:11px"><%= p.dateSource %></div><% } %>
               </td>
-              <td><%= p.citability == null ? '—' : p.citability %></td>
+              <td><%= p.citability == null ? ' - ' : p.citability %></td>
             </tr>
           <% }) %>
           </tbody>
@@ -226,7 +226,7 @@ const VERDICTS = {
         </div>
       <% }) %>
       <p class="hint" style="margin-bottom:0">
-        Compare the two query lists before editing — together they name the new question precisely, which is
+        Compare the two query lists before editing - together they name the new question precisely, which is
         more useful than any summary of them. Re-angle rather than rewrite: the subject is still right.
       </p>
     </div>

@@ -1,13 +1,13 @@
-// INTERNAL LINK OPPORTUNITIES — the run wrapper around ./linkFinder.js.
+// INTERNAL LINK OPPORTUNITIES - the run wrapper around ./linkFinder.js.
 //
 // ./linkFinder.js is pure: give it a URL, it returns rows. This is the thin
-// layer that makes it one of the suite's nine features — it opens a run row,
+// layer that makes it one of the suite's nine features - it opens a run row,
 // stores the result, raises the findings, and bridges to the task backlog, so
 // the shared `feature()` router in src/routes/aiseo.js can serve it with no
 // special-casing.
 //
-// Kept separate from linkFinder.js so the finder stays callable from anywhere —
-// the architecture report calls it with a crawl it already has — without
+// Kept separate from linkFinder.js so the finder stays callable from anywhere - 
+// the architecture report calls it with a crawl it already has - without
 // dragging in the database.
 const store = require('./store');
 const providers = require('./providers');
@@ -64,7 +64,7 @@ async function run({
         title: `${found.rows.length} page${found.rows.length === 1 ? '' : 's'} could link to this URL using a phrase already in their own copy`,
         detail: `Top by relevance: ${found.rows.slice(0, 5).map((r) => `${r.sourceUrl} → anchor "${r.anchorText}"`).join('; ')}. `
           + `${found.alreadyLinking.length} page${found.alreadyLinking.length === 1 ? '' : 's'} already link here. `
-          + 'Every anchor listed is a verbatim substring of the source page\'s own editorial text, with the sentence it sits in — so implementing a row is wrapping an existing phrase, not writing a new one.',
+          + 'Every anchor listed is a verbatim substring of the source page\'s own editorial text, with the sentence it sits in - so implementing a row is wrapping an existing phrase, not writing a new one.',
         severity: found.alreadyLinking.length === 0 ? 'high' : 'medium',
         affectedUrl: target,
         affectedCount: found.rows.length,
@@ -81,7 +81,7 @@ async function run({
         detail: `${found.crawl.usable} page${found.crawl.usable === 1 ? '' : 's'} were crawled from ${found.crawl.startUrl} and none of them link to ${target}. `
           + (found.crawl.complete
             ? 'The crawl completed, so this is an orphan rather than a page the crawl did not reach.'
-            : `The crawl stopped at its ${found.crawl.maxPages}-page cap before exhausting the site, so a linking page may exist beyond it — raise the cap to be certain.`),
+            : `The crawl stopped at its ${found.crawl.maxPages}-page cap before exhausting the site, so a linking page may exist beyond it - raise the cap to be certain.`),
         severity: found.crawl.complete ? 'high' : 'medium',
         affectedUrl: target,
         action: 'An orphan page depends entirely on the sitemap for discovery and receives no internal authority. Add at least two links from the rows below.',
@@ -95,7 +95,7 @@ async function run({
         checkKey: 'relevant_no_anchor',
         title: `${found.relevantWithoutAnchor.length} relevant pages carry no usable anchor phrase`,
         detail: `These pages are topically close to the target but none of the target's own phrases appear verbatim in their editorial content: ${found.relevantWithoutAnchor.slice(0, 6).map((r) => r.sourceUrl).join(', ')}. `
-          + 'They are listed separately rather than mixed into the recommendations, because linking from them means writing a new sentence — a content task, not a linking task.',
+          + 'They are listed separately rather than mixed into the recommendations, because linking from them means writing a new sentence - a content task, not a linking task.',
         severity: 'low',
         affectedUrl: found.relevantWithoutAnchor[0].sourceUrl,
         affectedCount: found.relevantWithoutAnchor.length,

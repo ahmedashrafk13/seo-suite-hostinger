@@ -10,16 +10,16 @@
 // It is NOT used for measurement. Scores, similarities, densities, drift and
 // counts are computed in ./nlp.js, deterministically. This split is not
 // stylistic:
-//   - A score that changes when nothing changed cannot be explained to a
+//  - A score that changes when nothing changed cannot be explained to a
 //     client, and cannot be alerted on.
-//   - A cron job that measures with a paid model burns the spend cap on the
+//  - A cron job that measures with a paid model burns the spend cap on the
 //     least valuable work in the system.
-//   - Every one of these features must still work with no AI configured. If
+//  - Every one of these features must still work with no AI configured. If
 //     measurement lived here, they would all return nothing.
 //
 // Every call goes through lib/ai/azureClient.js, which enforces the hard spend
 // cap BEFORE any HTTP request, and through the cache in ./store.js, which is
-// keyed on a hash of the meaningful inputs — so reopening a page never
+// keyed on a hash of the meaningful inputs - so reopening a page never
 // re-bills, and re-running an unchanged analysis costs nothing.
 const azure = require('../ai/azureClient');
 const budget = require('../ai/budget');
@@ -32,7 +32,7 @@ function available() {
 
 // Runs a prompt, or returns the cached answer for identical inputs.
 //
-// `force` re-asks and overwrites the cache — needed because a user who has
+// `force` re-asks and overwrites the cache - needed because a user who has
 // edited the page and wants a fresh opinion would otherwise be shown the old
 // one forever when the hashed inputs happen not to have changed (they hash the
 // analysis inputs, not the whole page).
@@ -56,7 +56,7 @@ async function ask({
       promptTokens: r.promptTokens, completionTokens: r.completionTokens,
     };
   } catch (err) {
-    // A budget refusal is a normal, expected state, not a bug — it is
+    // A budget refusal is a normal, expected state, not a bug - it is
     // reported as such so the page says "cap reached" rather than "error".
     return {
       ok: false,
@@ -69,11 +69,11 @@ async function ask({
 
 // A house style every prompt inherits. The rules exist because each one was a
 // failure mode worth designing out:
-//   - JSON only: the caller parses it.
-//   - No invented metrics: a model asked about keywords will happily produce
+//  - JSON only: the caller parses it.
+//  - No invented metrics: a model asked about keywords will happily produce
 //     "search volume: 2,400", and that number would then be rendered in a
 //     client report as though it were measured.
-//   - Say when unsure: an empty array is a usable answer; a confident
+//  - Say when unsure: an empty array is a usable answer; a confident
 //     fabrication is not.
 const HOUSE_RULES = `
 You are an SEO and AI-search analyst working inside a reporting tool.
@@ -93,8 +93,8 @@ Rules you must follow:
 // ------------------------------------------------- 1. prompt research
 //
 // The thing traditional keyword tools cannot give you: the sentences people
-// type into an AI assistant. They differ from search queries in shape — full
-// questions, constraints, comparisons, and a stated situation — so they cannot
+// type into an AI assistant. They differ from search queries in shape - full
+// questions, constraints, comparisons, and a stated situation - so they cannot
 // be derived from a keyword list by transformation, only written.
 async function promptResearch({ brandId, brand, topics, keywords, vertical, force = false }) {
   const inputs = { topics, keywords: keywords.slice(0, 60), vertical, site: brand && brand.site_url };
@@ -136,7 +136,7 @@ Shape:
 // ------------------------------------------------ 2. on-page edit suggestions
 //
 // The model sees the MEASURED gaps, not the raw page. That keeps the token
-// cost bounded on a long page and — more importantly — keeps the suggestions
+// cost bounded on a long page and - more importantly - keeps the suggestions
 // anchored to something checkable, instead of a free-form rewrite nobody can
 // diff against the original.
 async function onPageEdits({ brandId, targetKeyword, doc, gaps, citabilityInfo, competitorHeadings, force = false }) {
@@ -218,7 +218,7 @@ async function schemaDraft({
 Your task: decide which Schema.org types genuinely fit this page, and draft the
 JSON-LD for them.
 
-Hard constraints — a violation here produces markup that earns a manual action:
+Hard constraints - a violation here produces markup that earns a manual action:
 - Mark up ONLY what is visibly on the page. If the page has no FAQ, do not
   return FAQPage. If it has no prices, do not return Offer.
 - Never fabricate a rating, review count, price, availability, author name or
@@ -227,7 +227,7 @@ Hard constraints — a violation here produces markup that earns a manual action
 - The page type has ALREADY BEEN DECIDED by a deterministic classifier and is
   given to you as pageTypeVerdict. Do not re-litigate it. Types listed in
   pageTypeVerdict.forbidden must NOT appear in "recommended" under any
-  circumstances — put them in "rejected" and quote the stated reason. This
+  circumstances - put them in "rejected" and quote the stated reason. This
   constraint exists because models reliably reach for Product on anything with
   a price, and Product on a service page is the exact failure this check is for.
 - Where pageTypeVerdict.confident is false, say so in your reasoning and
@@ -273,7 +273,7 @@ what its named competitors publish, and turn it into a prioritised plan.
 
 For each gap say what to build, why it is worth building for THIS brand, and
 what would make the brand's version the citable one rather than a copy. Where
-the right answer is "do not compete on this", say so — a gap that exists
+the right answer is "do not compete on this", say so - a gap that exists
 because a competitor is a marketplace with 40,000 pages is not an opportunity.
 
 Shape:
@@ -295,7 +295,7 @@ Shape:
 //
 // Lexicon sentiment classifies everything (cheap, deterministic). This is
 // asked only about the items the lexicon flagged as carrying a damaging
-// claim — the small set where the distinction between "an angry opinion" and
+// claim - the small set where the distinction between "an angry opinion" and
 // "a false factual assertion an AI engine will repeat" actually matters, and
 // where the response differs completely.
 async function mentionTriage({ brandId, brand, mentions, force = false }) {
@@ -338,8 +338,8 @@ Shape:
 // --------------------------------------------- 6. intent-drift interpretation
 //
 // The divergence number comes from nlp.jensenShannon. What a shift in the
-// query mix MEANS for the page — and whether the fix is a rewrite, a split, or
-// nothing — is the judgement call.
+// query mix MEANS for the page - and whether the fix is a rewrite, a split, or
+// nothing - is the judgement call.
 //
 // Batched across every drifted page in one call rather than one call per
 // page: the earlier per-page loop resent the full system prompt (~250-300
@@ -347,9 +347,9 @@ Shape:
 // paid for that overhead 6 times to get 6 independent judgements that fit
 // comfortably in a single request. Caching stays per-page (each page keeps
 // its own input hash and its own cache row), so a re-run where only one of
-// six pages actually changed still re-asks about just that one page — this
+// six pages actually changed still re-asks about just that one page - this
 // only collapses the *uncached* pages into one request instead of N.
-// `item.page` is the page URL (a plain string) — the identifier used both to
+// `item.page` is the page URL (a plain string) - the identifier used both to
 // key the per-page cache and to match the model's per-page answer back to
 // its request.
 function intentDriftInputs(item) {
@@ -391,7 +391,7 @@ Distinguish three cases, because the response differs completely:
   (e.g. research became comparison). Re-angle the existing page.
 - "topic-split": the page is now catching two distinct needs. Split it.
 
-Return one verdict per page, in the same order, identified by its "page" URL —
+Return one verdict per page, in the same order, identified by its "page" URL - 
 judge each page independently of the others.
 
 Shape:
@@ -487,8 +487,8 @@ Shape:
 // ---------------------------------------- 8. llms.txt / brand-hub fact review
 //
 // A brand hub is only useful if it is TRUE and complete. The model checks the
-// declared facts for the things that make an AI engine distrust a page —
-// vagueness, unverifiable superlatives, missing basics — rather than writing
+// declared facts for the things that make an AI engine distrust a page - 
+// vagueness, unverifiable superlatives, missing basics - rather than writing
 // the facts, which must come from the business.
 async function brandHubReview({ brandId, brand, facts, force = false }) {
   return ask({
@@ -499,7 +499,7 @@ async function brandHubReview({ brandId, brand, facts, force = false }) {
     maxTokens: 1200,
     systemPrompt: `${HOUSE_RULES}
 
-Your task: review a brand's declared canonical facts — the set an AI engine
+Your task: review a brand's declared canonical facts - the set an AI engine
 would read to answer "what is this company, and can I trust it".
 
 Report:

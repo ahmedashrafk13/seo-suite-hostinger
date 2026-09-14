@@ -1,6 +1,6 @@
 // 2. ON-PAGE OPTIMISATION AND REAL-TIME SCORING
 //
-// Scores a page — live URL or pasted draft — against the pages it actually
+// Scores a page - live URL or pasted draft - against the pages it actually
 // competes with, on the four things that decide whether it ranks AND whether
 // an AI answer engine can quote it:
 //
@@ -12,7 +12,7 @@
 // HOW THE COMPETITOR SET IS OBTAINED, AND WHY IT IS HONEST
 // A "top-ranking pages" comparison needs a SERP. There is no SERP API
 // credential in this deployment, and scraping Google's result page is both
-// unreliable and against its terms — a comparison built on a blocked or
+// unreliable and against its terms - a comparison built on a blocked or
 // captcha'd scrape silently degrades to comparing against nothing, which is
 // worse than not offering the feature.
 //
@@ -27,7 +27,7 @@
 //      Wired as an adapter (see ./providers.js) and used automatically when
 //      present.
 //
-// The score is never presented as "you will rank" — it is presented as
+// The score is never presented as "you will rank" - it is presented as
 // coverage relative to the named comparison set, which is what it measures.
 const db = require('../../db');
 const nlp = require('./nlp');
@@ -103,8 +103,8 @@ async function discoverCompetitorPages(brandId, keyword, { limit = 4, perDomain 
 // The key design decision is "agrees on". Comparing against the UNION of
 // competitor terms punishes a page for every idiosyncratic word any one
 // competitor happens to use. Comparing against terms that appear on at least
-// half of them isolates the shared subject matter — the things a page about
-// this topic is expected to discuss — and that is a gap worth reporting.
+// half of them isolates the shared subject matter - the things a page about
+// this topic is expected to discuss - and that is a gap worth reporting.
 function semanticCoverage(doc, competitorDocs, {
   ourText = null, theirTexts = null, noiseOpts = null,
 } = {}) {
@@ -113,8 +113,8 @@ function semanticCoverage(doc, competitorDocs, {
   }
   // Boilerplate-stripped text where the caller supplied it. Without this, the
   // "consensus vocabulary" of four competitor pages is dominated by the words
-  // every one of their templates repeats — their nav labels, their footer, the
-  // words "privacy policy" — and the page under review is then marked down for
+  // every one of their templates repeats - their nav labels, their footer, the
+  // words "privacy policy" - and the page under review is then marked down for
   // not carrying a competitor's navigation.
   const theirs = (theirTexts && theirTexts.length === competitorDocs.length)
     ? theirTexts
@@ -195,7 +195,7 @@ function entityGap(doc, competitorDocs, {
   // THE FILTER THAT STOPS THE BAD RECOMMENDATIONS.
   //
   // A competitor's own brand name is, by construction, the entity most likely
-  // to appear on their pages and not on ours — so before this filter the top of
+  // to appear on their pages and not on ours - so before this filter the top of
   // every entity-gap list was the competitors' brands, and the report was
   // literally advising the client to write about their rivals. Generic button
   // and section labels ("Learn More", "Why Choose Us", "Office Headquarters")
@@ -216,7 +216,7 @@ function entityGap(doc, competitorDocs, {
   };
 }
 
-// Headings the comparison set covers and this page does not — the fastest read
+// Headings the comparison set covers and this page does not - the fastest read
 // on a structural content gap, and the one a writer can act on directly.
 function headingGap(doc, competitorDocs) {
   const norm = (h) => nlp.contentWords(h).map(nlp.stem).join(' ');
@@ -244,7 +244,7 @@ function headingGap(doc, competitorDocs) {
     .slice(0, 20);
 }
 
-// Keyword placement — the deterministic on-page basics, kept because they
+// Keyword placement - the deterministic on-page basics, kept because they
 // still matter and are the cheapest thing to get wrong.
 function placement(doc, keyword) {
   const kwWords = nlp.contentWords(keyword).map(nlp.stem);
@@ -273,7 +273,7 @@ function placement(doc, keyword) {
 // two the comparison set gives real evidence for; placement is cheap to fix and
 // therefore worth little credit; readability is capped so a page cannot score
 // well purely by being simple. When there is no comparison set, coverage is
-// EXCLUDED and the weights renormalise — a score computed against nothing must
+// EXCLUDED and the weights renormalise - a score computed against nothing must
 // not silently report 0% coverage as a failure.
 function compositeScore({
   coverage, readability, entity, citabilityInfo, placementInfo,
@@ -316,7 +316,7 @@ function compositeScore({
   parts.push({ key: 'placement', weight: 10, value: placementHits / 5, label: 'Target-term placement' });
 
   // Heading structure. Weighted at 10 because it is cheap to fix and decides
-  // whether a retrieval system can attribute a passage to a question at all —
+  // whether a retrieval system can attribute a passage to a question at all - 
   // the same reason citability carries weight.
   if (headingInfo) {
     parts.push({
@@ -328,7 +328,7 @@ function compositeScore({
   }
 
   // Over-optimisation. A PENALTY rather than a scored dimension, because
-  // "not stuffed" is the normal state and does not deserve credit — a page
+  // "not stuffed" is the normal state and does not deserve credit - a page
   // should not be able to raise its score by having no keyword problems. The
   // deduction is applied after the weighted sum, and stated.
   let penalty = 0;
@@ -390,7 +390,7 @@ async function run({
     if (draftHtml) {
       // A draft is scored exactly like a live page. Wrapping bare text in
       // markup would fake a structure the draft does not have and inflate the
-      // citability score — so a draft with no HTML is parsed as-is and its
+      // citability score - so a draft with no HTML is parsed as-is and its
       // structural signals come out low, correctly.
       doc = parseDocument(url ? normalizeUrl(url) : 'draft://local', draftHtml);
     } else {
@@ -459,7 +459,7 @@ async function run({
     //
     // Before this, readability, entity density, keyword density and semantic
     // coverage were computed over whatever fetcher.parseDocument chose as the
-    // main region — and where no container held enough of the page's text, that
+    // main region - and where no container held enough of the page's text, that
     // is <body>: the navigation, the cookie banner, the footer link farm and
     // the social row included. On a short page those are most of the words, so
     // every one of those numbers was measuring the template. See
@@ -495,7 +495,7 @@ async function run({
       boilerplateBlocks: templateBlocks.usable ? templateBlocks.blocks : null,
     };
 
-    // Measurements — all local, all deterministic.
+    // Measurements - all local, all deterministic.
     const coverage = semanticCoverage(doc, competitorDocs, {
       ourText: cleanText, theirTexts: theirCleanTexts, noiseOpts,
     });
@@ -515,8 +515,8 @@ async function run({
       keyword: keyword || '', headings: doc.headings,
     });
 
-    // What kind of page this is. Reported rather than acted on here — the
-    // schema feature is where it drives generation — because a practitioner
+    // What kind of page this is. Reported rather than acted on here - the
+    // schema feature is where it drives generation - because a practitioner
     // scoring a page wants to know whether the tool understood what it was
     // looking at.
     const classified = pageTypeLib.classify(doc, { brand });
@@ -584,7 +584,7 @@ async function run({
         severity: coverage.pct < 40 ? 'high' : 'medium',
         affectedUrl: target,
         affectedCount: coverage.missing.length,
-        action: 'Add substantive coverage of the missing subjects — not the words. Terms added without the underlying explanation raise this number and change nothing else.',
+        action: 'Add substantive coverage of the missing subjects - not the words. Terms added without the underlying explanation raise this number and change nothing else.',
         evidence: { missing: coverage.missing.slice(0, 60), basis: coverage.basis, comparedWith: competitorFetches.filter((c) => c.ok).map((c) => c.url) },
         dedupeKey: `onpage:coverage:${target}`,
       });
@@ -598,12 +598,12 @@ async function run({
       }, headingInfo.issues[0]);
       findings.push({
         checkKey: 'heading_hierarchy',
-        title: `Heading structure scores ${headingInfo.score}/100 — ${headingInfo.issues.length} issue${headingInfo.issues.length === 1 ? '' : 's'}`,
+        title: `Heading structure scores ${headingInfo.score}/100 - ${headingInfo.issues.length} issue${headingInfo.issues.length === 1 ? '' : 's'}`,
         detail: headingInfo.issues.map((i) => i.message).join(' '),
         severity: worst.severity,
         affectedUrl: target,
         affectedCount: headingInfo.issues.length,
-        action: 'Fix the outline before rewriting any copy. A retrieval system chunks a page by its heading tree, so a skipped level or a second H1 changes which passage it believes answers which question — and the same defect fails WCAG 1.3.1 for screen-reader users.',
+        action: 'Fix the outline before rewriting any copy. A retrieval system chunks a page by its heading tree, so a skipped level or a second H1 changes which passage it believes answers which question - and the same defect fails WCAG 1.3.1 for screen-reader users.',
         evidence: {
           score: headingInfo.score,
           issues: headingInfo.issues,
@@ -624,8 +624,8 @@ async function run({
       findings.push({
         checkKey: 'over_optimisation',
         title: `${real.length} repetition problem${real.length === 1 ? '' : 's'} in the body content`
-          + (stuffingInfo.target ? ` — target term at ${stuffingInfo.target.densityPct}% density` : ''),
-        detail: `${real.map((i) => i.message).join(' ')} Measured over ${stuffingInfo.words} words of content AFTER the navigation, header, footer, social links and repeated pricing labels were excluded — so none of this is a template artefact.`,
+          + (stuffingInfo.target ? ` - target term at ${stuffingInfo.target.densityPct}% density` : ''),
+        detail: `${real.map((i) => i.message).join(' ')} Measured over ${stuffingInfo.words} words of content AFTER the navigation, header, footer, social links and repeated pricing labels were excluded - so none of this is a template artefact.`,
         severity: worst.severity,
         affectedUrl: target,
         affectedCount: real.length,
@@ -649,7 +649,7 @@ async function run({
         detail: clean.reason,
         severity: 'info',
         affectedUrl: target,
-        action: 'Wrap the page\'s own content in a <main> or <article> element. Every content metric on this report — readability, entity density, keyword density, semantic coverage — is currently measured over the navigation and footer as well, which moves all of them.',
+        action: 'Wrap the page\'s own content in a <main> or <article> element. Every content metric on this report - readability, entity density, keyword density, semantic coverage - is currently measured over the navigation and footer as well, which moves all of them.',
         evidence: { clean: { fellBack: true, reason: clean.reason, strippedWords: clean.strippedWords }, mainSelector: doc.mainSelector, mainSelectorRejected: doc.mainSelectorRejected },
         dedupeKey: `onpage:contentregion:${target}`,
       });
@@ -661,7 +661,7 @@ async function run({
         title: `${entities.missing.length} entities the comparison pages name and this page does not`,
         detail: entities.missing.slice(0, 12).map((e) => `${e.surface} (${e.documents} of ${competitorDocs.length} pages)`).join('; ')
           + (entities.suppressedCount
-            ? `. ${entities.suppressedCount} further candidate${entities.suppressedCount === 1 ? ' was' : 's were'} excluded as noise rather than reported: ${entities.suppressedSummary.join(', ')} — competitor brand names and generic button or section labels are not content gaps.`
+            ? `. ${entities.suppressedCount} further candidate${entities.suppressedCount === 1 ? ' was' : 's were'} excluded as noise rather than reported: ${entities.suppressedSummary.join(', ')} - competitor brand names and generic button or section labels are not content gaps.`
             : ''),
         severity: 'medium',
         affectedUrl: target,
@@ -684,13 +684,13 @@ async function run({
       const s = citabilityInfo.signals;
       const reasons = [];
       if (s.selfContainedShare < 70) reasons.push(`only ${s.selfContainedShare}% of paragraphs can stand alone (the rest open with "This", "It", "However" and lose their referent when extracted)`);
-      if (!s.hasStructuredBlocks) reasons.push('no lists, tables or definition lists — nothing survives chunking intact');
+      if (!s.hasStructuredBlocks) reasons.push('no lists, tables or definition lists - nothing survives chunking intact');
       if (!s.hasVisibleDate) reasons.push('no visible date or "last updated" marker, so an engine cannot judge currency');
       if (!s.hasSchema) reasons.push('no valid structured data');
       if (s.questionHeadings === 0) reasons.push('no heading is phrased as the question a reader would ask');
       findings.push({
         checkKey: 'low_citability',
-        title: `Citability is ${citabilityInfo.score}/100 — AI answer engines will struggle to quote this page`,
+        title: `Citability is ${citabilityInfo.score}/100 - AI answer engines will struggle to quote this page`,
         detail: reasons.join('; ') || 'Passage structure is not extractable.',
         severity: citabilityInfo.score < 35 ? 'high' : 'medium',
         affectedUrl: target,
@@ -853,7 +853,7 @@ function toTasks(run, brand, { userId }) {
     const r = tasksLib.upsertTask({
       userId,
       brandId: run.brand_id,
-      title: `${f.title} — ${run.target}`,
+      title: `${f.title} - ${run.target}`,
       detail: `${f.detail}\n\nRecommended: ${f.action || ''}`.trim(),
       source: 'aiseo',
       sourceRef: `aiseo:onpage:${run.id}:${f.check_key}`,

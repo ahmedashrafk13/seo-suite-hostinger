@@ -12,15 +12,15 @@
 // same reason, which is why this is also a WCAG 1.3.1 issue.
 //
 // The checks, and the severity each earns:
-//   missing H1          the page states no subject at all — high
-//   multiple H1s        two competing subjects; a retrieval system picks one — medium
-//   skipped level       H2 → H4, or an H5 before any H1 — medium
-//   H1 not first        a heading precedes the page's own title heading — low
+//   missing H1          the page states no subject at all - high
+//   multiple H1s        two competing subjects; a retrieval system picks one - medium
+//   skipped level       H2 → H4, or an H5 before any H1 - medium
+//   H1 not first        a heading precedes the page's own title heading - low
 //   duplicate adjacent  two consecutive headings at the same level with the
 //                       same text, which is nearly always a template bug that
-//                       renders a section title twice — low
+//                       renders a section title twice - low
 //   empty heading       a heading tag with no text: invisible to a reader,
-//                       counted by a parser — low
+//                       counted by a parser - low
 //
 // WHY KEYWORD STUFFING IS MEASURED AS DENSITY *AND* DISTRIBUTION
 // Density alone is a bad test. A 300-word page mentioning its term six times
@@ -40,7 +40,7 @@ function normaliseHeading(text) {
 // Validates the heading tree of a parsed document.
 //
 // `headings` must be in DOCUMENT ORDER, which is what fetcher.parseDocument
-// produces — the order is the whole point, and a sorted list would make every
+// produces - the order is the whole point, and a sorted list would make every
 // skipped-level check pass.
 function hierarchy(doc) {
   const headings = (doc && doc.headings) || [];
@@ -136,7 +136,7 @@ function hierarchy(doc) {
       severity: 'low',
       message: `${duplicates.length} consecutive heading pair${duplicates.length === 1 ? ' repeats' : 's repeat'} the same text at the same level: `
         + duplicates.slice(0, 5).map((d) => `H${d.level} "${d.text}"`).join('; ')
-        + '. Almost always a template rendering a section title twice — once visibly and once for mobile, or once per breakpoint.',
+        + '. Almost always a template rendering a section title twice - once visibly and once for mobile, or once per breakpoint.',
       count: duplicates.length,
       detail: duplicates.slice(0, 20),
     });
@@ -174,7 +174,7 @@ function hierarchy(doc) {
     });
   }
 
-  // Headings whose entire text is UI chrome — "Learn More" as an H3 is a
+  // Headings whose entire text is UI chrome - "Learn More" as an H3 is a
   // structural claim the page does not mean to make.
   const chromeHeadings = nonEmpty.filter((h) => boilerplate.isGenericUi(h.text));
   if (chromeHeadings.length >= 2) {
@@ -219,7 +219,7 @@ function hierarchy(doc) {
 // reading requires, and blocks of the same text duplicated on a page. Both are
 // countable.
 //
-// `text` should be the BOILERPLATE-STRIPPED content text — otherwise a footer
+// `text` should be the BOILERPLATE-STRIPPED content text - otherwise a footer
 // repeating the brand name on every page reads as stuffing. That is the caller's
 // responsibility and ./onpage.js passes the cleaned text.
 const NATURAL_DENSITY_CEILING = 2.8; // per cent, for an exact target term
@@ -231,11 +231,11 @@ function stuffing(text, { keyword = '', headings = [], minWords = 120 } = {}) {
   if (total < minWords) {
     // The same SHAPE as the measured return, with empty collections rather than
     // missing keys. A caller that reads `.duplicatedSentences.length` must not
-    // have to know which branch produced the object — the two returns differing
+    // have to know which branch produced the object - the two returns differing
     // in shape is how a view ends up throwing on a short page.
     return {
       measurable: false,
-      reason: `only ${total} words of body content after boilerplate was excluded — density is meaningless below ${minWords} and is not reported`,
+      reason: `only ${total} words of body content after boilerplate was excluded - density is meaningless below ${minWords} and is not reported`,
       words: total,
       target: null,
       overUsedPhrases: [],
@@ -305,10 +305,10 @@ function stuffing(text, { keyword = '', headings = [], minWords = 120 } = {}) {
       issues.push({
         key: 'target_density',
         severity: density > NATURAL_DENSITY_CEILING * 1.8 ? 'high' : 'medium',
-        message: `"${kw}" appears ${exact} times in ${total} words of body content — ${target.densityPct}% density, against a natural ceiling of ${NATURAL_DENSITY_CEILING}%. `
+        message: `"${kw}" appears ${exact} times in ${total} words of body content - ${target.densityPct}% density, against a natural ceiling of ${NATURAL_DENSITY_CEILING}%. `
           + (clustered
             ? `${heaviestPair} of those ${exact} occurrences sit in one fifth of the page, which is what distinguishes stuffing from a page that is simply about the subject.`
-            : 'Spread evenly, so this reads as over-use rather than a stuffed block — but it is still above what prose requires.'),
+            : 'Spread evenly, so this reads as over-use rather than a stuffed block - but it is still above what prose requires.'),
         action: 'Replace the surplus occurrences with pronouns and near-synonyms. Search engines resolve those; the reader prefers them.',
       });
     } else if (clustered) {
@@ -324,7 +324,7 @@ function stuffing(text, { keyword = '', headings = [], minWords = 120 } = {}) {
       issues.push({
         key: 'target_absent',
         severity: 'medium',
-        message: `"${kw}" does not appear as an exact phrase anywhere in the body content. That is not automatically wrong — the page may cover the subject in other words — but it should be deliberate.`,
+        message: `"${kw}" does not appear as an exact phrase anywhere in the body content. That is not automatically wrong - the page may cover the subject in other words - but it should be deliberate.`,
         action: 'Either work the phrase in once, naturally, or accept that this page is targeting a different phrasing and score it against that instead.',
       });
     }

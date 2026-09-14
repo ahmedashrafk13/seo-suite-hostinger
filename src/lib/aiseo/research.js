@@ -9,13 +9,13 @@
 // the queries this exact site was actually shown for, with real impressions
 // and real positions. Those are measurements, not estimates. They are extended
 // with Google's own autocomplete, which is a free, keyless view of what Google
-// believes people are searching — the same source every "keyword idea" tool
+// believes people are searching - the same source every "keyword idea" tool
 // starts from.
 //
 // The second problem is new and no keyword tool answers it: the PROMPTS people
 // type into ChatGPT, Perplexity and Gemini. Those are not queries. They are
 // whole sentences that state a situation and ask for a judgement, and they
-// cannot be derived from a keyword list by adding modifiers — they have to be
+// cannot be derived from a keyword list by adding modifiers - they have to be
 // written by something that knows how people talk to assistants. That is the
 // one job the model is given here.
 //
@@ -43,9 +43,9 @@
 //
 // KEYWORD DIFFICULTY, AND WHY IT IS CALLED A PROXY
 // A vendor KD is used where a credential provides one. Otherwise a difficulty
-// is COMPUTED from a keyless sample of a non-Google result page — how much of
+// is COMPUTED from a keyless sample of a non-Google result page - how much of
 // the top ten is on a named high-authority domain, how many titles carry the
-// exact phrase, how many results are homepages, how much of it is Reddit — with
+// exact phrase, how many results are homepages, how much of it is Reddit - with
 // the formula and every component shown. That is a real competition signal. It
 // is labelled "proxy" in every view and is never presented as Ahrefs KD.
 //
@@ -106,7 +106,7 @@ async function suggest(term, { hl = 'en', gl = null, market = null } = {}) {
 //
 // Rate-limited deliberately. Google answers this endpoint generously but not
 // infinitely, and a research run that fires 400 concurrent requests gets an
-// empty result set for the second half — which looks like "no ideas found"
+// empty result set for the second half - which looks like "no ideas found"
 // rather than "throttled". Two at a time with a pause is slower and complete.
 // The alphabet sweep: "<seed> a", "<seed> b" … Google completes each prefix
 // differently, and this is where the long-tail phrasings a modifier list cannot
@@ -173,12 +173,12 @@ async function expandSeeds(seeds, {
 // Google's autocomplete is one index's view of how a question gets typed;
 // Bing's is another, and the two lists genuinely differ. Verified live on the
 // same seed, Google offered "…per square metre / …calculator uk / …ireland"
-// while Bing offered "…per foot / …near me cost / …company cost" — different
+// while Bing offered "…per foot / …near me cost / …company cost" - different
 // framings of one intent, and a keyword universe built from a single suggestion
 // source does not contain them at all.
 //
 // This replaced an attempt to scrape the "related searches" block from a result
-// page, which neither engine actually serves — see ./serpLite.js for what was
+// page, which neither engine actually serves - see ./serpLite.js for what was
 // tried and why an always-empty list was the wrong thing to ship.
 async function relatedForSeeds(seeds, { market = 'ZZ', maxSeeds = 6 } = {}) {
   if (!providers.has('serp-lite')) return { ok: false, rows: [], reason: 'keyless SERP sampling is disabled' };
@@ -275,7 +275,7 @@ function mergeUniverse(gscRows, suggestRows, brand, { metrics = null } = {}) {
 
   // Volume, difficulty and relative interest, folded in with the BASIS for
   // each. A row can legitimately carry a measured volume, a proxy difficulty
-  // and a Trends interest all at once, from three different rungs — so each
+  // and a Trends interest all at once, from three different rungs - so each
   // value keeps its own provenance rather than the row keeping one.
   if (metrics && metrics.values) {
     list.forEach((k) => {
@@ -311,7 +311,7 @@ function scoreKeyword(k) {
   let score = 0;
   const reasons = [];
 
-  // A MEASURED volume, where one exists, outranks every inferred signal — so it
+  // A MEASURED volume, where one exists, outranks every inferred signal - so it
   // enters the score first and at the highest weight. Log-scaled for the same
   // reason impressions are: the gap between 100 and 1,000 monthly searches
   // matters far more than the gap between 50,000 and 51,000.
@@ -353,13 +353,13 @@ function scoreKeyword(k) {
   // keyword with the same impressions sitting at 60.
   if (k.position != null && k.position >= 4 && k.position <= 20) {
     score += 16;
-    reasons.push(`already ranking at position ${k.position.toFixed(1)} — striking distance`);
+    reasons.push(`already ranking at position ${k.position.toFixed(1)} - striking distance`);
   }
   if (k.branded) {
     // Branded terms are not opportunities; they are already won. Kept in the
     // universe (they matter for the prompt work) but pushed down the list.
     score *= 0.35;
-    reasons.push('branded term — already captured');
+    reasons.push('branded term - already captured');
   }
 
   if (k.difficulty != null) {
@@ -368,7 +368,7 @@ function scoreKeyword(k) {
     // real demand is still worth planning for.
     const factor = 1 - (Math.max(0, Math.min(100, k.difficulty)) / 100) * 0.45;
     score *= factor;
-    reasons.push(`difficulty ${k.difficulty}/100 (${k.difficultyBasis === 'serp-proxy' ? 'SERP proxy' : k.difficultyBasis}) — priority scaled by ${factor.toFixed(2)}`);
+    reasons.push(`difficulty ${k.difficulty}/100 (${k.difficultyBasis === 'serp-proxy' ? 'SERP proxy' : k.difficultyBasis}) - priority scaled by ${factor.toFixed(2)}`);
   }
 
   return { score: Math.round(score * 10) / 10, reasons };
@@ -432,7 +432,7 @@ async function run({
       seedOrigin = 'top non-branded Search Console queries';
     }
     if (!seeds.length) {
-      // Nothing to work from is a real, explainable state — not an error and
+      // Nothing to work from is a real, explainable state - not an error and
       // not an empty page.
       return store.finish(runRow.id, {
         score: null,
@@ -487,7 +487,7 @@ async function run({
     // ------------------------------------------------------ volume and KD
     //
     // Enriched BEFORE scoring, because volume and difficulty change the
-    // ordering — and enriched on the ranked head of the universe rather than
+    // ordering - and enriched on the ranked head of the universe rather than
     // all of it, since a keyless difficulty costs one paced SERP request per
     // keyword. What was and was not enriched is reported.
     const preliminary = mergeUniverse(gscRows, suggestRows, brand)
@@ -556,7 +556,7 @@ async function run({
         impressions,
         // Cluster-level demand and difficulty, so a content plan can be built
         // from the clusters rather than from individual keywords. Both state how
-        // many members they were computed from — a total volume over 2 of 9
+        // many members they were computed from - a total volume over 2 of 9
         // members is not the cluster's volume and must not read as one.
         volume: withVolume.length ? withVolume.reduce((a, m) => a + m.volume, 0) : null,
         volumeMembers: withVolume.length,
@@ -586,7 +586,7 @@ async function run({
     //
     // The order matters more than it looks. The queue drains in insertion
     // order, so enqueuing cluster by cluster would score all thirty keywords
-    // of the first cluster before touching the second — and a user looking at
+    // of the first cluster before touching the second - and a user looking at
     // the table an hour later would see one complete cluster and a column of
     // em dashes. Interleaving means the first pass gives every cluster a
     // number, and later passes deepen the average.
@@ -645,9 +645,9 @@ async function run({
           : `No measured search volume is available for ${market.name}`,
         detail: `${metrics.volumeBasisNote} `
           + `Difficulty: ${measuredKd} measured, ${proxyKd} from a keyless SERP proxy`
-          + (proxyKd ? ' (computed from a DuckDuckGo/Bing result sample, not from Google — the formula and every component are shown against each keyword)' : '')
+          + (proxyKd ? ' (computed from a DuckDuckGo/Bing result sample, not from Google - the formula and every component are shown against each keyword)' : '')
           + `. Relative interest: ${interest} keyword${interest === 1 ? '' : 's'}. `
-          + `Rungs tried, in order: ${metrics.attempted.map((a) => `${a.rung} — ${a.outcome}`).join('; ')}.`,
+          + `Rungs tried, in order: ${metrics.attempted.map((a) => `${a.rung} - ${a.outcome}`).join('; ')}.`,
         severity: 'info',
         action: measuredVolumes
           ? 'No action needed. The source of each number is shown on its own row.'
@@ -677,7 +677,7 @@ async function run({
             + `. Difficulty basis: ${[...new Set(winnable.map((k) => k.difficultyBasis))].join(', ')}.`,
           severity: 'medium',
           affectedCount: winnable.length,
-          action: 'These are the shortest path to traffic in this run. Check the sampled result page shown against each one before committing — a low proxy difficulty on a SERP full of forum threads means a good page wins, and that is exactly the case worth taking.',
+          action: 'These are the shortest path to traffic in this run. Check the sampled result page shown against each one before committing - a low proxy difficulty on a SERP full of forum threads means a good page wins, and that is exactly the case worth taking.',
           evidence: { keywords: winnable.slice(0, 40) },
           dedupeKey: `research:winnable:${brandId}:${market.code}`,
         });
@@ -691,7 +691,7 @@ async function run({
           checkKey: 'related_search_phrasings',
           title: `${newFromRelated.length} alternative phrasings from a second suggestion index`,
           detail: `${newFromRelated.slice(0, 10).map((r) => `"${r.keyword}"`).join(', ')}. `
-            + 'These come from Bing\'s suggestion index rather than Google\'s. The two lists genuinely differ — the same seed produces different framings of the same intent in each — so a keyword universe built from one suggestion source does not contain them.',
+            + 'These come from Bing\'s suggestion index rather than Google\'s. The two lists genuinely differ - the same seed produces different framings of the same intent in each - so a keyword universe built from one suggestion source does not contain them.',
           severity: 'info',
           affectedCount: newFromRelated.length,
           action: 'Read these as evidence about how the intent is expressed, not as separate pages to build. Several phrasings of one question belong on one page.',
@@ -710,7 +710,7 @@ async function run({
         detail: `Google offers these completions for the seed topics, and Search Console shows no impressions for them: ${unclaimed.slice(0, 8).map((k) => `"${k.keyword}"`).join(', ')}.`,
         severity: 'medium',
         affectedCount: unclaimed.length,
-        action: 'Check each against the live SERP before committing — autocomplete proves the phrasing exists, not that it carries useful volume. Cluster the survivors into one page per intent rather than one page per phrase.',
+        action: 'Check each against the live SERP before committing - autocomplete proves the phrasing exists, not that it carries useful volume. Cluster the survivors into one page per intent rather than one page per phrase.',
         evidence: { keywords: unclaimed.slice(0, 40) },
         dedupeKey: `research:unclaimed:${brandId}`,
       });

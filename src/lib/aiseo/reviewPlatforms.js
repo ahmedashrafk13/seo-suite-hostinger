@@ -1,4 +1,4 @@
-// REVIEW PLATFORM COVERAGE — which review sites this brand is missing from.
+// REVIEW PLATFORM COVERAGE - which review sites this brand is missing from.
 //
 // WHAT WAS ASKED FOR
 // "Missing top reviews platforms."
@@ -7,7 +7,7 @@
 // reputation.js is a MENTION MONITOR: it scans Reddit, Hacker News and news RSS
 // for new mentions and scores their sentiment. It deliberately refuses to
 // scrape Trustpilot, G2, Capterra or Google reviews, and that refusal is
-// correct and unchanged — those sites block automated access, and a scrape that
+// correct and unchanged - those sites block automated access, and a scrape that
 // silently starts returning nothing would be indistinguishable from "no new
 // reviews", which is the worst possible failure for a monitoring feature.
 //
@@ -18,7 +18,7 @@
 //
 //   1. A KEYLESS SEARCH for the brand restricted to that platform's domain. If
 //      the platform has an indexed page for this brand, it comes back. A search
-//      that returns nothing is reported as "not found", not as "absent" — the
+//      that returns nothing is reported as "not found", not as "absent" - the
 //      distinction is kept on every row.
 //   2. A DIRECT PROBE of the conventional profile URL where the platform has
 //      one (trustpilot.com/review/<domain> is deterministic). A 200 is proof;
@@ -32,7 +32,7 @@
 // A restaurant missing from G2 has no problem; a B2B SaaS product missing from
 // G2 has a serious one. A flat list of twenty platforms would produce nineteen
 // irrelevant findings per brand, so each platform declares the verticals it
-// matters for and the run reports only those — plus the universal ones, which
+// matters for and the run reports only those - plus the universal ones, which
 // apply to every business that has customers.
 const store = require('./store');
 const providers = require('./providers');
@@ -54,7 +54,7 @@ const PLATFORMS = [
     why: 'The single most consequential review surface there is. It feeds the map pack, the knowledge panel, and the "is this legitimate" judgement every AI assistant makes about a business. A brand with no Google profile is invisible to local intent entirely.',
     // No probe: a Business Profile has no stable public URL derivable from a
     // domain, so presence is established by search against google.com/maps and
-    // — more reliably — by the Places lookup this app already has.
+    // - more reliably - by the Places lookup this app already has.
     probe: null,
     searchDomain: 'google.com/maps',
     alsoTryPlaces: true,
@@ -102,7 +102,7 @@ const PLATFORMS = [
     domain: 'yelp.com',
     verticals: ['restaurant', 'local', 'retail', 'healthcare', 'services', 'automotive'],
     weight: 6,
-    why: 'Still the strongest local review signal in the US after Google, and one of Apple Maps\' data sources — so a Yelp absence costs visibility on iOS as well as on Yelp.',
+    why: 'Still the strongest local review signal in the US after Google, and one of Apple Maps\' data sources - so a Yelp absence costs visibility on iOS as well as on Yelp.',
     probe: null,
   },
   {
@@ -120,7 +120,7 @@ const PLATFORMS = [
     domain: 'glassdoor.com',
     verticals: null,
     weight: 3,
-    why: 'Employer reviews, not customer reviews — included because it ranks for the brand name and is often the top non-owned result, so it shapes the brand\'s ambient reputation whether or not it is about the product.',
+    why: 'Employer reviews, not customer reviews - included because it ranks for the brand name and is often the top non-owned result, so it shapes the brand\'s ambient reputation whether or not it is about the product.',
     probe: null,
   },
   {
@@ -210,7 +210,7 @@ const PLATFORMS = [
     domain: 'coursereport.com',
     verticals: ['certification', 'education'],
     weight: 5,
-    why: 'The review directories for training and certification providers, which rank for "is <programme> worth it" — the query a prospective candidate actually types.',
+    why: 'The review directories for training and certification providers, which rank for "is <programme> worth it" - the query a prospective candidate actually types.',
     probe: null,
   },
 ];
@@ -227,7 +227,7 @@ function platformsFor(vertical) {
 //
 // Three outcomes and they are kept distinct: found (200 with the brand's own
 // domain or name on the page), absent (404), unknown (403, 429, timeout, or a
-// 200 whose body does not mention the brand — a soft 404).
+// 200 whose body does not mention the brand - a soft 404).
 async function probeProfile(platform, { domain, brandName }) {
   if (!platform.probe) return null;
   const url = platform.probe(domain);
@@ -259,7 +259,7 @@ async function probeProfile(platform, { domain, brandName }) {
     status: res.status,
     evidence: mentionsBrand
       ? `HTTP 200 and the page names ${domain}${brandName ? ` or "${brandName}"` : ''}`
-      : 'HTTP 200 but the page does not name the brand or its domain, which is how these platforms serve a soft 404 — treated as unknown rather than found',
+      : 'HTTP 200 but the page does not name the brand or its domain, which is how these platforms serve a soft 404 - treated as unknown rather than found',
   };
 }
 
@@ -284,7 +284,7 @@ async function searchProfile(platform, { domain, brandName, market }) {
     hits: hits.slice(0, 3).map((h) => ({ url: h.url, title: h.title })),
     evidence: hits.length
       ? `${hits.length} indexed page${hits.length === 1 ? '' : 's'} on ${rootHost} for this brand, top result: ${hits[0].url}`
-      : `no indexed page on ${rootHost} for this brand in a ${serp.engine} sample. That is evidence of absence, not proof — the profile may exist and be unindexed.`,
+      : `no indexed page on ${rootHost} for this brand in a ${serp.engine} sample. That is evidence of absence, not proof - the profile may exist and be unindexed.`,
   };
 }
 
@@ -313,7 +313,7 @@ async function run({
 
     // Checked sequentially with pacing, not in parallel: every check here is a
     // request to a platform that rate-limits, and twenty concurrent ones return
-    // 429 for most of them — which would land in the "unknown" bucket and make
+    // 429 for most of them - which would land in the "unknown" bucket and make
     // the whole report say nothing.
     const rows = [];
     for (const platform of relevant) {
@@ -371,7 +371,7 @@ async function run({
         title: `${gaps.length} review platform${gaps.length === 1 ? '' : 's'} relevant to this business have no profile for it`,
         detail: gaps.slice(0, 8).map((g) => `${g.label} (${g.verdict === 'missing' ? 'confirmed absent' : 'no indexed profile found'})`).join('; ')
           + `. ${heavy.length ? `The consequential ones: ${heavy.slice(0, 4).map((g) => g.label).join(', ')}. ` : ''}`
-          + 'Review profiles are the evidence an AI assistant checks when asked whether a business is reputable — it will not take the brand\'s own site as an answer to that question, and where there is nothing else to read it reports what a forum post said.',
+          + 'Review profiles are the evidence an AI assistant checks when asked whether a business is reputable - it will not take the brand\'s own site as an answer to that question, and where there is nothing else to read it reports what a forum post said.',
         severity: heavy.length ? 'high' : 'medium',
         affectedCount: gaps.length,
         action: `Claim the profiles in weight order: ${gaps.slice(0, 5).map((g) => g.label).join(', ')}. Claiming a profile is free on every one of these; the work is in seeding it with genuine reviews afterwards, and that is the part worth planning.`,
@@ -391,7 +391,7 @@ async function run({
           + '. These are reported as unknown rather than as gaps, because a platform that blocked the request has told us nothing, and calling that a gap would send someone to create a profile that may already exist.',
         severity: 'info',
         affectedCount: unknown.length,
-        action: 'Check these by hand, or re-run later — the block is usually rate limiting rather than a permanent refusal.',
+        action: 'Check these by hand, or re-run later - the block is usually rate limiting rather than a permanent refusal.',
         evidence: { platforms: unknown.map((u) => ({ label: u.label, evidence: u.evidence })) },
         dedupeKey: `reviewplatforms:unknown:${brandId}`,
       });
@@ -410,7 +410,7 @@ async function run({
     }
 
     // Score: the share of AVAILABLE weight that is covered, with unknowns
-    // excluded from both sides — the same rule the tracking board uses, and for
+    // excluded from both sides - the same rule the tracking board uses, and for
     // the same reason.
     const scorable = rows.filter((r) => r.verdict !== 'unknown');
     const totalWeight = scorable.reduce((a, r) => a + r.weight, 0);
@@ -436,7 +436,7 @@ async function run({
           likelyMissing: likelyMissing.length,
           unknown: unknown.length,
         },
-        method: 'A profile is established either by probing the platform\'s conventional profile URL (where it has a deterministic one) or by a keyless site-restricted search. No reviews are read: this answers "is there a profile", not "what do the reviews say" — the latter needs a platform API credential and is the reason the mention monitor deliberately does not scrape these sites.',
+        method: 'A profile is established either by probing the platform\'s conventional profile URL (where it has a deterministic one) or by a keyless site-restricted search. No reviews are read: this answers "is there a profile", not "what do the reviews say" - the latter needs a platform API credential and is the reason the mention monitor deliberately does not scrape these sites.',
         scoreMeaning: score == null ? null : `${wonWeight} of ${totalWeight} available platform weight covered, excluding ${unknown.length} platform(s) that could not be checked.`,
         provenance: providers.provenance([...new Set(sources)]),
       },
@@ -459,7 +459,7 @@ function toTasks(runRecord, brand, { userId }) {
   const gaps = ((runRecord.result || {}).gaps) || [];
 
   // One task per platform, because claiming a profile is one discrete job on
-  // one named site — exactly the shape a backlog item should have.
+  // one named site - exactly the shape a backlog item should have.
   gaps.forEach((g) => {
     const res = tasksLib.upsertTask({
       userId,

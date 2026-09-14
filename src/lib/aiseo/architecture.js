@@ -128,7 +128,7 @@ function topicCommunities(nodes, { threshold = 0.22 } = {}) {
     .filter((g) => g.length > 1)
     .map((members) => {
       // The hub is the member with the broadest entity coverage that also has
-      // the shallowest depth — a topic's overview page is normally both.
+      // the shallowest depth - a topic's overview page is normally both.
       const scored = members.map((m) => ({
         node: m,
         breadth: m.entities.size,
@@ -138,7 +138,7 @@ function topicCommunities(nodes, { threshold = 0.22 } = {}) {
       const hub = scored[0].node;
       const spokes = scored.slice(1).map((s) => s.node);
 
-      // Shared entities across the whole community — the topic's actual name,
+      // Shared entities across the whole community - the topic's actual name,
       // as far as the site expresses it.
       const counts = new Map();
       members.forEach((m) => m.entities.forEach((e) => counts.set(e, (counts.get(e) || 0) + 1)));
@@ -176,7 +176,7 @@ function topicCommunities(nodes, { threshold = 0.22 } = {}) {
 // Link candidates: pairs that share entities and are not linked.
 //
 // Directionality matters and is decided, not guessed. A link should point from
-// the page with LESS authority on the shared topic to the one with more —
+// the page with LESS authority on the shared topic to the one with more - 
 // which here means from the narrower page to the broader one, and from the page
 // with fewer inbound links to the one with more when depth is equal. Getting
 // this backwards produces recommendations that dilute a hub instead of
@@ -221,7 +221,7 @@ function linkCandidates(nodes, communities, { limit = 60, minOverlap = 0.18 } = 
   }
 
   return out
-    // Within-topic links first — they are the ones that build topical
+    // Within-topic links first - they are the ones that build topical
     // authority rather than merely adding a path.
     .sort((a, b) => (Number(b.sameCommunity) - Number(a.sameCommunity))
       || (b.similarity - a.similarity)
@@ -232,7 +232,7 @@ function linkCandidates(nodes, communities, { limit = 60, minOverlap = 0.18 } = 
 // Breadcrumb proposals from the URL hierarchy plus the topic graph.
 //
 // Built from the path segments, because that is the hierarchy the site already
-// commits to in its URLs — proposing a trail that contradicts the URL would
+// commits to in its URLs - proposing a trail that contradicts the URL would
 // be worse than proposing none. The topic graph supplies a readable label for
 // a segment whose slug is uninformative.
 function breadcrumbProposals(nodes, siteUrl) {
@@ -246,7 +246,7 @@ function breadcrumbProposals(nodes, siteUrl) {
   const label = (segment, node) => {
     if (node && node.title) {
       // A title of the form "Thing | Brand" reads better as just "Thing".
-      return node.title.split(/\s+[|–—·]\s+/)[0].slice(0, 60);
+      return node.title.split(/\s+[|–—·-]\s+/)[0].slice(0, 60);
     }
     return segment.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
@@ -365,7 +365,7 @@ async function run({
 
     // The start URL always has zero inbound links inside its own crawl,
     // because nothing above it was crawled. Excluding it is not a special case
-    // — it is the difference between a real orphan and an artefact of where the
+    // - it is the difference between a real orphan and an artefact of where the
     // crawl began.
     const startKey = canonUrl(site);
     const orphans = nodeList.filter((n) => n.inLinks === 0 && n.url !== startKey);
@@ -391,7 +391,7 @@ async function run({
         severity: withTraffic.length ? 'high' : 'medium',
         affectedCount: orphans.length,
         affectedUrl: orphans[0].url,
-        action: 'Link each from the most relevant hub. Pages already earning impressions come first — they are proven to have demand and are being held back only by internal signals.',
+        action: 'Link each from the most relevant hub. Pages already earning impressions come first - they are proven to have demand and are being held back only by internal signals.',
         evidence: { orphans: orphans.slice(0, 40) },
         dedupeKey: `architecture:orphans:${site}`,
       });
@@ -435,7 +435,7 @@ async function run({
         severity: 'medium',
         affectedCount: needBreadcrumb.length,
         affectedUrl: needBreadcrumb[0].url,
-        action: 'Add breadcrumbs with BreadcrumbList markup. They replace the URL in the SERP, and they tell an AI crawler where a page sits in the hierarchy — which is how it decides whether a page is the authoritative one on a subtopic.',
+        action: 'Add breadcrumbs with BreadcrumbList markup. They replace the URL in the SERP, and they tell an AI crawler where a page sits in the hierarchy - which is how it decides whether a page is the authoritative one on a subtopic.',
         evidence: { pages: needBreadcrumb.slice(0, 30) },
         dedupeKey: `architecture:breadcrumbs:${site}`,
       });
@@ -450,7 +450,7 @@ async function run({
         severity: 'low',
         affectedCount: brokenTrails.length,
         affectedUrl: brokenTrails[0].url,
-        action: 'Either create the intermediate listing page — usually worth having anyway, as a hub — or render that breadcrumb level as plain text rather than a link.',
+        action: 'Either create the intermediate listing page - usually worth having anyway, as a hub - or render that breadcrumb level as plain text rather than a link.',
         evidence: { pages: brokenTrails.slice(0, 30) },
         dedupeKey: `architecture:breadcrumbgaps:${site}`,
       });
@@ -464,7 +464,7 @@ async function run({
         severity: 'low',
         affectedCount: deep.length,
         affectedUrl: deep[0].url,
-        action: 'Link the important ones from a hub closer to the homepage. Depth is only a problem for pages that matter — a deep archive page is fine where it is.',
+        action: 'Link the important ones from a hub closer to the homepage. Depth is only a problem for pages that matter - a deep archive page is fine where it is.',
         evidence: { pages: deep.slice(0, 30) },
         dedupeKey: `architecture:depth:${site}`,
       });

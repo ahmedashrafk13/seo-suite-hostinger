@@ -52,7 +52,7 @@ const statusBadgeFor = function (s) {
       <p class="hint mt-0">
         <%= r.sample.urls.length %> URL<%= r.sample.urls.length === 1 ? '' : 's' %> out of
         <%= fmtInt(r.sample.sitemapUrlsSeen) %> seen in the sitemap. A count like "3 pages have no H1" means
-        3 <em>of these</em> — not 3 on the whole site.
+        3 <em>of these</em> - not 3 on the whole site.
       </p>
       <div class="table-wrap scroll-y" style="max-height:240px">
         <table class="data">
@@ -122,7 +122,7 @@ const statusBadgeFor = function (s) {
           </div>
           <div class="alert-body">
             <% if (c.whatItTracks) { %>
-              <p class="muted mt-0" style="font-size:12px"><%= c.whatItTracks %> — <%= c.whyItMatters %></p>
+              <p class="muted mt-0" style="font-size:12px"><%= c.whatItTracks %> - <%= c.whyItMatters %></p>
             <% } %>
 
             <% if (c.status === 'unavailable') { %>
@@ -131,7 +131,7 @@ const statusBadgeFor = function (s) {
               <p class="mt-0"><span class="badge medium">could not measure</span> <%= c.reason %></p>
             <% } else if (c.status === 'error') { %>
               <p class="mt-0"><span class="badge critical">check failed</span> <%= c.reason %>
-                <span class="muted">— the rest of the sweep continued.</span></p>
+                <span class="muted"> - the rest of the sweep continued.</span></p>
             <% } %>
 
             <% if (c.metrics && c.metrics.length) { %>
@@ -142,9 +142,9 @@ const statusBadgeFor = function (s) {
                   <tr>
                     <td><code><%= m.key %></code></td>
                     <td class="muted truncate" style="max-width:200px"><%= m.url ? shortUrl(m.url, 40) : 'site-wide' %></td>
-                    <td><%= m.value == null ? '—' : m.value %></td>
+                    <td><%= m.value == null ? ' - ' : m.value %></td>
                     <td><span class="badge <%= statusBadgeFor(m.status) %>"><%= m.status || 'unknown' %></span></td>
-                    <td class="muted" style="font-size:11px"><%= m.detail || '—' %></td>
+                    <td class="muted" style="font-size:11px"><%= m.detail || ' - ' %></td>
                   </tr>
                 <% }) %>
                 </tbody>

@@ -11,13 +11,13 @@
 //                                 rendered in the UI so the board explains
 //                                 itself rather than needing a separate doc
 //   needs       capabilities that must be available (see ./providers.js)
-//   scope       'site' or 'page' — a page-scoped check runs over a sample
+//   scope       'site' or 'page' - a page-scoped check runs over a sample
 //   run(ctx)    => { metrics: [], findings: [], detail: {} }
 //
 // WHY EVERY CHECK REPORTS A VERDICT AND A VALUE
 // A tracking board that shows only current values cannot answer the question
 // people actually ask it, which is "did something break". Every check returns
-// both a number and a status, and the store keeps the series — so the board
+// both a number and a status, and the store keeps the series - so the board
 // can show the value, the verdict, and the direction, and the alert engine has
 // something to fire on.
 //
@@ -67,7 +67,7 @@ const bandOf = (value, good, poor, { lowerIsBetter = true } = {}) => {
 
 define({
   key: 'crawl_errors',
-  element: 'Crawlability & indexation — crawl errors',
+  element: 'Crawlability & indexation - crawl errors',
   group: 'Crawlability & indexation',
   whatItTracks: '4xx and 5xx responses across the sampled URL set',
   whyItMatters: 'A page returning an error cannot be indexed, and internal links pointing at it waste the crawl budget spent reaching them.',
@@ -145,7 +145,7 @@ define({
 //
 // So this check takes the full URL set in sitewide scope and adds the one thing
 // a sitemap cannot supply: the TARGETS OF INTERNAL LINKS. Those are where dead
-// URLs actually live — a page deleted from the CMS leaves the sitemap
+// URLs actually live - a page deleted from the CMS leaves the sitemap
 // immediately and leaves the links pointing at it for years. A 404 nothing
 // links to costs nothing; a 404 with eleven internal links pointing at it wastes
 // crawl budget on every sweep and hands a reader a dead end.
@@ -165,10 +165,10 @@ define({
 //                                     counted as one
 define({
   key: 'broken_pages',
-  element: 'Crawlability & indexation — 4xx and 5xx pages, sitewide',
+  element: 'Crawlability & indexation - 4xx and 5xx pages, sitewide',
   group: 'Crawlability & indexation',
-  whatItTracks: 'Every URL in the sitemap, every page with Search Console traffic, and every internal link target — checked for 4xx, 5xx, soft 404s and unreachable responses, with the internal links pointing at each one',
-  whyItMatters: 'A sample tells you a site has broken pages. This tells you which ones, and which of them are linked from elsewhere on the site — the difference between a list you can act on and a number you cannot.',
+  whatItTracks: 'Every URL in the sitemap, every page with Search Console traffic, and every internal link target - checked for 4xx, 5xx, soft 404s and unreachable responses, with the internal links pointing at each one',
+  whyItMatters: 'A sample tells you a site has broken pages. This tells you which ones, and which of them are linked from elsewhere on the site - the difference between a list you can act on and a number you cannot.',
   needs: ['crawler'],
   scope: 'site',
   // Receives ctx.allUrls in sitewide scope; falls back to the sample otherwise.
@@ -192,7 +192,7 @@ define({
     if (sitewide) ctx.allUrls.forEach((u) => push(u.url, u.from));
     else ctx.sample.forEach((u) => push(u, 'sample'));
 
-    // Internal link targets. Only gathered in sitewide scope — a link crawl is
+    // Internal link targets. Only gathered in sitewide scope - a link crawl is
     // the expensive half of this check, and in sampled scope crawl_errors has
     // already covered the same ground more cheaply.
     const inboundLinks = new Map(); // canonical target -> [{ from, anchor }]
@@ -222,7 +222,7 @@ define({
       let soft404 = false;
       if (res.ok && res.body) {
         // A soft 404 is a 200 whose content says otherwise. Matched on the
-        // TITLE and the H1 only — the phrase appearing somewhere in a footer or
+        // TITLE and the H1 only - the phrase appearing somewhere in a footer or
         // a help article is not a soft 404, and matching the whole body would
         // flag every page with a "404 page" link in its sitemap.
         const doc = parseDocument(res.url, res.body);
@@ -278,7 +278,7 @@ define({
         severity: clientLinked.length ? 'high' : 'medium',
         affectedCount: client.length,
         affectedUrl: (clientLinked[0] || client[0]).url,
-        action: 'Split the work: URLs with inbound links need either a 301 to the right page or the links fixed — both, ideally. URLs with no inbound links need removing from the sitemap. Redirecting everything to the homepage is the wrong answer and Google treats it as a soft 404.',
+        action: 'Split the work: URLs with inbound links need either a 301 to the right page or the links fixed - both, ideally. URLs with no inbound links need removing from the sitemap. Redirecting everything to the homepage is the wrong answer and Google treats it as a soft 404.',
         evidence: {
           linked: clientLinked.slice(0, 60).map((r) => ({ url: r.url, status: r.status, inbound: r.inbound, from: r.from })),
           unlinked: client.filter((r) => !r.inbound.length).slice(0, 60).map((r) => ({ url: r.url, status: r.status, from: r.from })),
@@ -309,7 +309,7 @@ define({
         severity: 'high',
         affectedCount: dead.length,
         affectedUrl: dead[0].url,
-        action: 'Check from a second network before treating this as a site problem — an intermittent failure from one location is usually a rate limit rather than an outage.',
+        action: 'Check from a second network before treating this as a site problem - an intermittent failure from one location is usually a rate limit rather than an outage.',
         evidence: { urls: dead.slice(0, 60).map((r) => ({ url: r.url, error: r.error, from: r.from })) },
       });
     }
@@ -339,7 +339,7 @@ define({
           key: 'track.broken_with_inbound_links',
           value: clientLinked.length + softLinked.length,
           status: (clientLinked.length + softLinked.length) ? 'fail' : 'good',
-          detail: sitewide ? 'broken URLs that other pages link to' : 'not measured in sampled scope — internal link targets are only gathered sitewide',
+          detail: sitewide ? 'broken URLs that other pages link to' : 'not measured in sampled scope - internal link targets are only gathered sitewide',
         },
       ],
       findings,
@@ -350,7 +350,7 @@ define({
         cap: CAP,
         truncated: targets.length > CAP,
         truncationNote: targets.length > CAP
-          ? `${targets.length - CAP} URL${targets.length - CAP === 1 ? '' : 's'} were NOT checked — the cap is ${CAP} per sweep. Raise the sitewide cap or re-run to cover the remainder; this is stated rather than left as a silent truncation.`
+          ? `${targets.length - CAP} URL${targets.length - CAP === 1 ? '' : 's'} were NOT checked - the cap is ${CAP} per sweep. Raise the sitewide cap or re-run to cover the remainder; this is stated rather than left as a silent truncation.`
           : null,
         crawl: crawl ? { fetched: crawl.fetched, discovered: crawl.discovered, complete: crawl.complete } : null,
         counts: { broken, client: client.length, server: server.length, soft404: soft.length, unreachable: dead.length, clean: rows.length - broken },
@@ -363,7 +363,7 @@ define({
 
 define({
   key: 'robots_changes',
-  element: 'Crawlability & indexation — robots.txt changes',
+  element: 'Crawlability & indexation - robots.txt changes',
   group: 'Crawlability & indexation',
   whatItTracks: 'The content of robots.txt, compared against the last capture',
   whyItMatters: 'A single accidental Disallow line can deindex a whole site, and nothing on the site itself looks different afterwards.',
@@ -385,7 +385,7 @@ define({
     const hash = require('crypto').createHash('sha1').update(body).digest('hex').slice(0, 16);
     const prev = ctx.previousMetric('track.robots_hash');
     // Metric values are numeric, so the hash is carried in `detail` and the
-    // numeric value is the byte length — which is itself a usable series.
+    // numeric value is the byte length - which is itself a usable series.
     const changed = Boolean(prev && prev.detail && prev.detail !== hash);
 
     const findings = [];
@@ -429,7 +429,7 @@ define({
 
 define({
   key: 'sitemap_health',
-  element: 'Crawlability & indexation — sitemap health',
+  element: 'Crawlability & indexation - sitemap health',
   group: 'Crawlability & indexation',
   whatItTracks: 'Sitemap reachability, URL count, and the errors Search Console reports against each submitted sitemap',
   whyItMatters: 'A sitemap listing redirects, 404s or non-canonical URLs teaches Google to distrust it, which slows discovery of everything in it.',
@@ -462,7 +462,7 @@ define({
         title: `Search Console reports errors on ${withErrors.length} sitemap${withErrors.length === 1 ? '' : 's'}`,
         detail: withErrors.map((s) => `${s.path}: ${s.errors} error${s.errors === 1 ? '' : 's'}, ${s.warnings} warning${s.warnings === 1 ? '' : 's'}`).join('; '),
         severity: 'high',
-        action: 'Open each in Search Console — the error detail names the specific URLs.',
+        action: 'Open each in Search Console - the error detail names the specific URLs.',
         evidence: { sitemaps: withErrors },
       });
     }
@@ -496,7 +496,7 @@ define({
 
 define({
   key: 'index_coverage',
-  element: 'Crawlability & indexation — index coverage drift',
+  element: 'Crawlability & indexation - index coverage drift',
   group: 'Crawlability & indexation',
   whatItTracks: 'The share of inspected URLs Search Console says are indexed, and how that share has moved',
   whyItMatters: 'Coverage falling is the earliest possible warning of a technical problem, and it usually moves weeks before traffic does.',
@@ -505,7 +505,7 @@ define({
   async run(ctx) {
     const summary = analytics.indexingSummary(ctx.brandId);
     if (!summary || !summary.totals || !summary.totals.total) {
-      return { unknown: 'no URL Inspection results stored yet — these are collected by the nightly sync' };
+      return { unknown: 'no URL Inspection results stored yet - these are collected by the nightly sync' };
     }
     const t = summary.totals;
     const share = t.total ? Math.round((t.indexed / t.total) * 100) : null;
@@ -529,7 +529,7 @@ define({
         title: `Indexed share has fallen ${Math.abs(drift)} percentage points since the last check`,
         detail: `Was ${prev.value}%, now ${share}%.`,
         severity: 'high',
-        action: 'Check robots.txt, canonical tags and the noindex header first — a coverage fall of this size is nearly always a directive change rather than a quality judgement.',
+        action: 'Check robots.txt, canonical tags and the noindex header first - a coverage fall of this size is nearly always a directive change rather than a quality judgement.',
         evidence: { previous: prev, current: share, summary },
       });
     }
@@ -572,7 +572,7 @@ define({
       : ((data.originLoadingExperience && data.originLoadingExperience.metrics)
         ? { metrics: data.originLoadingExperience.metrics, scope: 'origin' }
         : null);
-    if (!le) return { unknown: 'CrUX has no field data for this URL or origin — the site has too little Chrome traffic' };
+    if (!le) return { unknown: 'CrUX has no field data for this URL or origin - the site has too little Chrome traffic' };
 
     const spec = [
       { crux: 'LARGEST_CONTENTFUL_PAINT_MS', metric: 'track.lcp_ms', label: 'LCP', scale: 1, good: THRESHOLDS.lcpMs.googleGood, poor: THRESHOLDS.lcpMs.googleNeedsWork, brief: THRESHOLDS.lcpMs.target, unit: 'ms' },
@@ -595,10 +595,10 @@ define({
         findings.push({
           checkKey: `cwv_${s.label.toLowerCase().replace(/\s+/g, '_')}`,
           title: `${s.label} is ${s.unit === 'ms' ? `${Math.round(value)}ms` : value.toFixed(3)} at the 75th percentile`,
-          detail: `${le.scope === 'origin' ? 'Origin-wide figure — this URL has too little traffic for its own CrUX record. ' : ''}Google's "good" boundary is ${s.unit === 'ms' ? `${s.good}ms` : s.good}; this project targets ${s.unit === 'ms' ? `${s.brief}ms` : s.brief}.`,
+          detail: `${le.scope === 'origin' ? 'Origin-wide figure - this URL has too little traffic for its own CrUX record. ' : ''}Google's "good" boundary is ${s.unit === 'ms' ? `${s.good}ms` : s.good}; this project targets ${s.unit === 'ms' ? `${s.brief}ms` : s.brief}.`,
           severity: status === 'fail' ? 'high' : 'medium',
           affectedUrl: ctx.site,
-          action: 'Open the PageSpeed report for this URL — its opportunity list names the causes.',
+          action: 'Open the PageSpeed report for this URL - its opportunity list names the causes.',
           evidence: { value, status, scope: le.scope },
         });
       }
@@ -610,7 +610,7 @@ define({
 
 define({
   key: 'ttfb',
-  element: 'Site speed & performance — TTFB',
+  element: 'Site speed & performance - TTFB',
   group: 'Performance & Core Web Vitals',
   whatItTracks: 'Time to the first response byte, measured directly as the median of three samples',
   whyItMatters: 'TTFB is the floor on every other timing. An AI retrieval fetcher working to a short timeout gives up on a slow origin entirely.',
@@ -638,7 +638,7 @@ define({
 
 define({
   key: 'page_load',
-  element: 'Site speed & performance — document load time',
+  element: 'Site speed & performance - document load time',
   group: 'Performance & Core Web Vitals',
   whatItTracks: 'How long the HTML document itself takes to download, and how large it is',
   whyItMatters: 'Document time is a hard floor on page load, and an oversized HTML payload delays every render regardless of how fast the assets are.',
@@ -663,7 +663,7 @@ define({
       findings.push({
         checkKey: 'slow_documents',
         title: `${slow.length} of ${ok.length} sampled pages took over ${THRESHOLDS.loadMs.target}ms to deliver their HTML`,
-        detail: slowest.slice(0, 5).map((r) => `${r.url} — ${r.ms}ms, ${(r.bytes / 1024).toFixed(0)} KB`).join('; '),
+        detail: slowest.slice(0, 5).map((r) => `${r.url} - ${r.ms}ms, ${(r.bytes / 1024).toFixed(0)} KB`).join('; '),
         severity: median > 3000 ? 'high' : 'medium',
         affectedCount: slow.length,
         affectedUrl: slowest[0].url,
@@ -675,7 +675,7 @@ define({
       findings.push({
         checkKey: 'heavy_html',
         title: `${heavy.length} page${heavy.length === 1 ? '' : 's'} serve more than 500 KB of HTML`,
-        detail: heavy.slice(0, 5).map((r) => `${r.url} — ${(r.bytes / 1024).toFixed(0)} KB`).join('; '),
+        detail: heavy.slice(0, 5).map((r) => `${r.url} - ${(r.bytes / 1024).toFixed(0)} KB`).join('; '),
         severity: 'medium',
         affectedCount: heavy.length,
         affectedUrl: heavy[0].url,
@@ -789,7 +789,7 @@ define({
     // Warn, never fail, however many are absent.
     //
     // A metric status drives the group's colour on the board, and an absent
-    // hardening header is a hardening gap, not an outage — the finding it
+    // hardening header is a hardening gap, not an outage - the finding it
     // raises is 'low' severity for the same reason. Reporting it as 'fail'
     // turned the whole Security group red on a site whose certificate was
     // valid for another 86 days, which is precisely how a board stops being
@@ -957,7 +957,7 @@ define({
     return {
       metrics: [
         // Warn at worst. A page with no canonical raises a 'low' finding, and
-        // a metric must never be redder than the finding it produces — a group
+        // a metric must never be redder than the finding it produces - a group
         // shown as failing for a missing canonical tag competes for attention
         // with a collapsed canonical, which is a completely different problem.
         // Genuine collapse is caught by track.canonical_drift below, which does
@@ -1168,7 +1168,7 @@ define({
         severity: 'medium',
         affectedCount: multipleTitle.length,
         affectedUrl: multipleTitle[0].url,
-        action: 'Remove the extras — usually a plugin adding one on top of the theme\'s.',
+        action: 'Remove the extras - usually a plugin adding one on top of the theme\'s.',
         evidence: { pages: multipleTitle },
       });
     }
@@ -1201,9 +1201,9 @@ define({
       findings.push({
         checkKey: 'ctr_falling',
         title: `Site-wide click-through rate fell ${Math.abs(ctrTrend.deltaPp)} percentage points`,
-        detail: `${ctrTrend.prior}% over ${ctrTrend.windows.prior.startDate}–${ctrTrend.windows.prior.endDate}, now ${ctrTrend.recent}%.`,
+        detail: `${ctrTrend.prior}% over ${ctrTrend.windows.prior.startDate}-${ctrTrend.windows.prior.endDate}, now ${ctrTrend.recent}%.`,
         severity: 'medium',
-        action: 'Check whether impressions rose at the same time — a CTR fall with rising impressions usually means new, lower-intent queries rather than worse titles.',
+        action: 'Check whether impressions rose at the same time - a CTR fall with rising impressions usually means new, lower-intent queries rather than worse titles.',
         evidence: ctrTrend,
       });
     }
@@ -1238,7 +1238,7 @@ define({
       if (!res.ok || !res.body) return { url, ok: false };
       const doc = parseDocument(res.url, res.body);
       // A level is "skipped" when a heading jumps more than one level deeper
-      // than its predecessor — h2 followed by h4. Going back UP any number of
+      // than its predecessor - h2 followed by h4. Going back UP any number of
       // levels is normal and is not a fault.
       const skips = [];
       let prev = null;
@@ -1281,7 +1281,7 @@ define({
         severity: 'low',
         affectedCount: manyH1.length,
         affectedUrl: manyH1[0].url,
-        action: 'Valid HTML5, and Google tolerates it — but a single H1 makes the page\'s subject unambiguous to a passage extractor, which multiple H1s do not.',
+        action: 'Valid HTML5, and Google tolerates it - but a single H1 makes the page\'s subject unambiguous to a passage extractor, which multiple H1s do not.',
         evidence: { pages: manyH1 },
       });
     }
@@ -1345,7 +1345,7 @@ define({
         url: res.url, ok: true, title: doc.title,
         words: doc.wordCount,
         // An index page's content IS its links, so it must not be counted as
-        // thin — see the same reasoning in the js_rendering check above,
+        // thin - see the same reasoning in the js_rendering check above,
         // including why only main-region links are counted.
         isIndexPage: (function () {
           const links = doc.links.filter((l) => l.internal && l.inMain).length;
@@ -1415,7 +1415,7 @@ define({
         severity: 'medium',
         affectedCount: thin.length,
         affectedUrl: thin[0].url,
-        action: 'Either develop them or consolidate them into a page that answers the whole question. Check first whether the content is being rendered by JavaScript — a thin count on a rich-looking page usually means that.',
+        action: 'Either develop them or consolidate them into a page that answers the whole question. Check first whether the content is being rendered by JavaScript - a thin count on a rich-looking page usually means that.',
         evidence: { pages: thin.map((r) => ({ url: r.url, words: r.words })) },
       });
     }
@@ -1459,18 +1459,18 @@ define({
 
     // A metric that fails must always come with a finding that explains it.
     // Without this, average citability could turn the Content quality group red
-    // with nothing on the page saying why — a colour with no explanation is
+    // with nothing on the page saying why - a colour with no explanation is
     // worse than no colour.
     if (avgCitability < 45) {
       const worst = ok.slice().sort((a, b) => a.citability - b.citability).slice(0, 6);
       findings.push({
         checkKey: 'low_citability',
         title: `Average citability across the sample is ${avgCitability}/100`,
-        detail: `Weakest: ${worst.map((r) => `${r.url} (${r.citability})`).join('; ')}. Citability measures whether an AI answer engine can lift a passage and attribute it — self-contained paragraphs, structured blocks, concrete figures, a visible date, valid schema.`,
+        detail: `Weakest: ${worst.map((r) => `${r.url} (${r.citability})`).join('; ')}. Citability measures whether an AI answer engine can lift a passage and attribute it - self-contained paragraphs, structured blocks, concrete figures, a visible date, valid schema.`,
         severity: avgCitability < 30 ? 'high' : 'medium',
         affectedCount: ok.length,
         affectedUrl: worst[0].url,
-        action: 'Run the on-page scorer on the weakest pages — it reports the specific signals each one is missing and which paragraphs cannot stand alone.',
+        action: 'Run the on-page scorer on the weakest pages - it reports the specific signals each one is missing and which paragraphs cannot stand alone.',
         evidence: { average: avgCitability, pages: ok.map((r) => ({ url: r.url, citability: r.citability })) },
       });
     }
@@ -1511,7 +1511,7 @@ define({
     const { crawlSite } = require('./fetcher');
     const crawl = await crawlSite(ctx.site, { maxPages: 40, concurrency: 4 });
     const okPages = crawl.pages.filter((p) => p.ok && p.doc);
-    if (okPages.length < 3) return { unknown: `only ${okPages.length} page(s) crawlable — internal links may be rendered by JavaScript` };
+    if (okPages.length < 3) return { unknown: `only ${okPages.length} page(s) crawlable - internal links may be rendered by JavaScript` };
 
     const inbound = new Map();
     const known = new Set(okPages.map((p) => canonUrl(p.url)));
@@ -1561,7 +1561,7 @@ define({
         severity: 'medium',
         affectedCount: orphans.length,
         affectedUrl: orphans[0],
-        action: 'Link each from the most relevant hub. Note that these were discovered BY crawling, so they are reachable — a page reachable only from a sitemap would not appear here at all.',
+        action: 'Link each from the most relevant hub. Note that these were discovered BY crawling, so they are reachable - a page reachable only from a sitemap would not appear here at all.',
         evidence: { orphans },
       });
     }
@@ -1581,7 +1581,7 @@ define({
       findings.push({
         checkKey: 'link_equity_concentration',
         title: `Inbound internal links are heavily concentrated (Gini ${gini})`,
-        detail: `The most-linked page has ${counts[0]} inbound links; the median has ${counts[Math.floor(counts.length / 2)]}. Some concentration is correct — a homepage should be the most-linked page — but at this level most of the site receives almost no internal signal.`,
+        detail: `The most-linked page has ${counts[0]} inbound links; the median has ${counts[Math.floor(counts.length / 2)]}. Some concentration is correct - a homepage should be the most-linked page - but at this level most of the site receives almost no internal signal.`,
         severity: 'low',
         action: 'Add contextual links from the well-linked pages into the topics they cover. The architecture analysis proposes specific pairs.',
         evidence: { gini, distribution: counts.slice(0, 25) },
@@ -1643,7 +1643,7 @@ define({
 
     // Actual byte sizes, for a bounded sample. Fetching every image on twelve
     // pages could be hundreds of requests, so this measures the first 20
-    // distinct ones — enough to establish whether the site has an image-weight
+    // distinct ones - enough to establish whether the site has an image-weight
     // problem, which is the question.
     const distinct = [...new Map(all.filter((i) => i.src && /^https?:/i.test(i.src)).map((i) => [i.src, i])).values()].slice(0, 20);
     const sized = await mapLimit(distinct, 4, async (img) => {
@@ -1659,7 +1659,7 @@ define({
       findings.push({
         checkKey: 'missing_alt',
         title: `${missingAlt.length} image${missingAlt.length === 1 ? '' : 's'} have no alt attribute`,
-        detail: `Across ${new Set(missingAlt.map((i) => i.page)).size} sampled pages. Note that alt="" is valid for a decorative image and is counted separately (${emptyAlt.length} found) — this count is images where the attribute is absent entirely.`,
+        detail: `Across ${new Set(missingAlt.map((i) => i.page)).size} sampled pages. Note that alt="" is valid for a decorative image and is counted separately (${emptyAlt.length} found) - this count is images where the attribute is absent entirely.`,
         severity: 'medium',
         affectedCount: missingAlt.length,
         affectedUrl: missingAlt[0].page,
@@ -1671,7 +1671,7 @@ define({
       findings.push({
         checkKey: 'oversized_images',
         title: `${oversized.length} of ${fetchedImages.length} measured images exceed 200 KB`,
-        detail: oversized.slice(0, 5).map((s) => `${s.src.split('/').pop()} — ${(s.bytes / 1024).toFixed(0)} KB (${s.type || 'unknown type'})`).join('; '),
+        detail: oversized.slice(0, 5).map((s) => `${s.src.split('/').pop()} - ${(s.bytes / 1024).toFixed(0)} KB (${s.type || 'unknown type'})`).join('; '),
         severity: 'medium',
         affectedCount: oversized.length,
         affectedUrl: oversized[0].page,
@@ -1683,7 +1683,7 @@ define({
       findings.push({
         checkKey: 'missing_dimensions',
         title: `${noDimensions.length} of ${all.length} images declare no width and height`,
-        detail: 'Without intrinsic dimensions the browser cannot reserve space, so the page shifts as each image loads — which is exactly what CLS measures.',
+        detail: 'Without intrinsic dimensions the browser cannot reserve space, so the page shifts as each image loads - which is exactly what CLS measures.',
         severity: 'medium',
         affectedCount: noDimensions.length,
         action: 'Add width and height attributes. CSS can still control the rendered size; the attributes only supply the aspect ratio.',
@@ -1697,7 +1697,7 @@ define({
         detail: 'Every image is fetched immediately, including the ones far below the fold.',
         severity: 'low',
         affectedCount: noLazy.length,
-        action: 'Add loading="lazy" to below-the-fold images. Do NOT add it to the hero image — lazy-loading the LCP element makes LCP worse, which is the most common mistake here.',
+        action: 'Add loading="lazy" to below-the-fold images. Do NOT add it to the hero image - lazy-loading the LCP element makes LCP worse, which is the most common mistake here.',
         evidence: { images: noLazy.slice(0, 25) },
       });
     }
@@ -1807,7 +1807,7 @@ define({
     const totalErrors = ok.reduce((a, r) => a + r.errors + r.parseErrors, 0);
     // Rich-result eligibility comes from URL Inspection, which the nightly sync
     // collects. With nothing inspected the count is 0, and reporting 0 as
-    // 'good' would state "no rich results, and that is fine" — so it is
+    // 'good' would state "no rich results, and that is fine" - so it is
     // reported as unknown until there is something to read.
     const inspected = (rich && rich.totals && Number(rich.totals.checked)) || 0;
     return {
@@ -1821,7 +1821,7 @@ define({
           key: 'track.rich_result_types',
           value: inspected ? ((rich.types || []).length) : null,
           status: inspected ? 'good' : 'unknown',
-          detail: inspected ? `${inspected} URL(s) inspected` : 'no URL Inspection results stored yet — collected by the nightly sync',
+          detail: inspected ? `${inspected} URL(s) inspected` : 'no URL Inspection results stored yet - collected by the nightly sync',
         },
       ],
       findings,
@@ -1859,7 +1859,7 @@ define({
       //
       // A word count alone gets index pages wrong, and gets them wrong in the
       // most damaging direction. A blog listing page on the first site this ran
-      // against served 30 words of prose — and 23 headings and 131 links. It is
+      // against served 30 words of prose - and 23 headings and 131 links. It is
       // a perfectly rendered, fully readable index page; a bare threshold
       // reported it as "serves almost no content in its HTML", at critical
       // severity, alongside a genuine client-rendering failure. One
@@ -1868,13 +1868,13 @@ define({
       //
       //   'ok'        substantial prose, or a page whose content IS its links
       //   'client'    little of either, AND evidence of client rendering
-      //   'thin'      little of either, and no such evidence — a real problem,
+      //   'thin'      little of either, and no such evidence - a real problem,
       //               but a content problem, not a rendering one
       const words = doc.wordCount;
       const headings = doc.headings.length;
       // MAIN-REGION links only. A document-wide count classifies every page on
       // a normal site as an index page, because a header and footer alone carry
-      // twenty links — which would let a genuinely blank client-rendered page
+      // twenty links - which would let a genuinely blank client-rendered page
       // escape this check entirely.
       const links = doc.links.filter((l) => l.internal && l.inMain).length;
       // A navigational index: its job is to point elsewhere, and it does that
@@ -1911,7 +1911,7 @@ define({
       findings.push({
         checkKey: 'client_rendered_pages',
         title: `${clientRendered.length} of ${ok.length} sampled pages depend on JavaScript for their content`,
-        detail: clientRendered.slice(0, 6).map((r) => `${r.url} — ${r.servedWords} words, ${r.headings} headings, ${r.internalLinks} internal links, ${r.scripts} scripts${r.spaMarker ? ', single-page-app markers present' : ''}`).join('; '),
+        detail: clientRendered.slice(0, 6).map((r) => `${r.url} - ${r.servedWords} words, ${r.headings} headings, ${r.internalLinks} internal links, ${r.scripts} scripts${r.spaMarker ? ', single-page-app markers present' : ''}`).join('; '),
         severity: 'critical',
         affectedCount: clientRendered.length,
         affectedUrl: clientRendered[0].url,
@@ -1924,7 +1924,7 @@ define({
       findings.push({
         checkKey: 'thin_served_html',
         title: `${thin.length} of ${ok.length} sampled pages serve little content and are not index pages`,
-        detail: thin.slice(0, 6).map((r) => `${r.url} — ${r.servedWords} words, ${r.headings} headings, ${r.internalLinks} internal links`).join('; ')
+        detail: thin.slice(0, 6).map((r) => `${r.url} - ${r.servedWords} words, ${r.headings} headings, ${r.internalLinks} internal links`).join('; ')
           + '. No single-page-app markers and few scripts, so this is thin content rather than a rendering failure.',
         severity: 'medium',
         affectedCount: thin.length,
@@ -1941,7 +1941,7 @@ define({
         { key: 'track.html_content_share', value: share, status: bandOf(share, 95, 70, { lowerIsBetter: false }) },
         { key: 'track.client_rendered_pages', value: clientRendered.length, status: clientRendered.length ? 'fail' : 'good' },
         { key: 'track.thin_served_pages', value: thin.length, status: thin.length ? 'warn' : 'good' },
-        { key: 'track.index_pages_sampled', value: ok.filter((r) => r.isIndexPage).length, status: 'good', detail: 'excluded from the content-share ratio — their content is their links' },
+        { key: 'track.index_pages_sampled', value: ok.filter((r) => r.isIndexPage).length, status: 'good', detail: 'excluded from the content-share ratio - their content is their links' },
       ],
       findings,
       detail: { sampled: ok.length, share, clientRendered: clientRendered.length, thin: thin.length, results: ok },

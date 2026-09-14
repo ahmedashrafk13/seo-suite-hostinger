@@ -32,7 +32,7 @@
       </p>
       <p class="hint mt-0">
         This matters more than it sounds. Readability, entity density, keyword density and semantic coverage are
-        all ratios, and computing them over a page's chrome moves every one of them — on a short page the
+        all ratios, and computing them over a page's chrome moves every one of them - on a short page the
         navigation and footer are most of the words.
       </p>
       <% if (r.page.boilerplateExcluded && (r.page.boilerplateExcluded.samples || []).length) { %>
@@ -40,7 +40,7 @@
           <summary>What was excluded (<%= (r.page.boilerplateExcluded.samples || []).length %> samples)</summary>
           <ul class="tight">
             <% r.page.boilerplateExcluded.samples.forEach(function (x) { %>
-              <li><span class="mono-sm"><%= x.selector %></span> — <span class="muted"><%= x.preview %></span></li>
+              <li><span class="mono-sm"><%= x.selector %></span> - <span class="muted"><%= x.preview %></span></li>
             <% }) %>
           </ul>
         </details>
@@ -50,7 +50,7 @@
           <strong>This page reads as a <%= r.pageTypeVerdict.label.toLowerCase() %></strong>
           <% if (!r.pageTypeVerdict.confident) { %>
             <span class="badge medium">low confidence</span>
-            — it scored <%= r.pageTypeVerdict.score %><% if (r.pageTypeVerdict.runnerUp) { %> against <%= r.pageTypeVerdict.runnerUp.label %> at <%= r.pageTypeVerdict.runnerUp.score %><% } %>.
+           - it scored <%= r.pageTypeVerdict.score %><% if (r.pageTypeVerdict.runnerUp) { %> against <%= r.pageTypeVerdict.runnerUp.label %> at <%= r.pageTypeVerdict.runnerUp.score %><% } %>.
           <% } %>
           <span class="muted">
             Based on: <%= (r.pageTypeVerdict.evidence || []).slice(0, 3).map(function (e) { return e.why; }).join('; ') %>.
@@ -99,8 +99,8 @@
       <p class="hint">
         <strong>Why the order is not a style preference.</strong> A retrieval system chunks a page by its heading
         tree: an H3 is understood as belonging to the H2 above it, and the H2 to the H1. A page that goes
-        H1 → H4 → H2 has no tree, so the chunker either flattens it — losing which passage answers which
-        question — or nests wrongly and attributes a passage to the wrong subject. Screen readers have the same
+        H1 → H4 → H2 has no tree, so the chunker either flattens it - losing which passage answers which
+        question - or nests wrongly and attributes a passage to the wrong subject. Screen readers have the same
         problem for the same reason.
       </p>
 
@@ -154,7 +154,7 @@
             <div class="stat">
               <div class="label">Spread across the page</div>
               <div class="value"><%= t.tenthsCovered %>/10</div>
-              <div class="meta"><%= t.clustered ? 'clustered — over half the occurrences in one tenth' : 'evenly distributed' %></div>
+              <div class="meta"><%= t.clustered ? 'clustered - over half the occurrences in one tenth' : 'evenly distributed' %></div>
             </div>
             <div class="stat">
               <div class="label">In subheadings</div>
@@ -205,7 +205,7 @@
 
         <p class="hint">
           <strong>Density alone is a bad test, so both are measured.</strong> A 300-word page mentioning its term
-          six times and a 3,000-word page mentioning it sixty times are both at 2% — but if fifty of those sixty
+          six times and a 3,000-word page mentioning it sixty times are both at 2% - but if fifty of those sixty
           sit in one section, the second reads like spam and the first does not. That is why the distribution is
           charted next to the percentage, and why a clustered term is flagged even when the overall density is
           natural. All of it is measured after the template was excluded, so a brand name repeated in a footer
@@ -242,7 +242,7 @@
   <div class="stat-row">
     <div class="stat">
       <div class="label">Semantic coverage</div>
-      <div class="value"><%= r.coverage.pct == null ? '—' : r.coverage.pct + '%' %></div>
+      <div class="value"><%= r.coverage.pct == null ? ' - ' : r.coverage.pct + '%' %></div>
       <div class="meta"><%= r.coverage.basis %></div>
     </div>
     <div class="stat">
@@ -257,7 +257,7 @@
     </div>
     <div class="stat">
       <div class="label">Reading ease</div>
-      <div class="value"><%= r.readability.fleschReadingEase == null ? '—' : r.readability.fleschReadingEase %></div>
+      <div class="value"><%= r.readability.fleschReadingEase == null ? ' - ' : r.readability.fleschReadingEase %></div>
       <div class="meta">grade <%= r.readability.fleschKincaidGrade %> · avg sentence <%= r.readability.avgSentenceWords %> words</div>
     </div>
   </div>
@@ -330,9 +330,9 @@
                 <% if (p.ok) { %><span class="badge good">read</span>
                 <% } else { %><span class="badge critical"><%= p.error || ('HTTP ' + p.status) %></span><% } %>
               </td>
-              <td class="truncate" style="max-width:220px"><%= p.title || '—' %></td>
-              <td><%= p.words == null ? '—' : fmtInt(p.words) %></td>
-              <td><%= p.headings == null ? '—' : p.headings %></td>
+              <td class="truncate" style="max-width:220px"><%= p.title || ' - ' %></td>
+              <td><%= p.words == null ? ' - ' : fmtInt(p.words) %></td>
+              <td><%= p.headings == null ? ' - ' : p.headings %></td>
             </tr>
           <% }) %>
           </tbody>
@@ -347,7 +347,7 @@
       <div class="card-head"><h3>Consensus terms this page is missing</h3></div>
       <div class="card-body">
         <% if (!r.coverage.missing.length) { %>
-          <div class="empty-state">Nothing missing — the page covers every term the comparison set agrees on.</div>
+          <div class="empty-state">Nothing missing - the page covers every term the comparison set agrees on.</div>
         <% } else { %>
           <p class="hint mt-0"><%= r.coverage.basis %>.</p>
           <p class="pre term"><%= r.coverage.missing.join('  ·  ') %></p>
@@ -372,7 +372,7 @@
       <div class="card-body">
         <% if (!r.entityGap.missing.length) { %>
           <div class="empty-state">
-            None — every entity they name appears here too<% if (r.entityGap.suppressedCount) { %>, once the
+            None - every entity they name appears here too<% if (r.entityGap.suppressedCount) { %>, once the
             <%= r.entityGap.suppressedCount %> noise candidate<%= r.entityGap.suppressedCount === 1 ? '' : 's' %>
             below <%= r.entityGap.suppressedCount === 1 ? 'is' : 'are' %> set aside<% } %>.
           </div>
@@ -397,7 +397,7 @@
             suppressed as noise</strong> (<%= (r.entityGap.suppressedSummary || []).join(', ') %>),
             from <%= r.entityGap.candidatesBeforeFilter %> before filtering.
             A competitor's own brand name is structurally the entity most certain to be on their pages and not on
-            this one, so without the filter it topped every list — and the report was advising the client to write
+            this one, so without the filter it topped every list - and the report was advising the client to write
             about their rivals. Generic button and section labels came next for the same reason.
           </p>
           <details class="disclosure">
@@ -412,7 +412,7 @@
             </table></div>
             <p class="hint mt-0">
               Shown because a filter nobody can inspect is a filter nobody can trust. If something here is a real
-              gap, it will be a competitor brand term the domain-name heuristic caught by mistake — the surface
+              gap, it will be a competitor brand term the domain-name heuristic caught by mistake - the surface
               and the reason together are enough to tell.
             </p>
           </details>
@@ -457,7 +457,7 @@
         <div>
           <h4 style="margin-top:0">Paragraphs that cannot be quoted</h4>
           <% if (!r.citability.weakPassages.length) { %>
-            <p class="muted">None — every paragraph reads independently of its neighbours.</p>
+            <p class="muted">None - every paragraph reads independently of its neighbours.</p>
           <% } else { %>
             <p class="hint mt-0">
               These open with a word whose referent is off-screen ("This", "It", "However"), so a retrieval
@@ -503,7 +503,7 @@
             <tbody>
             <% d.edits.forEach(function (e) { %>
               <tr>
-                <td><span class="badge <%= e.priority === 'high' ? 'high' : (e.priority === 'medium' ? 'medium' : 'low') %>"><%= e.priority || '—' %></span></td>
+                <td><span class="badge <%= e.priority === 'high' ? 'high' : (e.priority === 'medium' ? 'medium' : 'low') %>"><%= e.priority || ' - ' %></span></td>
                 <td class="muted"><%= e.type %></td>
                 <td><%= e.where %></td>
                 <td class="muted" style="font-size:12px"><%= e.why %></td>
@@ -522,7 +522,7 @@
             <thead><tr><th>Heading</th><th>What it should cover</th><th>Approx words</th></tr></thead>
             <tbody>
             <% d.missingSections.forEach(function (s) { %>
-              <tr><td><%= s.heading %></td><td class="muted"><%= s.whatItShouldCover %></td><td><%= s.approxWords || '—' %></td></tr>
+              <tr><td><%= s.heading %></td><td class="muted"><%= s.whatItShouldCover %></td><td><%= s.approxWords || ' - ' %></td></tr>
             <% }) %>
             </tbody>
           </table></div>

@@ -83,7 +83,7 @@
   <div class="card">
     <div class="card-head">
       <h3>Per AI agent</h3>
-      <span class="muted" style="font-size:12px">robots.txt <em>and</em> the live wire response — the second is what catches an edge rule</span>
+      <span class="muted" style="font-size:12px">robots.txt <em>and</em> the live wire response - the second is what catches an edge rule</span>
     </div>
     <div class="card-body">
       <div class="table-wrap"><table class="data">
@@ -99,7 +99,7 @@
             <td><%= a.allowed ? 'allowed' : 'blocked' %><% if (a.rule) { %><div class="muted" style="font-size:11px"><%= a.rule %></div><% } %></td>
             <td class="muted" style="font-size:12px">
               <% if (a.probe) { %>
-                HTTP <%= a.probe.status == null ? '—' : a.probe.status %><% if (a.probe.challenge) { %> · <%= a.probe.challenge %><% } %>
+                HTTP <%= a.probe.status == null ? ' - ' : a.probe.status %><% if (a.probe.challenge) { %> · <%= a.probe.challenge %><% } %>
               <% } else { %>not probed<% } %>
             </td>
             <td>
@@ -115,7 +115,7 @@
       </table></div>
       <p class="hint">
         <strong>Retrieval and training are not the same decision.</strong> A retrieval fetcher requests a page at
-        the moment someone asks a question, in order to cite it — blocking one means this site cannot appear in
+        the moment someone asks a question, in order to cite it - blocking one means this site cannot appear in
         that assistant's answers. A training crawler collects text for model training, and blocking it costs
         nothing in visibility. A tool that reports "8 AI bots blocked" without that split tells a publisher who
         deliberately blocked training crawlers that they have a problem, and tells a site whose WAF is silently
@@ -167,10 +167,10 @@
             <% c.detail.noindexed.slice(0, 40).forEach(function (n) { %>
               <tr>
                 <td class="mono-sm"><%= n.url %></td>
-                <td class="muted" style="font-size:12px"><%= n.robotsMeta || n.xRobots || '—' %></td>
+                <td class="muted" style="font-size:12px"><%= n.robotsMeta || n.xRobots || ' - ' %></td>
                 <td>
-                  <% if (n.inSitemap) { %><span class="badge critical">yes — contradiction</span>
-                  <% } else { %><span class="badge neutral">no — reads as deliberate</span><% } %>
+                  <% if (n.inSitemap) { %><span class="badge critical">yes - contradiction</span>
+                  <% } else { %><span class="badge neutral">no - reads as deliberate</span><% } %>
                 </td>
               </tr>
             <% }) %>
@@ -225,7 +225,7 @@
           <% if (c.detail.thin.length) { %>
             <h4>Thin pages (under 120 words of content, no SPA markers)</h4>
             <ul class="tight">
-              <% c.detail.thin.slice(0, 25).forEach(function (x) { %><li class="mono-sm"><%= x.url %> <span class="muted">— <%= x.contentWords %> words</span></li><% }) %>
+              <% c.detail.thin.slice(0, 25).forEach(function (x) { %><li class="mono-sm"><%= x.url %> <span class="muted"> - <%= x.contentWords %> words</span></li><% }) %>
             </ul>
           <% } %>
         <% } %>
@@ -239,7 +239,7 @@
                 <td class="mono-sm"><%= x.url %></td>
                 <td><%= x.realAnchors %></td>
                 <td><%= x.fakeTotal %></td>
-                <td><%= x.realShare == null ? '—' : x.realShare + '%' %></td>
+                <td><%= x.realShare == null ? ' - ' : x.realShare + '%' %></td>
                 <td class="muted" style="font-size:11px">
                   <%= (x.examples || []).slice(0, 3).map(function (e) { return e.kind + (e.text ? ' ("' + e.text + '")' : ''); }).join('; ') %>
                 </td>
@@ -258,7 +258,7 @@
               <tr>
                 <td class="mono-sm"><%= x.url %></td>
                 <td><%= x.pageTypeLabel %><% if (!x.pageTypeConfident) { %> <span class="badge medium">low confidence</span><% } %></td>
-                <td class="muted" style="font-size:12px"><%= (x.declaredTypes || []).join(', ') || '—' %></td>
+                <td class="muted" style="font-size:12px"><%= (x.declaredTypes || []).join(', ') || ' - ' %></td>
                 <td><%= x.blocks %></td>
                 <td>
                   <% if (x.ok) { %><span class="badge good">clean</span><% } %>

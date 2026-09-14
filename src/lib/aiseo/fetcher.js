@@ -20,6 +20,7 @@
 // than fail on it), and a byte cap (a 200MB response must not end the process
 // on a host with a small memory allowance).
 const cheerio = require('cheerio');
+const renderer = require('../../../tools/node/lib/renderer');
 const tls = require('tls');
 const { URL } = require('url');
 const { AsyncLocalStorage } = require('async_hooks');
@@ -37,7 +38,7 @@ const {
 //
 // The nine analyses fetch through this module from 87 call sites across
 // seventeen files, so threading a credential argument through each one would
-// be both enormous and fragile — one missed call site produces a report that
+// be both enormous and fragile - one missed call site produces a report that
 // mixes real pages with login pages, which is the failure this is meant to
 // remove.
 //
@@ -49,19 +50,19 @@ const {
 // TWO RULES MAKE THIS SAFE, and both matter more than the feature:
 //
 //   1. SCOPED TO THE BRAND'S OWN SITE. These analyses deliberately fetch
-//      third parties — competitor domains, Reddit, Hacker News, Google and
+//      third parties - competitor domains, Reddit, Hacker News, Google and
 //      Bing News, review platforms. Sending a client's session cookie to a
 //      competitor's server would be handing over a live credential, so the
 //      scope is checked against every hop of every request.
 //   2. THE AI-CRAWLER CHECKS OPT OUT (`noAuth`). Their whole question is
-//      "can an unauthenticated agent read this page?" — answering it with a
+//      "can an unauthenticated agent read this page?" - answering it with a
 //      logged-in session would report that GPTBot can read a page only a
 //      member can see. A green light that means the opposite of what it says
 //      is the worst possible output for that check.
 const authContext = new AsyncLocalStorage();
 
 // Runs `fn` with credentials available to every fetch inside it, including
-// everything it awaits. `site` is the brand's own URL — the only host the
+// everything it awaits. `site` is the brand's own URL - the only host the
 // credentials will ever be sent to.
 function runWithAuth({ headers, site }, fn) {
   const usable = headers && Object.keys(headers).length && site;
@@ -133,6 +134,12 @@ async function fetchPage(url, {
   // Opt out of the run's credentials. Used by the AI-crawler access checks,
   // whose question is precisely what an UNauthenticated agent can read.
   noAuth = false,
+  // Fetch this page through the rendering service, so the body is the DOM a
+  // browser builds rather than the HTML the server ships. Opt-in per call
+  // because rendering is billed per page. Ignored, without error, when no
+  // ZENROWS_API_KEY is configured - the caller gets the raw fetch it would
+  // have got anyway, and out.rendered says so.
+  render = false,
 } = {}) {
   const started = Date.now();
   const out = {
@@ -149,6 +156,10 @@ async function fetchPage(url, {
     totalMs: null,
     redirectChain: [],
     ua,
+    rendered: false,
+    renderSkipped: null,
+    // Masked, never the key itself - this value reaches logs and reports.
+    renderKey: null,
   };
   try {
     // requestOnce resolves once the body is complete; the redirect-following
@@ -156,7 +167,10 @@ async function fetchPage(url, {
     // headers-only probe below where a check needs it, because attributing
     // total elapsed time to TTFB would be wrong.
     const auth = noAuth ? null : currentAuth();
-    const res = await fetchUrl(url, {
+
+    // The plain fetch, as it has always been. Rendering falls back to this on
+    // any failure, so it stays a named function rather than being inlined.
+    const rawFetch = () => fetchUrl(url, {
       timeout,
       headers: { 'User-Agent': ua, ...(extraHeaders || {}) },
       // Evaluated per redirect hop against the brand's own site, so a redirect
@@ -166,14 +180,53 @@ async function fetchPage(url, {
       ...(body != null ? { body } : {}),
       ...(maxBytes ? { maxBytes } : {}),
     });
+
+    // Rendering applies to plain GETs only. A POST carries a body the provider
+    // would not forward, and re-issuing it through a third party is the kind
+    // of surprise a fetch helper should never spring on its caller.
+    let renderRefusal = null;
+    if (render) {
+      if (!renderer.isEnabled()) renderRefusal = 'not rendered: no ZENROWS_API_KEY is configured';
+      else if (method !== 'GET') renderRefusal = 'not rendered: only GET requests are rendered';
+      else renderRefusal = renderer.refuseForAuth(auth);
+    }
+    const useRender = render && !renderRefusal;
+
+    let res = null;
+    if (useRender) {
+      try {
+        // renderPage walks the key pool: an account that has spent its
+        // allowance hands over to the next one. A provider error arrives as a
+        // JSON body, sometimes under a 2xx - left undetected it would score
+        // the page as a few hundred bytes with no headings and no links, the
+        // exact false reading this feature exists to remove - so renderPage
+        // throws on one rather than returning it as content.
+        const r = await renderer.renderPage(url, { timeout, maxBytes, ua }, { fetchUrl, decodeBody });
+        res = r.res;
+        out.rendered = true;
+        out.renderKey = renderer.mask(r.key);
+      } catch (err) {
+        renderRefusal = `not rendered: ${String(err.message).slice(0, 160)}`;
+      }
+    }
+    // Any refusal or failure lands here: an audit must not go down because a
+    // rendering vendor did.
+    if (!res) res = await rawFetch();
+    if (renderRefusal) out.renderSkipped = renderRefusal;
+
     out.totalMs = Date.now() - started;
     out.status = res.status;
-    out.url = res.url;
+    // A rendered response came from the provider's host. Reporting that as the
+    // page's URL would repoint every relative link, same-site test and
+    // canonical comparison downstream at api.zenrows.com, so the target URL is
+    // kept. The provider follows redirects internally and does not report the
+    // chain, which is why redirectChain stays empty on a rendered fetch.
+    out.url = out.rendered ? url : res.url;
     out.ok = res.status >= 200 && res.status < 300;
     out.headers = res.headers || {};
     out.contentType = String(out.headers['content-type'] || '');
     out.bytes = res.body ? res.body.length : 0;
-    out.redirectChain = (res.history || []).map((h) => ({ status: h.status, url: h.url }));
+    out.redirectChain = out.rendered ? [] : (res.history || []).map((h) => ({ status: h.status, url: h.url }));
     if (res.body && res.body.length
       && (/html|xml|json|text|javascript/i.test(out.contentType || 'text/html') || !out.contentType)) {
       out.body = decodeBody(res);
@@ -198,7 +251,7 @@ async function measureTtfb(url, { samples = 3, ua = UA } = {}) {
     const t0 = Date.now();
     try {
       // A HEAD would be cheaper, but plenty of servers handle HEAD on a
-      // different (often faster, sometimes 405) path than GET — so this
+      // different (often faster, sometimes 405) path than GET - so this
       // measures the request a visitor actually makes, and the byte cap keeps
       // it from downloading the whole page.
       await requestOnce(url, { timeout: 15000, headers: { 'User-Agent': ua }, maxBytes: 2048 });
@@ -214,8 +267,8 @@ async function measureTtfb(url, { samples = 3, ua = UA } = {}) {
 }
 
 // TLS certificate expiry. Read from the live handshake rather than inferred,
-// because the failure this guards against — a certificate that silently
-// expires — is invisible in the HTML and fatal to every other check at once.
+// because the failure this guards against - a certificate that silently
+// expires - is invisible in the HTML and fatal to every other check at once.
 function inspectCertificate(url, { timeoutMs = 8000 } = {}) {
   return new Promise((resolve) => {
     let host;
@@ -272,12 +325,12 @@ function inspectCertificate(url, { timeoutMs = 8000 } = {}) {
 
 // scriptingEnabled: false so <noscript> content parses as markup, matching the
 // audit crawler. Without it a noscript fallback is one opaque text node and
-// every selector below silently misses it — see tools/node/audit/page.js.
+// every selector below silently misses it - see tools/node/audit/page.js.
 function load(html) {
   return cheerio.load(String(html || ''), { scriptingEnabled: false });
 }
 
-// Visible text, joined the way BeautifulSoup's get_text(" ") does — one
+// Visible text, joined the way BeautifulSoup's get_text(" ") does - one
 // separator between text nodes. cheerio's own .text() concatenates with
 // nothing, which merges `<td>Total</td><td>19</td>` into "Total19" and
 // deflates every word count and readability score downstream.
@@ -302,6 +355,74 @@ function visibleText($, root) {
 // main-content text, and the metadata. Parsing this once per page and passing
 // the result around is what keeps the on-page scorer, the schema checker and
 // the architecture graph from each re-parsing the same HTML.
+// THE CHEERIO HANDLE IS LENT, NOT KEPT.
+//
+// Everything parseDocument computes is plain data. Six modules (boilerplate,
+// freshness, headings, pageType, schemaAuto, schemaBuilder) additionally run
+// their own selectors, so `$` has to stay reachable. It used to be a plain
+// field, and that is what took the app down: crawlSite holds every page for
+// the length of a crawl, so a 60-page architecture run held 60 parse5 trees at
+// once - each one roughly 20x its source HTML - and Node hit its heap limit
+// and exited 134 mid-crawl.
+//
+// So the tree is a releasable cache instead. Reading `doc.$` parses on demand
+// and remembers; releaseDom() drops it. A caller looping over crawled pages
+// releases as it goes and peaks at one tree rather than all of them, at the
+// cost of re-parsing a page whose DOM is asked for twice across phases.
+//
+// THIS MUST BE ITS OWN FUNCTION, AND THAT IS NOT A STYLE CHOICE.
+// A closure captures the whole scope it was declared in, not just the
+// variables it names. Defining this getter inline inside parseDocument
+// therefore pinned parseDocument's entire scope - the eager `$` binding
+// included - so releasing the cache freed nothing at all and the crawl still
+// retained every tree. Measured: 220MB retained after a 59-page crawl, versus
+// 14MB once the accessors could only see the three things passed in here.
+// `dom` is a parameter precisely so that assigning null to it drops the last
+// reference this closure holds.
+//
+// Non-enumerable on purpose: several result payloads reach JSON.stringify with
+// a doc still attached, and a serialised parse5 tree is both enormous and
+// meaningless.
+function attachDom(doc, html, dom) {
+  // The retained HTML is capped. fetchPage sets no body limit, so a crawl can
+  // meet a single multi-megabyte page, and keeping its source for every page
+  // of a 150-page crawl would recreate a smaller version of the problem this
+  // is fixing. Past the cap the source is dropped and a released page has no
+  // tree to give back: `doc.$` is null, which is the case every caller of it
+  // already guards for, and boilerplate.contentText falls back to the plain
+  // extracted text. Losing one selector pass on an outsized page beats
+  // exiting 134 mid-run.
+  const source = String(html || '');
+  const retained = source.length <= RETAIN_HTML_MAX_CHARS ? source : null;
+
+  Object.defineProperty(doc, 'html', { value: retained, enumerable: false, configurable: true });
+  Object.defineProperty(doc, '$', {
+    enumerable: false,
+    configurable: true,
+    get() {
+      if (!dom && retained) dom = load(retained);
+      return dom;
+    },
+  });
+  Object.defineProperty(doc, 'releaseDom', {
+    enumerable: false,
+    configurable: true,
+    value() { dom = null; },
+  });
+  // Lets a loop release only the trees it caused to be parsed, rather than
+  // yanking one out from under a caller still using it.
+  Object.defineProperty(doc, 'domLoaded', {
+    enumerable: false,
+    configurable: true,
+    get() { return !!dom; },
+  });
+  return doc;
+}
+
+// Ceiling on the per-page HTML kept for re-parsing. 1.5MB covers the long
+// tail of real pages; the handful above it are the ones worth not holding.
+const RETAIN_HTML_MAX_CHARS = Number(process.env.AISEO_RETAIN_HTML_MAX || 1_500_000);
+
 function parseDocument(url, html) {
   const $ = load(html);
 
@@ -333,7 +454,7 @@ function parseDocument(url, html) {
   //
   // Selector guessing fails in a specific and damaging way. A blog index on the
   // first site this ran against had a `<main>` wrapping only a 30-word intro
-  // while the 23 post cards — the actual content, present in the served HTML —
+  // while the 23 post cards - the actual content, present in the served HTML - 
   // sat outside it. Every downstream measurement then read that page as
   // 30 words: readability, entity density and citability were computed on an
   // intro paragraph, the thin-content check flagged it, and the
@@ -354,7 +475,7 @@ function parseDocument(url, html) {
     const share = bodyText.length ? candidateText.length / bodyText.length : 0;
     if (share >= MIN_MAIN_SHARE || bodyText.length < 400) { mainSel = sel; break; }
     // Remember the closest miss, so the rejection is explainable rather than
-    // silent — a page measured from <body> reads differently and the reason
+    // silent - a page measured from <body> reads differently and the reason
     // belongs in the payload.
     if (!mainSelectorRejected || share > mainSelectorRejected.share) {
       mainSelectorRejected = { selector: sel, share: Math.round(share * 100) / 100 };
@@ -417,7 +538,7 @@ function parseDocument(url, html) {
     });
   };
   // The main-region anchors are identified by node identity rather than by
-  // re-running a selector, because `mainNode` may be <body> itself — in which
+  // re-running a selector, because `mainNode` may be <body> itself - in which
   // case every anchor is "in main" and the distinction correctly collapses.
   const mainAnchors = new Set(mainNode.find('a[href]').toArray());
   $('a[href]').each((_, el) => collect($(el), mainAnchors.has(el)));
@@ -441,9 +562,8 @@ function parseDocument(url, html) {
     definitionLists: $('dl').length,
   };
 
-  return {
+  const doc = {
     url,
-    $,
     htmlLength: String(html || '').length,
     title: $('title').first().text().trim() || null,
     titleCount: $('title').length,
@@ -483,6 +603,9 @@ function parseDocument(url, html) {
     },
     breadcrumbTrail: extractBreadcrumbs($, url),
   };
+
+  attachDom(doc, html, $);
+  return doc;
 }
 
 // Breadcrumbs, from whichever of the three ways a site expresses them is
@@ -537,7 +660,7 @@ function parseRobots(text) {
 
     if (field === 'sitemap') { sitemaps.push(value); return; }
     if (field === 'user-agent') {
-      // Consecutive User-agent lines share one group of rules — a detail that
+      // Consecutive User-agent lines share one group of rules - a detail that
       // is easy to miss and changes the answer for every agent listed after
       // the first.
       if (current && !sawDirective) {
@@ -559,7 +682,7 @@ function parseRobots(text) {
   return { groups, sitemaps, raw: String(text || '') };
 }
 
-// Longest-match wins, and on an equal-length tie Allow wins — the rule Google
+// Longest-match wins, and on an equal-length tie Allow wins - the rule Google
 // and Bing both document. Getting the tie wrong flips the verdict on the
 // extremely common `Disallow: /` + `Allow: /$` homepage-only pattern.
 function robotsAllows(robots, agentToken, path) {
@@ -611,13 +734,13 @@ async function fetchRobots(siteUrl, { headers = null } = {}) {
   };
 }
 
-// llms.txt — the emerging convention for a plain-text map of a site's
+// llms.txt - the emerging convention for a plain-text map of a site's
 // canonical content, aimed at AI retrieval rather than at search crawlers.
 //
 // Worth being straight about in the UI: Google has stated it does not use
 // llms.txt, and it is not a ranking factor anywhere. It is cheap, it is read
 // by some retrieval pipelines, and it forces a brand to write its canonical
-// facts down in one place — which is the part that actually helps. It is
+// facts down in one place - which is the part that actually helps. It is
 // reported as an opportunity, never as an error.
 async function fetchLlmsTxt(siteUrl) {
   let origin;
@@ -736,6 +859,12 @@ async function crawlSite(startUrl, {
       };
       pages.push(page);
       if (onPage) onPage(page);
+      // The eager parse is done with: everything parseDocument computes is
+      // already on `doc`, and onPage has had its turn at the tree. Dropping it
+      // here is what keeps a 150-page crawl inside the heap. A later phase
+      // that needs `doc.$` re-parses that one page on access - see
+      // parseDocument for the reasoning.
+      page.doc.releaseDom();
 
       doc.links.forEach((l) => {
         if (sameHostOnly && !sameSite(start, l.url)) return;

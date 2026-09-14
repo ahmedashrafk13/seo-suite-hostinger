@@ -21,14 +21,14 @@
               <%= r.label || shortUrl(r.target) %>
               <% if (r.brand_name && (typeof brand === 'undefined' || !brand)) { %><span class="muted"> · <%= r.brand_name %></span><% } %>
             </td>
-            <td><%= r.score == null ? '—' : Math.round(r.score) %></td>
+            <td><%= r.score == null ? ' - ' : Math.round(r.score) %></td>
             <td>
-              <% if (!r.findings) { %>—<% } else { %>
+              <% if (!r.findings) { %> - <% } else { %>
                 <%= r.findings %><% if (r.urgent) { %> <span class="badge critical"><%= r.urgent %> urgent</span><% } %>
               <% } %>
             </td>
             <td><span class="badge <%= statusBadge(r.status) %>"><%= r.status %></span></td>
-            <td class="muted"><%= r.ms ? (r.ms > 1000 ? (r.ms/1000).toFixed(1) + 's' : r.ms + 'ms') : '—' %></td>
+            <td class="muted"><%= r.ms ? (r.ms > 1000 ? (r.ms/1000).toFixed(1) + 's' : r.ms + 'ms') : ' - ' %></td>
             <td><a class="btn secondary xs" href="/ai-seo/<%= slug %>/<%= r.id %>">Open</a></td>
           </tr>
         <% }) %>

@@ -13,13 +13,13 @@
         This is a different question from the one <a href="/ai-seo/reputation">Reputation signals</a> answers.
         That feature monitors what is being <em>said</em>; this one establishes what <em>exists</em>. A profile
         is a public page with a predictable shape, so its existence can be checked without reading a single
-        review — which is what makes it possible on platforms that block automated access.
+        review - which is what makes it possible on platforms that block automated access.
       </p>
       <p class="hint">
         <strong>Two methods, and a third outcome.</strong> Where a platform has a deterministic profile URL, that
         URL is probed directly: a 200 naming the brand is proof, a 404 is proof of absence. Everywhere else a
         keyless site-restricted search is used. A platform that rate-limits or blocks the request is recorded as
-        <strong>unknown</strong>, never as missing — calling an unknown a gap would send someone to create a
+        <strong>unknown</strong>, never as missing - calling an unknown a gap would send someone to create a
         profile that already exists, and "unknown" has its own count on the result page for exactly that reason.
       </p>
     </div>
@@ -47,14 +47,14 @@
           <label class="check">
             <input type="checkbox" name="include_probe" checked>
             Probe conventional profile URLs directly
-            <span class="muted">— the stronger evidence where a platform has a deterministic URL shape</span>
+            <span class="muted"> - the stronger evidence where a platform has a deterministic URL shape</span>
           </label>
         </div>
         <div class="checkbox-row">
           <label class="check">
             <input type="checkbox" name="include_search" checked>
             Search each platform's domain for this brand
-            <span class="muted">— the only method available for platforms whose profile URLs are not derivable</span>
+            <span class="muted"> - the only method available for platforms whose profile URLs are not derivable</span>
           </label>
         </div>
         <div class="btn-row">
@@ -62,7 +62,7 @@
         </div>
         <p class="hint">
           Checks run one at a time with a pause between them. Every platform here rate-limits, and firing twenty
-          concurrent requests returns 429 for most of them — which would land in the "unknown" bucket and make
+          concurrent requests returns 429 for most of them - which would land in the "unknown" bucket and make
           the whole report say nothing.
         </p>
       </form>
@@ -72,7 +72,7 @@
   <div class="card">
     <div class="card-head">
       <h3>Platforms checked for a <%= brand.vertical || 'general' %> business</h3>
-      <span class="muted" style="font-size:12px"><%= platformList.length %> of <%= allPlatforms.length %> — the rest are irrelevant to this vertical and are not reported</span>
+      <span class="muted" style="font-size:12px"><%= platformList.length %> of <%= allPlatforms.length %> - the rest are irrelevant to this vertical and are not reported</span>
     </div>
     <div class="card-body">
       <div class="table-wrap"><table class="data">

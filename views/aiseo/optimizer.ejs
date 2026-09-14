@@ -10,7 +10,7 @@
     <div class="card-body">
       <p class="hint mt-0">
         <strong>Scores a live URL or a pasted draft</strong> on semantic coverage against the pages it competes
-        with, readability, entity density, target-term placement, and citability — whether an AI answer engine
+        with, readability, entity density, target-term placement, and citability - whether an AI answer engine
         can lift a passage and attribute it. Every one of those is computed locally and returns the same number
         twice; the AI model is used only to turn the measured gaps into edits a writer can paste.
       </p>
@@ -29,18 +29,18 @@
           <input type="url" id="url" name="url" placeholder="https://example.com/certification/aml">
         </div>
         <div class="field">
-          <label for="keyword">Target term <span class="muted">(required — the score is relative to it)</span></label>
+          <label for="keyword">Target term <span class="muted">(required - the score is relative to it)</span></label>
           <input type="text" id="keyword" name="keyword" placeholder="aml certification">
         </div>
         <div class="field">
-          <label for="draft">Or paste a draft <span class="muted">(HTML or plain text — scored exactly as given, so plain text scores low on structure, correctly)</span></label>
+          <label for="draft">Or paste a draft <span class="muted">(HTML or plain text - scored exactly as given, so plain text scores low on structure, correctly)</span></label>
           <textarea id="draft" name="draft" rows="6" placeholder="<h1>…</h1><p>…</p>"></textarea>
         </div>
 
         <div class="section-divider"></div>
 
         <div class="field">
-          <label for="competitor_urls">Comparison pages <span class="muted">(one URL per line — the most accurate option, because you know who you compete with)</span></label>
+          <label for="competitor_urls">Comparison pages <span class="muted">(one URL per line - the most accurate option, because you know who you compete with)</span></label>
           <textarea id="competitor_urls" name="competitor_urls" rows="4" placeholder="https://competitor-one.com/their-page&#10;https://competitor-two.com/their-page"></textarea>
         </div>
         <div class="checkbox-row">
@@ -72,7 +72,7 @@
           <label class="check">
             <input type="checkbox" name="want_ai" <%= aiAvailable ? 'checked' : 'disabled' %>>
             Ask the model for in-line edits based on the measured gaps
-            <% if (!aiAvailable) { %><span class="muted">— needs an Azure OpenAI credential</span><% } %>
+            <% if (!aiAvailable) { %><span class="muted"> - needs an Azure OpenAI credential</span><% } %>
           </label>
         </div>
         <div class="checkbox-row">

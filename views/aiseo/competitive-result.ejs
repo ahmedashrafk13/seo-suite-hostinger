@@ -20,7 +20,7 @@
     <div class="stat">
       <div class="label">Dimensions where this site leads</div>
       <div class="value"><%= r.comparison.filter(function(d){ return d.ours >= d.theirs; }).length %> / <%= r.comparison.length %></div>
-      <div class="meta">measured dimensions only — see the caveat below</div>
+      <div class="meta">measured dimensions only - see the caveat below</div>
     </div>
     <div class="stat">
       <div class="label">Subject gaps</div>
@@ -44,7 +44,7 @@
   <div class="card">
     <div class="card-head">
       <h3>Topic coverage matrix</h3>
-      <span class="muted" style="font-size:12px">One score per site per topic, computed identically — so the columns are comparable</span>
+      <span class="muted" style="font-size:12px">One score per site per topic, computed identically - so the columns are comparable</span>
     </div>
     <div class="card-body">
       <div class="table-wrap scroll-y" style="max-height:620px">
@@ -76,8 +76,7 @@
                 </td>
               <% }) %>
               <td class="score <%= row.deficit != null && row.deficit > 0 ? 'cell-behind' : (row.deficit != null && row.deficit < 0 ? 'cell-lead' : '') %>">
-                <% if (row.deficit == null) { %>—
-                <% } else if (row.deficit > 0) { %>−<%= row.deficit %>
+                <% if (row.deficit == null) { %> - <% } else if (row.deficit > 0) { %>−<%= row.deficit %>
                 <% } else if (row.deficit < 0) { %>+<%= Math.abs(row.deficit) %>
                 <% } else { %>0<% } %>
               </td>
@@ -92,7 +91,7 @@
       </p>
       <p class="hint mt-0">
         The two halves of the score answer different questions and the tooltip on each cell splits them.
-        <em>Mentions</em> is breadth — how much of the site touches the subject at all. <em>About</em> is depth —
+        <em>Mentions</em> is breadth - how much of the site touches the subject at all. <em>About</em> is depth - 
         how many pages claim it in their title or H1. A site with a high mention count and a zero "about" count
         name-drops the topic and has no page for it, which is a completely different problem from a site that
         does not discuss it.
@@ -102,7 +101,7 @@
           <%= r.topicMatrix.noiseRemoved.total %> candidate topic<%= r.topicMatrix.noiseRemoved.total === 1 ? ' was' : 's were' %>
           excluded before this table was built (<%= (r.topicMatrix.noiseRemoved.summary || []).join(', ') %>),
           and <%= r.topicMatrix.collapsedDuplicates %> near-duplicate<%= r.topicMatrix.collapsedDuplicates === 1 ? ' was' : 's were' %>
-          collapsed — "capital adequacy" and "capital adequacy requirements" are one topic, and listing both makes
+          collapsed - "capital adequacy" and "capital adequacy requirements" are one topic, and listing both makes
           the table twice as long and no more useful.
         </p>
       <% } %>
@@ -158,8 +157,7 @@
               <td><%= row.keyword %><div class="basis"><%= row.engine %>, <%= row.resultsSampled %> results</div></td>
               <% row.cells.forEach(function (c) { %>
                 <td class="score <%= c.ours ? 'ours' : '' %> <%= c.position == null ? 'cell-none' : (c.position <= 3 ? 'cell-lead' : '') %>">
-                  <% if (c.position == null) { %>—
-                  <% } else { %>
+                  <% if (c.position == null) { %> - <% } else { %>
                     #<%= c.position %>
                     <% if (c.url) { %><div class="basis" title="<%= c.url %>"><%= shortUrl(c.url, 34) %></div><% } %>
                   <% } %>
@@ -178,14 +176,14 @@
       </div>
 
       <% if (r.keywordGap.truncated) { %>
-        <p class="hint"><strong>Capped at <%= r.keywordGap.cappedAt %> keywords.</strong> More candidates were available than were checked; each one costs a paced request to a result page. Raise the limit on the form to cover more — nothing was dropped silently.</p>
+        <p class="hint"><strong>Capped at <%= r.keywordGap.cappedAt %> keywords.</strong> More candidates were available than were checked; each one costs a paced request to a result page. Raise the limit on the form to cover more - nothing was dropped silently.</p>
       <% } %>
       <% if ((r.keywordGap.errors || []).length) { %>
         <p class="hint mt-0"><strong>Keywords that could not be sampled:</strong> <%= r.keywordGap.errors.join('; ') %></p>
       <% } %>
       <p class="hint">
         <strong>How to use a "gap" row.</strong> Open the competitor URL in the cell before deciding anything.
-        The useful question is not "do they rank" but "what does their page do that ours does not" — and where
+        The useful question is not "do they rank" but "what does their page do that ours does not" - and where
         the row says <em>nobody ranks</em>, the answer is usually that the intent is served by a different page
         type entirely, which no amount of optimising an existing page will fix.
       </p>
@@ -218,19 +216,19 @@
               <% if (row.ours) { %> <span class="badge accent">this brand</span><% } %>
             </td>
             <td>
-              <% if (row.referringDomains == null) { %><span class="cell-none">—</span>
+              <% if (row.referringDomains == null) { %><span class="cell-none"> - </span>
               <% } else { %>
                 <strong><%= fmtInt(row.referringDomains) %></strong>
                 <% if (row.isSample) { %><div class="basis proxy">floor, not a total</div><% } %>
               <% } %>
             </td>
-            <td><%= row.backlinks == null ? '—' : fmtInt(row.backlinks) %></td>
-            <td><%= row.followedDomains == null ? '—' : row.followedDomains %></td>
+            <td><%= row.backlinks == null ? ' - ' : fmtInt(row.backlinks) %></td>
+            <td><%= row.followedDomains == null ? ' - ' : row.followedDomains %></td>
             <td>
-              <%= row.mentionsWithoutLink == null ? '—' : row.mentionsWithoutLink %>
+              <%= row.mentionsWithoutLink == null ? ' - ' : row.mentionsWithoutLink %>
               <% if (row.ours && row.mentionsWithoutLink) { %><div class="basis">the easiest links available</div><% } %>
             </td>
-            <td><%= row.domainAuthority == null ? '—' : row.domainAuthority %></td>
+            <td><%= row.domainAuthority == null ? ' - ' : row.domainAuthority %></td>
             <td class="basis"><%= row.source %></td>
           </tr>
         <% }) %>
@@ -239,7 +237,7 @@
 
       <p class="hint">
         <strong>"Mentions without a link" is the number that used to be wrong.</strong> The previous version of
-        this report counted every page a web search returned for a domain name as a referring domain — including
+        this report counted every page a web search returned for a domain name as a referring domain - including
         pages that merely typed it in running text. Each candidate is now fetched and its anchors read, so the
         referring-domain column counts only real links and the mentions sit in their own column. Unlinked
         mentions of <em>this</em> brand are the cheapest links available: the publisher already decided to write
@@ -259,8 +257,8 @@
                 <% if (g.linksTo.length > 1) { %> <span class="badge medium"><%= g.linksTo.length %> competitors</span><% } %>
               </td>
               <td class="muted"><%= g.followed ? 'followed' : 'nofollow only' %></td>
-              <td class="muted" style="font-size:11.5px"><%= (g.anchors || []).slice(0, 3).join(' · ') || '—' %></td>
-              <td class="mono-sm"><% if (g.sample) { %><a href="<%= g.sample %>" target="_blank" rel="noopener"><%= shortUrl(g.sample, 44) %></a><% } else { %>—<% } %></td>
+              <td class="muted" style="font-size:11.5px"><%= (g.anchors || []).slice(0, 3).join(' · ') || ' - ' %></td>
+              <td class="mono-sm"><% if (g.sample) { %><a href="<%= g.sample %>" target="_blank" rel="noopener"><%= shortUrl(g.sample, 44) %></a><% } else { %> - <% } %></td>
             </tr>
           <% }) %>
           </tbody>
@@ -268,7 +266,7 @@
         <p class="hint">
           <strong>Start with the rows naming more than one competitor.</strong> A domain linking to several sites
           in a category and not to this one is a directory, a supplier page, an association member list or a
-          review site that has the whole category except this brand — and every one of those is reachable by
+          review site that has the whole category except this brand - and every one of those is reachable by
           asking. A one-off editorial link is not.
         </p>
       <% } %>
@@ -284,8 +282,8 @@
     </div>
     <div class="card-body">
       <p class="hint mt-0">
-        Before filtering, the top of every gap list was the competitors' own brand names — structurally, because
-        a competitor's brand is the entity most certain to appear on their pages and not on this one — followed by
+        Before filtering, the top of every gap list was the competitors' own brand names - structurally, because
+        a competitor's brand is the entity most certain to appear on their pages and not on this one - followed by
         generic button and section labels. The report was, in effect, recommending that the client write about
         their rivals and add buttons.
         <% if (r.gaps && r.gaps.beforeCleaning) { %>
@@ -300,7 +298,7 @@
             <h5>Entities (<%= (r.noiseRemoved.entities || []).length %>)</h5>
             <ul class="tight">
               <% (r.noiseRemoved.entities || []).forEach(function (x) { %>
-                <li><span class="mono-sm"><%= x.surface %></span> <span class="muted">— <%= x.reason %></span></li>
+                <li><span class="mono-sm"><%= x.surface %></span> <span class="muted"> - <%= x.reason %></span></li>
               <% }) %>
             </ul>
           </div>
@@ -308,7 +306,7 @@
             <h5>Phrases (<%= (r.noiseRemoved.phrases || []).length %>)</h5>
             <ul class="tight">
               <% (r.noiseRemoved.phrases || []).forEach(function (x) { %>
-                <li><span class="mono-sm"><%= x.phrase %></span> <span class="muted">— <%= x.reason %></span></li>
+                <li><span class="mono-sm"><%= x.phrase %></span> <span class="muted"> - <%= x.reason %></span></li>
               <% }) %>
             </ul>
           </div>
@@ -318,7 +316,7 @@
           <span class="mono-sm"><%= (r.noiseRemoved.competitorBrandTerms || []).join(', ') || 'none' %></span>.
           <% if (r.noiseRemoved.templateBlocksDetected) { %>
             <%= r.noiseRemoved.templateBlocksDetected %> template strings were also detected across the crawled
-            sites and suppressed — text repeating verbatim on most pages of a site is that site's furniture,
+            sites and suppressed - text repeating verbatim on most pages of a site is that site's furniture,
             whatever markup it sits in.
           <% } %>
         </p>
@@ -354,9 +352,9 @@
             <% r.competitors.forEach(function (c) { %><td><%= c.profile.schemaCoverage %>%</td><% }) %>
           </tr>
           <tr>
-            <td>Referring domains <span class="muted" title="A VERIFIED sample: candidate pages were found by a keyless web search, then each was fetched and its outbound links read — so every domain counted carries a real link. The candidate list is capped, so these are floors rather than totals, and they are not comparable to an Ahrefs or Semrush figure.">(verified sample — a floor, not a total)</span></td>
-            <td><%= (r.ours.referring && r.ours.referring.ok) ? r.ours.referring.referringDomains.length : '—' %></td>
-            <% r.competitors.forEach(function (c) { %><td><%= (c.referring && c.referring.ok) ? c.referring.referringDomains.length : '—' %></td><% }) %>
+            <td>Referring domains <span class="muted" title="A VERIFIED sample: candidate pages were found by a keyless web search, then each was fetched and its outbound links read - so every domain counted carries a real link. The candidate list is capped, so these are floors rather than totals, and they are not comparable to an Ahrefs or Semrush figure.">(verified sample - a floor, not a total)</span></td>
+            <td><%= (r.ours.referring && r.ours.referring.ok) ? r.ours.referring.referringDomains.length : ' - ' %></td>
+            <% r.competitors.forEach(function (c) { %><td><%= (c.referring && c.referring.ok) ? c.referring.referringDomains.length : ' - ' %></td><% }) %>
           </tr>
           <tr>
             <td>Pages with an author signal</td>
@@ -365,8 +363,8 @@
           </tr>
           <tr>
             <td>Average citability <span class="muted">(sampled pages)</span></td>
-            <td><%= r.ours.profile.avgCitability == null ? '—' : r.ours.profile.avgCitability %></td>
-            <% r.competitors.forEach(function (c) { %><td><%= c.profile.avgCitability == null ? '—' : c.profile.avgCitability %></td><% }) %>
+            <td><%= r.ours.profile.avgCitability == null ? ' - ' : r.ours.profile.avgCitability %></td>
+            <% r.competitors.forEach(function (c) { %><td><%= c.profile.avgCitability == null ? ' - ' : c.profile.avgCitability %></td><% }) %>
           </tr>
           <tr>
             <td>AI retrieval fetchers allowed</td>
@@ -375,13 +373,13 @@
           </tr>
           <tr>
             <td>Homepage TTFB</td>
-            <td><%= r.ours.posture.ttfbMs == null ? '—' : r.ours.posture.ttfbMs + 'ms' %></td>
-            <% r.competitors.forEach(function (c) { %><td><%= c.posture.ttfbMs == null ? '—' : c.posture.ttfbMs + 'ms' %></td><% }) %>
+            <td><%= r.ours.posture.ttfbMs == null ? ' - ' : r.ours.posture.ttfbMs + 'ms' %></td>
+            <% r.competitors.forEach(function (c) { %><td><%= c.posture.ttfbMs == null ? ' - ' : c.posture.ttfbMs + 'ms' %></td><% }) %>
           </tr>
           <tr>
             <td>Content present in served HTML</td>
-            <td><%= r.ours.posture.likelyClientRendered ? 'no — client-rendered' : 'yes' %></td>
-            <% r.competitors.forEach(function (c) { %><td><%= c.posture.likelyClientRendered ? 'no — client-rendered' : 'yes' %></td><% }) %>
+            <td><%= r.ours.posture.likelyClientRendered ? 'no - client-rendered' : 'yes' %></td>
+            <% r.competitors.forEach(function (c) { %><td><%= c.posture.likelyClientRendered ? 'no - client-rendered' : 'yes' %></td><% }) %>
           </tr>
           <tr>
             <td>llms.txt published</td>
@@ -392,17 +390,17 @@
             <td>Publishing rate <span class="muted">(pages/month, last 90 days)</span></td>
             <td>
               <% if (r.ours.velocityHistory && r.ours.velocityHistory.usable) { %>
-                <%= r.ours.velocityHistory.perMonth %> <span class="muted" title="Observed by diffing this site's sitemap against every prior run — a fact, not an estimate.">(observed)</span>
+                <%= r.ours.velocityHistory.perMonth %> <span class="muted" title="Observed by diffing this site's sitemap against every prior run - a fact, not an estimate.">(observed)</span>
               <% } else if (r.ours.velocity.usable) { %>
-                <%= r.ours.velocity.perMonth %> <span class="muted" title="<%= r.ours.velocity.reason %> No prior sitemap snapshot yet to observe a real rate from — run this again later for an observed figure.">(estimated from lastmod)</span>
+                <%= r.ours.velocity.perMonth %> <span class="muted" title="<%= r.ours.velocity.reason %> No prior sitemap snapshot yet to observe a real rate from - run this again later for an observed figure.">(estimated from lastmod)</span>
               <% } else { %><span class="muted" title="<%= r.ours.velocity.reason %>">not measurable</span><% } %>
             </td>
             <% r.competitors.forEach(function (c) { %>
               <td>
                 <% if (c.velocityHistory && c.velocityHistory.usable) { %>
-                  <%= c.velocityHistory.perMonth %> <span class="muted" title="Observed by diffing this site's sitemap against every prior run — a fact, not an estimate.">(observed)</span>
+                  <%= c.velocityHistory.perMonth %> <span class="muted" title="Observed by diffing this site's sitemap against every prior run - a fact, not an estimate.">(observed)</span>
                 <% } else if (c.velocity.usable) { %>
-                  <%= c.velocity.perMonth %> <span class="muted" title="<%= c.velocity.reason %> No prior sitemap snapshot yet to observe a real rate from — run this again later for an observed figure.">(estimated from lastmod)</span>
+                  <%= c.velocity.perMonth %> <span class="muted" title="<%= c.velocity.reason %> No prior sitemap snapshot yet to observe a real rate from - run this again later for an observed figure.">(estimated from lastmod)</span>
                 <% } else { %><span class="muted" title="<%= c.velocity.reason %>">not measurable</span><% } %>
               </td>
             <% }) %>
@@ -413,7 +411,7 @@
         <strong>"Publishing rate not measurable"</strong> is a real answer, not a failure: many CMS platforms
         stamp <code>lastmod</code> on every URL at deploy time, which would make an inactive site look prolific.
         Where the dates cluster on one or two days they are treated as a build artefact and the figure is
-        withheld — hover for the specific reason.
+        withheld - hover for the specific reason.
       </p>
     </div>
   </div>
@@ -429,7 +427,7 @@
           <tr>
             <td><strong><%= p.label %></strong></td>
             <td class="muted"><%= p.provides.join(', ') %></td>
-            <td class="muted" style="font-size:12px"><%= p.note || '—' %></td>
+            <td class="muted" style="font-size:12px"><%= p.note || ' - ' %></td>
           </tr>
         <% }) %>
         </tbody>
@@ -447,7 +445,7 @@
       <div class="card-head"><h3>Subjects competitors cover and this site does not</h3></div>
       <div class="card-body">
         <% if (!r.gaps.entities.length) { %>
-          <div class="empty-state">None — this site names everything they do.</div>
+          <div class="empty-state">None - this site names everything they do.</div>
         <% } else { %>
           <div class="table-wrap scroll-y" style="max-height:480px">
             <table class="data">
@@ -541,7 +539,7 @@
   <% } %>
 
   <div class="card">
-    <div class="card-head"><h3>Their internal anchor text — what they think their money pages are</h3></div>
+    <div class="card-head"><h3>Their internal anchor text - what they think their money pages are</h3></div>
     <div class="card-body">
       <div class="grid cols-2">
         <% r.competitors.forEach(function (c) { %>
@@ -594,7 +592,7 @@
         <% if (d.doNotChase && d.doNotChase.length) { %>
           <h4>Gaps it says not to chase</h4>
           <ul class="meta-list">
-            <% d.doNotChase.forEach(function (x) { %><li><strong><%= x.topic %></strong> — <%= x.why %></li><% }) %>
+            <% d.doNotChase.forEach(function (x) { %><li><strong><%= x.topic %></strong> - <%= x.why %></li><% }) %>
           </ul>
         <% } %>
       <% } %>

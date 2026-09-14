@@ -116,7 +116,7 @@
 
       <% if (r.microdata.length) { %>
         <p class="hint">
-          <strong>Microdata also present:</strong> <%= r.microdata.join(', ') %>. Detected but not validated —
+          <strong>Microdata also present:</strong> <%= r.microdata.join(', ') %>. Detected but not validated - 
           two formats describing the same thing is a common source of contradictory markup, and Google reads both.
         </p>
       <% } %>
@@ -143,7 +143,7 @@
             <% if (!r.pageType.confident) { %>
               <p class="mt-0">
                 The classifier is <strong>not confident</strong> here, so confirm the page type before removing
-                anything — see the evidence below.
+                anything - see the evidence below.
               </p>
             <% } %>
           </div>
@@ -156,7 +156,7 @@
         <% (r.pageType.evidence || []).forEach(function (e) { %>
           <tr class="<%= e.counterEvidence ? 'muted' : '' %>">
             <td class="mono-sm"><%= e.source %><% if (e.type) { %> → <%= e.type %><% } %></td>
-            <td><%= e.counterEvidence ? '—' : e.weight %></td>
+            <td><%= e.counterEvidence ? ' - ' : e.weight %></td>
             <td style="font-size:12.5px">
               <%= e.why %>
               <% if (e.counterEvidence) { %> <span class="badge neutral">counter-evidence</span><% } %>
@@ -168,8 +168,8 @@
 
       <p class="hint">
         <strong>Why a price is not enough to make a page a product page.</strong>
-        The discriminator is the <em>transaction apparatus</em> — an add-to-cart control, an SKU, a variant
-        selector — not the presence of a number. Service pages, pricing pages and course pages all quote prices,
+        The discriminator is the <em>transaction apparatus</em> - an add-to-cart control, an SKU, a variant
+        selector - not the presence of a number. Service pages, pricing pages and course pages all quote prices,
         and treating a price as evidence of a product is exactly what produced Product markup on service pages.
         A price with no purchase control is recorded above as evidence <em>against</em> product, which is what it
         is.
@@ -194,7 +194,7 @@
     <div class="card-body">
       <p class="hint mt-0">
         <strong>One combined <code>@graph</code>, cross-referenced by <code>@id</code>.</strong>
-        This is what actually goes on the page. Separate blocks side by side state unlinked facts — a standalone
+        This is what actually goes on the page. Separate blocks side by side state unlinked facts - a standalone
         Article next to a standalone Organization does not say "this article was published by this organisation",
         and the <code>@id</code> references below do.
         <% if ((r.build.sitewideTypes || []).length) { %>
@@ -205,7 +205,7 @@
       </p>
       <p class="hint mt-0">
         <strong>Every unknowable property is omitted, not set to <code>null</code>.</strong>
-        Google treats an explicit null as a malformed value — worse than an absent property, which it simply
+        Google treats an explicit null as a malformed value - worse than an absent property, which it simply
         ignores. So each block below is valid JSON-LD exactly as it stands, and the values that could not be read
         from the page are listed beside it as a checklist rather than smuggled into it.
       </p>
@@ -222,7 +222,7 @@
             <strong><%= b.type %></strong>
             <% if (!b.requiredPlaceholders.length) { %><span class="badge good">ready to paste</span>
             <% } else { %><span class="badge medium"><%= b.requiredPlaceholders.length %> required value<%= b.requiredPlaceholders.length === 1 ? '' : 's' %> missing</span><% } %>
-            <% if (b.requestedExplicitly) { %><span class="badge critical">you asked for this type — the page contradicts it</span><% } %>
+            <% if (b.requestedExplicitly) { %><span class="badge critical">you asked for this type - the page contradicts it</span><% } %>
             <% if (b.verifyRequired) { %><span class="badge medium">verify before publishing</span><% } %>
           </summary>
 
@@ -276,7 +276,7 @@
           </tbody>
         </table></div>
         <p class="hint">
-          This list is the point of the page-type check. A type on it was not omitted for lack of effort — it was
+          This list is the point of the page-type check. A type on it was not omitted for lack of effort - it was
           omitted because generating it would misdescribe the page, and markup that is complete and wrong is
           worse than markup that is incomplete and right. Where you know something the classifier does not, ask
           for the type explicitly on the form and it will be generated with the objection recorded against it.
@@ -295,13 +295,13 @@
     <div class="card-body">
       <p class="hint mt-0">
         <strong>Use the pasteable blocks above instead.</strong> This older view leaves unreadable fields as
-        explicit <code>null</code>s, which Google treats as malformed — so these fragments are not safe to paste
+        explicit <code>null</code>s, which Google treats as malformed - so these fragments are not safe to paste
         as they stand. They are retained only because seeing the raw derivation is occasionally the fastest way
         to check why a property came out the way it did.
       </p>
       <% r.generated.forEach(function (g) { %>
         <div class="disclosure" style="margin-bottom:16px">
-          <h4 style="margin:0 0 4px"><%= g.type %> <span class="muted" style="font-weight:400;font-size:12px">— <%= g.basis %></span></h4>
+          <h4 style="margin:0 0 4px"><%= g.type %> <span class="muted" style="font-weight:400;font-size:12px"> - <%= g.basis %></span></h4>
           <% if (g.needsHumanInput && g.needsHumanInput.length) { %>
             <ul class="meta-list">
               <% g.needsHumanInput.forEach(function (n) { %>
@@ -337,7 +337,7 @@
           <h4>Types it ruled out</h4>
           <ul class="meta-list">
             <% r.aiDraft.data.rejected.forEach(function (rej) { %>
-              <li><strong><%= rej.type %></strong> — <%= rej.whyNot %></li>
+              <li><strong><%= rej.type %></strong> - <%= rej.whyNot %></li>
             <% }) %>
           </ul>
         <% } %>

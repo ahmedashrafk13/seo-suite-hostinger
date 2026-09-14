@@ -1,4 +1,4 @@
-// WHOLE-SITE AI CRAWLER READINESS — the eight-point checklist.
+// WHOLE-SITE AI CRAWLER READINESS - the eight-point checklist.
 //
 // WHAT WAS ASKED FOR
 // "Search for whole website not single url", against this checklist:
@@ -154,7 +154,7 @@ function linkMechanics(doc) {
 //
 // Walks the JSON-LD for the properties whose values are supposed to be things a
 // reader can see, and checks each against the page's rendered text. Only
-// properties where a mismatch is a genuine problem are checked — comparing a
+// properties where a mismatch is a genuine problem are checked - comparing a
 // URL or an @id against body text would produce nothing but false positives.
 const VISIBLE_PROPERTIES = [
   { path: 'name', label: 'name' },
@@ -216,7 +216,7 @@ function markupMatchesVisible(doc) {
           markupValue: String(raw).slice(0, 160),
           severity: ['price', 'ratingValue', 'reviewCount', 'ratingCount'].includes(prop.path) ? 'high' : 'medium',
           why: ['ratingValue', 'reviewCount', 'ratingCount'].includes(prop.path)
-            ? 'A rating or review count in markup that does not appear on the page is self-serving review markup — the single most commonly penalised structured-data abuse.'
+            ? 'A rating or review count in markup that does not appear on the page is self-serving review markup - the single most commonly penalised structured-data abuse.'
             : (prop.path === 'price'
               ? 'A marked-up price that does not appear on the page is a misrepresentation in a shopping result, and Google validates it against the rendered page.'
               : 'Structured data is required to describe what a reader can see. A value present only in markup is unverifiable and may be ignored across the whole page.'),
@@ -330,8 +330,8 @@ async function run({
     let probes = [];
     if (probeEdge) {
       // Probed against the homepage only. An edge rule that blocks an agent
-      // blocks it everywhere — it is a server configuration, not a per-page
-      // one — so probing every page would cost N× the requests for the same
+      // blocks it everywhere - it is a server configuration, not a per-page
+      // one - so probing every page would cost N× the requests for the same
       // answer.
       probes = await probeAgents(target, {
         agents: AI_AGENTS,
@@ -360,7 +360,7 @@ async function run({
       status: !set.robots.present ? 'warn' : (retrievalBlocked.length ? 'fail' : 'pass'),
       summary: set.robots.present
         ? `Served at ${origin}/robots.txt. ${set.robots.parsed.sitemaps.length} sitemap declaration${set.robots.parsed.sitemaps.length === 1 ? '' : 's'}. ${agentStatus.filter((a) => a.purpose === 'retrieval' && a.verdict === 'reachable').length} of ${agentStatus.filter((a) => a.purpose === 'retrieval').length} AI retrieval fetchers can reach the site.`
-        : `No robots.txt is served (HTTP ${set.robots.status}). Not fatal — absence means "allow everything" — but it also means no sitemap is declared there, and a WAF that later starts serving an error page at that path would silently block every crawler.`,
+        : `No robots.txt is served (HTTP ${set.robots.status}). Not fatal - absence means "allow everything" - but it also means no sitemap is declared there, and a WAF that later starts serving an error page at that path would silently block every crawler.`,
       detail: { agents: agentStatus, sitemapsDeclared: set.robots.parsed.sitemaps, present: set.robots.present, status: set.robots.status },
     });
 
@@ -368,12 +368,12 @@ async function run({
       findings.push({
         checkKey: 'site_retrieval_blocked',
         title: `${retrievalBlocked.length} AI retrieval fetcher${retrievalBlocked.length === 1 ? '' : 's'} cannot read this site`,
-        detail: `${retrievalBlocked.map((a) => `${a.label}: ${a.reason}`).join('; ')}. These fetch pages at the moment a user asks a question, in order to cite them — while they are blocked, no page on this site can appear in those assistants' answers.`,
+        detail: `${retrievalBlocked.map((a) => `${a.label}: ${a.reason}`).join('; ')}. These fetch pages at the moment a user asks a question, in order to cite them - while they are blocked, no page on this site can appear in those assistants' answers.`,
         severity: 'critical',
         affectedUrl: target,
         affectedCount: retrievalBlocked.length,
         action: retrievalBlocked.some((a) => a.reason && a.reason.startsWith('robots.txt:'))
-          ? 'Remove the robots.txt rules blocking the retrieval agents. Rules for TRAINING crawlers can stay if they were set deliberately — that is a different decision with no visibility cost.'
+          ? 'Remove the robots.txt rules blocking the retrieval agents. Rules for TRAINING crawlers can stay if they were set deliberately - that is a different decision with no visibility cost.'
           : 'robots.txt allows these agents, so the block is at the edge: check Cloudflare bot-fight mode, any "block AI scrapers" plugin, and WAF user-agent rules.',
         evidence: { agents: retrievalBlocked },
         dedupeKey: `sitereadiness:retrieval:${target}`,
@@ -409,7 +409,7 @@ async function run({
         coveragePct: sitemapCoverage,
         // The honest caveat: "not reached by the crawl" has two causes and only
         // one of them is a problem.
-        caveat: `"Not reached by the crawl" means either the page has no internal links pointing at it (an orphan — a real problem) or the crawl stopped at ${maxPages} pages before reaching it (not a problem). The orphan check on the architecture report distinguishes them.`,
+        caveat: `"Not reached by the crawl" means either the page has no internal links pointing at it (an orphan - a real problem) or the crawl stopped at ${maxPages} pages before reaching it (not a problem). The orphan check on the architecture report distinguishes them.`,
         crawlComplete: set.crawl.complete,
       },
     });
@@ -433,7 +433,7 @@ async function run({
         severity: 'medium',
         affectedUrl: missingFromSitemap[0],
         affectedCount: missingFromSitemap.length,
-        action: 'Add them, or work out why the generator excluded them — an unintended exclusion rule usually affects a whole section rather than one page.',
+        action: 'Add them, or work out why the generator excluded them - an unintended exclusion rule usually affects a whole section rather than one page.',
         evidence: { urls: missingFromSitemap.slice(0, 100) },
         dedupeKey: `sitereadiness:sitemapgap:${target}`,
       });
@@ -527,8 +527,8 @@ async function run({
       status: noindexInSitemap.length ? 'fail' : (nosnippet.length ? 'warn' : 'pass'),
       summary: `${noindexed.length} of ${okPages.length} crawled pages carry noindex`
         + (noindexInSitemap.length
-          ? `, and ${noindexInSitemap.length} of those ${noindexInSitemap.length === 1 ? 'is' : 'are'} ALSO listed in the sitemap — the site is telling Google to index them and not to index them at the same time, which is the signature of an accident.`
-          : ' — none of them are in the sitemap, so they read as deliberate.')
+          ? `, and ${noindexInSitemap.length} of those ${noindexInSitemap.length === 1 ? 'is' : 'are'} ALSO listed in the sitemap - the site is telling Google to index them and not to index them at the same time, which is the signature of an accident.`
+          : ' - none of them are in the sitemap, so they read as deliberate.')
         + (nosnippet.length ? ` ${nosnippet.length} page${nosnippet.length === 1 ? '' : 's'} carry nosnippet or max-snippet:0, which prevents an AI answer engine quoting them even where they rank.` : ''),
       detail: {
         noindexed: noindexed.map((p) => ({ url: p.url, robotsMeta: p.doc.robotsMeta, xRobots: (p.headers || {})['x-robots-tag'] || null, inSitemap: set.sitemapKeys.has(canonUrl(p.url)) })),
@@ -541,7 +541,7 @@ async function run({
       findings.push({
         checkKey: 'noindex_in_sitemap',
         title: `${noindexInSitemap.length} page${noindexInSitemap.length === 1 ? '' : 's'} carry noindex while being listed in the sitemap`,
-        detail: `${noindexInSitemap.slice(0, 8).map((p) => p.url).join(', ')}. A sitemap entry is a request to index; a noindex tag is an instruction not to. One of the two is wrong, and which one it is is a decision only you can make — but the contradiction itself is never intentional.`,
+        detail: `${noindexInSitemap.slice(0, 8).map((p) => p.url).join(', ')}. A sitemap entry is a request to index; a noindex tag is an instruction not to. One of the two is wrong, and which one it is is a decision only you can make - but the contradiction itself is never intentional.`,
         severity: 'high',
         affectedUrl: noindexInSitemap[0].url,
         affectedCount: noindexInSitemap.length,
@@ -692,7 +692,7 @@ async function run({
       key: 'content_in_html',
       item: '6. Main content is available in HTML',
       status: clientRendered.length ? 'fail' : (thin.length > okPages.length * 0.2 ? 'warn' : 'pass'),
-      summary: `${clientRendered.length} of ${okPages.length} pages serve almost no content in their HTML while showing single-page-app markers — to an AI retrieval fetcher, which runs no JavaScript, those pages are blank. A further ${thin.length} serve under 120 words of content without SPA markers, which is thin rather than broken.`,
+      summary: `${clientRendered.length} of ${okPages.length} pages serve almost no content in their HTML while showing single-page-app markers - to an AI retrieval fetcher, which runs no JavaScript, those pages are blank. A further ${thin.length} serve under 120 words of content without SPA markers, which is thin rather than broken.`,
       detail: { clientRendered: clientRendered.slice(0, 40), thin: thin.slice(0, 40), rows: contentRows.slice(0, 200) },
     });
 
@@ -721,7 +721,7 @@ async function run({
       item: '7. Internal links are standard links',
       status: noRealLinks.length ? 'fail' : (badLinkPages.length ? 'warn' : 'pass'),
       summary: noRealLinks.length
-        ? `${noRealLinks.length} page${noRealLinks.length === 1 ? ' has' : 's have'} no real <a href> links at all — nothing can be discovered from ${noRealLinks.length === 1 ? 'it' : 'them'} by a crawler.`
+        ? `${noRealLinks.length} page${noRealLinks.length === 1 ? ' has' : 's have'} no real <a href> links at all - nothing can be discovered from ${noRealLinks.length === 1 ? 'it' : 'them'} by a crawler.`
         : `${totalFake} navigation element${totalFake === 1 ? '' : 's'} across ${badLinkPages.length} page${badLinkPages.length === 1 ? '' : 's'} are not crawlable links (href="#", javascript: hrefs, anchors with no href, or divs wired with onclick). ${linkRows.filter((r) => r.fakeTotal === 0).length} of ${linkRows.length} pages use standard links throughout.`,
       detail: { rows: linkRows.slice(0, 200), worst: badLinkPages.slice(0, 30), noRealLinks: noRealLinks.slice(0, 20) },
     });
@@ -738,7 +738,7 @@ async function run({
         severity: noRealLinks.length ? 'critical' : 'high',
         affectedUrl: (noRealLinks[0] || badLinkPages[0]).url,
         affectedCount: noRealLinks.length || badLinkPages.length,
-        action: 'Every navigation target must be an <a href="/real/url">. Keep the click handler if the app needs it — an anchor with a real href and a handler that calls preventDefault works for both a router and a crawler.',
+        action: 'Every navigation target must be an <a href="/real/url">. Keep the click handler if the app needs it - an anchor with a real href and a handler that calls preventDefault works for both a router and a crawler.',
         evidence: { noRealLinks: noRealLinks.slice(0, 20), pages: badLinkPages.slice(0, 30) },
         dedupeKey: `sitereadiness:fakelinks:${target}`,
       });
@@ -754,8 +754,14 @@ async function run({
       .sort((a, b) => (b.doc.jsonLd || []).length - (a.doc.jsonLd || []).length)
       .slice(0, Math.max(3, deepSample));
     const schemaRows = deepTargets.map((p) => {
+      // classify() runs its own selectors, so it re-parses this page's tree.
+      // Released at the end of the iteration: the sample is small, but a
+      // held tree per page is exactly the accumulation that used to exhaust
+      // the heap on a wide crawl. See fetcher.parseDocument.
+      const domWasLoaded = p.doc.domLoaded;
       const match = markupMatchesVisible(p.doc);
       const classified = pageTypeLib.classify(p.doc, { brand });
+      if (!domWasLoaded && typeof p.doc.releaseDom === 'function') p.doc.releaseDom();
       return {
         url: p.url,
         blocks: match.blocks,
@@ -796,7 +802,7 @@ async function run({
         checkKey: 'schema_parse_errors',
         title: `${withParseErrors.length} page${withParseErrors.length === 1 ? '' : 's'} carry JSON-LD that does not parse`,
         detail: withParseErrors.slice(0, 6).map((r) => `${r.url}: ${r.parseErrors[0].error}`).join('; ')
-          + '. A block that does not parse is invisible to Google and to every AI crawler — the markup is in the source and has no effect whatsoever, which is why nobody notices.',
+          + '. A block that does not parse is invisible to Google and to every AI crawler - the markup is in the source and has no effect whatsoever, which is why nobody notices.',
         severity: 'critical',
         affectedUrl: withParseErrors[0].url,
         affectedCount: withParseErrors.length,
@@ -814,7 +820,7 @@ async function run({
         severity: 'high',
         affectedUrl: withTypeMismatch[0].url,
         affectedCount: withTypeMismatch.length,
-        action: 'Run the schema audit on one of these URLs — it generates the correct block for the page type, ready to paste, and names what to remove.',
+        action: 'Run the schema audit on one of these URLs - it generates the correct block for the page type, ready to paste, and names what to remove.',
         evidence: { pages: withTypeMismatch.map((r) => ({ url: r.url, pageType: r.pageType, declared: r.declaredTypes, mismatches: r.typeMismatches })) },
         dedupeKey: `sitereadiness:schematype:${target}`,
       });
@@ -828,7 +834,7 @@ async function run({
         severity: 'high',
         affectedUrl: withFaqMismatch[0].url,
         affectedCount: withFaqMismatch.reduce((a, r) => a + r.faqMismatches.length, 0),
-        action: 'Either render the answers on the page — in an accordion is fine, collapsed content counts as visible — or remove the FAQPage markup.',
+        action: 'Either render the answers on the page - in an accordion is fine, collapsed content counts as visible - or remove the FAQPage markup.',
         evidence: { pages: withFaqMismatch.map((r) => ({ url: r.url, questions: r.faqMismatches })) },
         dedupeKey: `sitereadiness:schemafaq:${target}`,
       });

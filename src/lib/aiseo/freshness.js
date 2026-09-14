@@ -12,7 +12,7 @@
 //
 // INTENT DRIFT is the harder and more valuable one: the topic did not change,
 // but what people want from it did. A guide that ranked for "what is X" now
-// gets impressions for "X vs Y" and "X pricing" — the page is still about the
+// gets impressions for "X vs Y" and "X pricing" - the page is still about the
 // right subject and is now answering the wrong question. Traffic often falls
 // slowly enough that nothing triggers an alert, and the page reads perfectly
 // well on inspection, so this is close to undetectable by hand.
@@ -25,7 +25,7 @@
 //   10, which is where it always starts.
 //
 //   KL divergence. Undefined when a query appears in one window and not the
-//   other — which is exactly what drift produces, so it is undefined precisely
+//   other - which is exactly what drift produces, so it is undefined precisely
 //   when it is needed.
 //
 //   Comparing intent labels only. Too coarse. A page can shift substantially
@@ -33,7 +33,7 @@
 //
 // JSD is symmetric, always finite, and bounded at 1 bit, so one threshold
 // means the same thing on every brand and every page. The intent-label mix is
-// computed as well, and reported alongside — it explains a divergence number
+// computed as well, and reported alongside - it explains a divergence number
 // in language a human can act on.
 const db = require('../../db');
 const nlp = require('./nlp');
@@ -62,7 +62,7 @@ function queryDistribution(brandId, page, window) {
 // gsc_query_page holds periodic snapshots rather than daily rows, so drift
 // compares the two most recent DISTINCT snapshot periods for the brand. Using
 // date windows against a snapshot table would silently compare a period
-// against itself whenever only one snapshot fell inside the window — and would
+// against itself whenever only one snapshot fell inside the window - and would
 // then report zero drift on every page, which reads as "nothing to do".
 function snapshotPeriods(brandId, { limit = 2 } = {}) {
   return db.prepare(`SELECT DISTINCT period_start, period_end FROM gsc_query_page
@@ -180,7 +180,7 @@ function buildLastmodIndex(sitemapUrls) {
   return {
     index,
     trustworthy,
-    reason: trustworthy ? null : `${dates.length} lastmod values across only ${byDay.size} distinct days — stamped at deploy time, so they do not indicate when content was edited`,
+    reason: trustworthy ? null : `${dates.length} lastmod values across only ${byDay.size} distinct days - stamped at deploy time, so they do not indicate when content was edited`,
     dated: dates.length,
     total: sitemapUrls.length,
   };
@@ -238,7 +238,7 @@ async function run({
         score: null,
         result: {
           empty: true,
-          reason: 'No Search Console history for this brand, so neither decay nor intent drift can be measured. Connect Search Console and let a nightly sync run — drift needs at least two query snapshots, which is roughly two weeks of history.',
+          reason: 'No Search Console history for this brand, so neither decay nor intent drift can be measured. Connect Search Console and let a nightly sync run - drift needs at least two query snapshots, which is roughly two weeks of history.',
         },
         findings: [],
         sources,
@@ -278,12 +278,19 @@ async function run({
     const canMeasureDrift = periods.length >= 2;
 
     // Fetch each page once for its own date and its citability, in parallel but
-    // politely — this is the brand's own site, so a small concurrency is fine.
+    // politely - this is the brand's own site, so a small concurrency is fine.
     const fetched = await mapLimit(pages, 4, async (p) => {
       const res = await fetchPage(p.page, { timeout: 18000 });
       if (!res.ok || !res.body) return { page: p.page, ok: false, status: res.status, error: res.error };
       const doc = parseDocument(res.url, res.body);
-      return { page: p.page, ok: true, doc, pageDate: dateFromPage(doc) };
+      const pageDate = dateFromPage(doc);
+      // dateFromPage is the only thing here that needs the parsed tree
+      // (doc.$ for <time datetime>); everything downstream reads plain
+      // fields - nlp.citability and doc.title. These rows are all held at
+      // once, up to maxPages of them, so releasing now is the difference
+      // between one live tree and forty. See fetcher.parseDocument.
+      doc.releaseDom();
+      return { page: p.page, ok: true, doc, pageDate };
     });
     const docByPage = new Map(fetched.filter((f) => f && f.ok).map((f) => [f.page, f]));
 
@@ -350,7 +357,7 @@ async function run({
         why = `query mix diverged by ${drift.divergence} bits${drift.intentChanged ? ` and the dominant intent moved from ${drift.intentFrom} to ${drift.intentTo}` : ''}`;
       } else if (d && d.relativeClickChange != null && d.relativeClickChange <= -25) {
         verdict = 'decaying';
-        why = `clicks down ${Math.abs(d.clickChange)}% against a site trend of ${d.siteClickChange}% — ${Math.abs(d.relativeClickChange)}pp worse than the site`;
+        why = `clicks down ${Math.abs(d.clickChange)}% against a site trend of ${d.siteClickChange}% - ${Math.abs(d.relativeClickChange)}pp worse than the site`;
       } else if (age != null && age >= staleDays && d && (d.imprChange == null || d.imprChange < 0)) {
         verdict = 'stale';
         why = `last changed ${age} days ago (${dateSource}) and impressions are not growing`;
@@ -359,7 +366,7 @@ async function run({
         why = 'no reliable last-modified date available from the sitemap or the page';
       } else if (age >= staleDays) {
         verdict = 'old-but-healthy';
-        why = `${age} days old, but still growing — leave it alone`;
+        why = `${age} days old, but still growing - leave it alone`;
       }
 
       return {
@@ -381,14 +388,14 @@ async function run({
       };
     });
 
-    // AI reading, for the drifted pages only — the subset where the question
+    // AI reading, for the drifted pages only - the subset where the question
     // "is this seasonal noise, a re-angle, or a split" genuinely needs
     // judgement, and where getting it wrong wastes a writer's week.
     const drifted = analysed.filter((a) => a.verdict === 'intent-drift').slice(0, 6);
     const readings = [];
     if (wantAi && drifted.length) {
       // One batched call for every page that isn't already cached, instead of
-      // one call per page — same per-page judgement, far less repeated
+      // one call per page - same per-page judgement, far less repeated
       // system-prompt overhead. See aiCalls.intentDriftReadings.
       const items = drifted.map((item) => ({
         page: item.page,
@@ -418,12 +425,12 @@ async function run({
     if (drifted.length) {
       findings.push({
         checkKey: 'intent_drift',
-        title: `${byVerdict('intent-drift').length} page${byVerdict('intent-drift').length === 1 ? '' : 's'} show intent drift — what searchers want has changed`,
-        detail: byVerdict('intent-drift').slice(0, 6).map((a) => `${a.page}: divergence ${a.drift.divergence} bits${a.drift.intentChanged ? `, ${a.drift.intentFrom} → ${a.drift.intentTo}` : ''}, gaining "${(a.drift.gained[0] || {}).query || '—'}" and losing "${(a.drift.lost[0] || {}).query || '—'}"`).join('; ') + '.',
+        title: `${byVerdict('intent-drift').length} page${byVerdict('intent-drift').length === 1 ? '' : 's'} show intent drift - what searchers want has changed`,
+        detail: byVerdict('intent-drift').slice(0, 6).map((a) => `${a.page}: divergence ${a.drift.divergence} bits${a.drift.intentChanged ? `, ${a.drift.intentFrom} → ${a.drift.intentTo}` : ''}, gaining "${(a.drift.gained[0] || {}).query || ' - '}" and losing "${(a.drift.lost[0] || {}).query || ' - '}"`).join('; ') + '.',
         severity: 'high',
         affectedCount: byVerdict('intent-drift').length,
         affectedUrl: drifted[0].page,
-        action: 'Re-angle rather than rewrite. The subject is still right; the question being asked is different. Compare the gained and lost query lists on each page before editing — they name the new question precisely.',
+        action: 'Re-angle rather than rewrite. The subject is still right; the question being asked is different. Compare the gained and lost query lists on each page before editing - they name the new question precisely.',
         evidence: { pages: byVerdict('intent-drift').map((a) => ({ page: a.page, divergence: a.drift.divergence, gained: a.drift.gained.slice(0, 8), lost: a.drift.lost.slice(0, 8), intentFrom: a.drift.intentFrom, intentTo: a.drift.intentTo })) },
         dedupeKey: `freshness:drift:${brandId}:${periods[0] ? periods[0].endDate : 'na'}`,
       });
@@ -438,7 +445,7 @@ async function run({
         severity: 'high',
         affectedCount: decaying.length,
         affectedUrl: decaying[0].page,
-        action: 'Refresh these. Decay measured against the site trend excludes a sitewide fall, so what remains is page-specific — usually a competitor publishing something better, or a fact on the page that has gone out of date.',
+        action: 'Refresh these. Decay measured against the site trend excludes a sitewide fall, so what remains is page-specific - usually a competitor publishing something better, or a fact on the page that has gone out of date.',
         evidence: { pages: decaying.map((a) => ({ page: a.page, decay: a.decay, ageDays: a.ageDays })) },
         dedupeKey: `freshness:decay:${brandId}:${w.endDate}`,
       });
@@ -453,7 +460,7 @@ async function run({
         severity: 'medium',
         affectedCount: stale.length,
         affectedUrl: stale[0].page,
-        action: 'Schedule a refresh pass. Age alone is not a problem — these were selected because they are also flat or falling, which is the combination worth acting on.',
+        action: 'Schedule a refresh pass. Age alone is not a problem - these were selected because they are also flat or falling, which is the combination worth acting on.',
         evidence: { pages: stale.map((a) => ({ page: a.page, ageDays: a.ageDays, dateSource: a.dateSource, decay: a.decay })) },
         dedupeKey: `freshness:stale:${brandId}:${new Date().toISOString().slice(0, 7)}`,
       });
@@ -466,7 +473,7 @@ async function run({
         title: `${unknownAge.length} page${unknownAge.length === 1 ? ' has' : 's have'} no reliable last-modified date`,
         detail: (lastmod.trustworthy
           ? 'These URLs carry no lastmod in the sitemap and show no date in their markup or schema. '
-          : `Sitemap lastmod values are unusable for this site — ${lastmod.reason}. `)
+          : `Sitemap lastmod values are unusable for this site - ${lastmod.reason}. `)
           + 'A page with no stated date cannot demonstrate currency to a reader or to an AI engine, which will prefer a dated competitor over an undated page even when the undated one is more accurate.',
         severity: 'medium',
         affectedCount: unknownAge.length,
@@ -482,7 +489,7 @@ async function run({
         title: 'Intent drift could not be measured yet',
         detail: `Drift compares two query-level snapshots and only ${periods.length} exist for this brand. Snapshots are written by the nightly sync, so this becomes available once a second one has been taken.`,
         severity: 'info',
-        action: 'No action — decay and staleness on this page are unaffected and were measured normally.',
+        action: 'No action - decay and staleness on this page are unaffected and were measured normally.',
         dedupeKey: `freshness:nodrift:${brandId}`,
       });
     }
@@ -542,7 +549,7 @@ function scheduleRefreshes(run, brand, { userId, weeklyCapacity = 3 }) {
   const pages = (result.pages || []).filter((p) => ['intent-drift', 'decaying', 'stale'].includes(p.verdict));
   if (!pages.length) return { created: 0, scheduled: 0 };
 
-  // Most urgent first: drift, then decay, then age — and within each, by the
+  // Most urgent first: drift, then decay, then age - and within each, by the
   // impressions at stake.
   const rank = { 'intent-drift': 0, decaying: 1, stale: 2 };
   const ordered = pages.sort((a, b) => (rank[a.verdict] - rank[b.verdict]) || (b.impressions - a.impressions));
@@ -566,7 +573,7 @@ function scheduleRefreshes(run, brand, { userId, weeklyCapacity = 3 }) {
       detailLines.push(`Clicks ${p.decay.clickChange == null ? 'n/a' : `${p.decay.clickChange}%`}, impressions ${p.decay.imprChange == null ? 'n/a' : `${p.decay.imprChange}%`}, position change ${p.decay.positionChange == null ? 'n/a' : p.decay.positionChange}, against a site click trend of ${p.decay.siteClickChange == null ? 'n/a' : `${p.decay.siteClickChange}%`}.`);
     }
     if (p.ageDays != null) detailLines.push(`Last changed ${p.ageDays} days ago (${p.dateSource}).`);
-    if (p.citability != null) detailLines.push(`Citability score ${p.citability}/100 — worth improving in the same pass.`);
+    if (p.citability != null) detailLines.push(`Citability score ${p.citability}/100 - worth improving in the same pass.`);
 
     const r = tasksLib.upsertTask({
       userId,

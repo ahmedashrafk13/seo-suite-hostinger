@@ -1,19 +1,19 @@
-// COMPETITIVE GAP ANALYSIS — the four tables the report was missing.
+// COMPETITIVE GAP ANALYSIS - the four tables the report was missing.
 //
 // WHAT WAS ASKED FOR
 //   1. Clean the response: the gap lists were full of brand entities and
 //      generic words ("Office Headquarters", "why choose us").
 //   2. The referring-domains analysis was wrong.
 //   3. Topical coverage gap in tabular form: Topic | Comp 1 | Comp 2 | Us.
-//   4. Keyword gap — the competitors' keyword rankings.
-//   5. Backlink gap — the competitors' backlinks.
+//   4. Keyword gap - the competitors' keyword rankings.
+//   5. Backlink gap - the competitors' backlinks.
 //
 // EACH ONE, AND HOW IT IS ANSWERED HONESTLY
 //
 // 1. NOISE. Handled in ./boilerplate.js and applied here. A competitor's own
 //    brand name is, structurally, the entity most likely to be on their pages
 //    and not on ours, so before filtering it was always at the top of the gap
-//    list — the report was advising the client to write about their rivals.
+//    list - the report was advising the client to write about their rivals.
 //
 // 2. REFERRING DOMAINS. The old figure came from a DuckDuckGo search for pages
 //    MENTIONING a domain, which counted a page that types "example.com" in
@@ -23,7 +23,7 @@
 //    candidate page is fetched and its outbound links are read, and a domain
 //    counts only when a real <a href> to the target is found. `nofollow` is
 //    recorded separately. That turns a mention count into a small, true
-//    backlink sample — and where a link index credential exists, that is used
+//    backlink sample - and where a link index credential exists, that is used
 //    instead and the sample is skipped.
 //
 // 3. TOPIC MATRIX. A per-topic COVERAGE SCORE for each site, computed the same
@@ -33,7 +33,7 @@
 // 4. KEYWORD GAP. Needs to know where competitors rank. With DataForSEO or
 //    Semrush that is measured. Without, each candidate keyword's result page is
 //    sampled from a keyless engine and each site's position in that sample is
-//    recorded — a real visibility comparison against a non-Google index, capped
+//    recorded - a real visibility comparison against a non-Google index, capped
 //    and labelled. Never presented as Google positions.
 //
 // 5. BACKLINK GAP. Moz, Ahrefs or DataForSEO where a credential exists.
@@ -58,7 +58,7 @@ const { fetchPage, parseDocument, mapLimit, sleep, hostKey } = require('./fetche
 //               (the topic's terms appear in the page's title, headings or
 //               content). Weight 40. This is BREADTH.
 //   focusShare  share of the site's crawled pages where the topic is in the
-//               TITLE or an H1 — i.e. pages ABOUT the topic rather than pages
+//               TITLE or an H1 - i.e. pages ABOUT the topic rather than pages
 //               that mention it. Weight 40. This is DEPTH, and it is the half
 //               that separates a site with a dedicated page from a site that
 //               name-drops the subject in a footer.
@@ -66,7 +66,7 @@ const { fetchPage, parseDocument, mapLimit, sleep, hostKey } = require('./fetche
 //               (500+ words). Weight 20.
 //
 // Scored 0-100 per site per topic, identically for every site, so the columns
-// are comparable — which is the entire point of a matrix.
+// are comparable - which is the entire point of a matrix.
 function topicCoverage(topicTerms, pages) {
   const usable = pages.filter((p) => p && p.doc);
   if (!usable.length || !topicTerms.length) {
@@ -80,7 +80,7 @@ function topicCoverage(topicTerms, pages) {
   // How much of the topic's distinctive vocabulary is present.
   //
   // The threshold has to scale with the topic's length. A fixed 50% means a
-  // two-word topic like "green roof" is satisfied by "roof" alone — so a
+  // two-word topic like "green roof" is satisfied by "roof" alone - so a
   // roofing site with no green-roof content scored identically to one with a
   // dedicated section, which made the whole matrix useless. Short topics
   // therefore require EVERY word; longer ones allow one miss, because a
@@ -180,7 +180,7 @@ function topicsFromGaps({ entityGaps = [], topicGaps = [], ourPhrases = [], nois
     : { kept: topicGaps, suppressed: [], suppressedCount: 0, summary: [] };
 
   // Merge entities and phrases into one topic list, collapsing near-duplicates
-  // by stem set — "capital adequacy" and "capital adequacy requirements" are one
+  // by stem set - "capital adequacy" and "capital adequacy requirements" are one
   // topic, and listing both makes the matrix twice as long and no more useful.
   const topics = [];
   const seenStemKeys = new Set();
@@ -193,7 +193,7 @@ function topicsFromGaps({ entityGaps = [], topicGaps = [], ourPhrases = [], nois
     // "capital adequacy requirements" are one topic; whichever arrives first
     // wins and the other is dropped. Checking only one direction left the
     // longer phrase in the list beside the shorter one, which is the case that
-    // actually occurs — the entity list supplies the short form and the phrase
+    // actually occurs - the entity list supplies the short form and the phrase
     // list the long one.
     for (const existing of seenStemKeys) {
       const eStems = existing.split('|');
@@ -216,7 +216,7 @@ function topicsFromGaps({ entityGaps = [], topicGaps = [], ourPhrases = [], nois
   return {
     topics: topics.slice(0, limit),
     suppressed: (() => {
-      // Merged by count, not by string union — see competitive.js for the bug
+      // Merged by count, not by string union - see competitive.js for the bug
       // the union produced.
       const merged = { ...(filteredEntities.byReason || {}) };
       Object.entries(filteredPhrases.byReason || {}).forEach(([reason, n]) => {
@@ -244,13 +244,13 @@ function topicsFromGaps({ entityGaps = [], topicGaps = [], ourPhrases = [], nois
 //
 //   linked      a verified outbound link exists, with rel recorded
 //   mention     the page's own text names the domain, but carries no link
-//   irrelevant  the page neither links to nor mentions the domain — the search
+//   irrelevant  the page neither links to nor mentions the domain - the search
 //               engine simply returned a poor match
 //   unverified  the page could not be fetched, so nothing is claimed
 //
 // THE `irrelevant` BUCKET EXISTS BECAUSE OF A BUG IN THE FIRST VERSION OF THIS
 // FUNCTION. It had three buckets and treated "fetched, no link found" as
-// "mentions the domain without linking" — without ever checking that the page
+// "mentions the domain without linking" - without ever checking that the page
 // mentioned it. Verified against a live run: the fallback engine ignores the
 // `-site:` and quoted-phrase operators, so candidates came back including
 // support.google.com and brainly.ph, and all of them were reported as unlinked
@@ -284,7 +284,7 @@ async function verifyReferring(domain, { limit = 20, excludeHost = null, concurr
     if (!links.length) {
       // Does the page actually NAME the domain? Checked rather than assumed.
       // The bare label is accepted as well as the full domain, because a page
-      // often writes "Americaneagle.com" or just the brand — but the full
+      // often writes "Americaneagle.com" or just the brand - but the full
       // domain is required to be present somewhere for the stronger claim.
       const text = `${doc.title || ''} ${doc.bodyText || doc.mainText || ''}`.toLowerCase();
       const names = text.includes(clean);
@@ -293,7 +293,7 @@ async function verifyReferring(domain, { limit = 20, excludeHost = null, concurr
         : {
           ...item,
           state: 'irrelevant',
-          reason: 'the page neither links to nor names the domain — the search engine returned a poor match for this query',
+          reason: 'the page neither links to nor names the domain - the search engine returned a poor match for this query',
         };
     }
     return {
@@ -349,9 +349,9 @@ async function verifyReferring(domain, { limit = 20, excludeHost = null, concurr
       + `${linked.length} carry a real link to ${clean}; ${mentions.length} name it without linking; `
       + `${irrelevant.length} neither link to nor name it (the search engine returned a poor match); `
       + `${unverified.length} could not be fetched. `
-      + `This is a verified SAMPLE of ${byDomain.size} referring domain${byDomain.size === 1 ? '' : 's'}, capped at ${limit * 2} candidates — it is not a link index and the true count is higher.`
+      + `This is a verified SAMPLE of ${byDomain.size} referring domain${byDomain.size === 1 ? '' : 's'}, capped at ${limit * 2} candidates - it is not a link index and the true count is higher.`
       + (rows.length && (irrelevant.length / rows.length) >= 0.6
-        ? ' MOST CANDIDATES WERE IRRELEVANT, which means the search operators were not honoured — treat this sample as unreliable rather than as evidence of a thin link profile.'
+        ? ' MOST CANDIDATES WERE IRRELEVANT, which means the search operators were not honoured - treat this sample as unreliable rather than as evidence of a thin link profile.'
         : ''),
     method: 'verified-sample',
   };
@@ -391,7 +391,7 @@ async function linkIndexMetrics(domain) {
     referringDomains: m.root_domains_to_root_domain == null ? null : Number(m.root_domains_to_root_domain),
     backlinks: m.external_pages_to_root_domain == null ? null : Number(m.external_pages_to_root_domain),
     spamScore: m.spam_score == null ? null : Number(m.spam_score),
-    basis: 'Moz Link Explorer — a real link index.',
+    basis: 'Moz Link Explorer - a real link index.',
   };
 }
 
@@ -452,7 +452,7 @@ async function backlinkGap(ourDomain, competitorDomains, { sampleLimit = 20 } = 
 
   // The domains linking to THEM and not to US. This is what "backlink gap"
   // actually means, and it only exists where both sides came from a sample or
-  // both from an index — mixing a sample with an index would produce a gap list
+  // both from an index - mixing a sample with an index would produce a gap list
   // that is mostly an artefact of the different methods.
   const ourDomainsSet = new Set(((ours && ours.sampleDetail) ? ours.sampleDetail.referringDomains : []).map((d) => d.domain));
   const gapDomains = [];
@@ -477,7 +477,7 @@ async function backlinkGap(ourDomain, competitorDomains, { sampleLimit = 20 } = 
     method: useIndex ? 'moz-index' : 'verified-sample',
     caveat: useIndex
       ? 'Referring-domain and backlink counts come from the Moz link index and are complete counts, not samples.'
-      : `No link-index credential is configured, so each row is a VERIFIED SAMPLE: candidate pages found by a keyless web search were fetched and their outbound links read, and a domain counts only where a real link to the target was found. The sample is capped at ${sampleLimit * 2} candidates per site, so every count is a floor rather than a total — comparable between sites because the same cap applies to all of them, but not comparable to an Ahrefs or Semrush figure.`,
+      : `No link-index credential is configured, so each row is a VERIFIED SAMPLE: candidate pages found by a keyless web search were fetched and their outbound links read, and a domain counts only where a real link to the target was found. The sample is capped at ${sampleLimit * 2} candidates per site, so every count is a floor rather than a total - comparable between sites because the same cap applies to all of them, but not comparable to an Ahrefs or Semrush figure.`,
   };
 }
 
@@ -560,7 +560,7 @@ async function keywordGap(keywords, sites, { market = 'ZZ', limit = 25, engine =
     errors,
     engine: rows.length ? rows[0].engine : null,
     // Repeated on the table itself, not only here.
-    caveat: `Positions are read from a ${rows.length ? rows[0].engine : 'keyless'} result sample for ${m.name}, NOT from Google. They are a real visibility comparison — the same query, the same page, the same moment, for every site — and they are not Google rankings. A DataForSEO credential replaces this with live Google SERPs.`,
+    caveat: `Positions are read from a ${rows.length ? rows[0].engine : 'keyless'} result sample for ${m.name}, NOT from Google. They are a real visibility comparison - the same query, the same page, the same moment, for every site - and they are not Google rankings. A DataForSEO credential replaces this with live Google SERPs.`,
     cappedAt: limit,
     truncated: (keywords || []).length > limit,
   };

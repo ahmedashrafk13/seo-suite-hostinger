@@ -1,4 +1,4 @@
-// 9. AI REFERRAL TRAFFIC — the demand side of GEO/AEO.
+// 9. AI REFERRAL TRAFFIC - the demand side of GEO/AEO.
 //
 // Every other AI-SEO feature in this directory measures whether a page COULD
 // be cited: can the fetchers reach it, is the content in the served HTML, is
@@ -11,7 +11,7 @@
 // session source. That is a measurement of a human being, not an estimate of a
 // model's behaviour, and it is free.
 //
-// WHAT THIS CAN AND CANNOT SEE — the important part
+// WHAT THIS CAN AND CANNOT SEE - the important part
 //
 //   CAN SEE   Clicks from assistants that send a real referrer: ChatGPT,
 //             Perplexity, Claude, Copilot, Gemini, and the rest of the list
@@ -22,7 +22,7 @@
 //             as google / organic, identical to an ordinary blue-link click.
 //             Google publishes no way to separate them. Any tool claiming to
 //             count AI Overview traffic in GA4 is inferring it, and this one
-//             will not pretend otherwise — the shortfall is stated on screen
+//             will not pretend otherwise - the shortfall is stated on screen
 //             rather than quietly filled with a guess.
 //
 //   CANNOT SEE  Citations that were never clicked. An assistant naming the
@@ -31,8 +31,8 @@
 //             labelled that way in the view.
 //
 // WHY EACH ASSISTANT HAS SEVERAL HOSTNAMES
-// Assistants rename themselves — chat.openai.com became chatgpt.com,
-// bard.google.com became gemini.google.com — and GA4 keeps whatever the
+// Assistants rename themselves - chat.openai.com became chatgpt.com,
+// bard.google.com became gemini.google.com - and GA4 keeps whatever the
 // referrer said at the time. Every historical hostname is therefore listed
 // and matched, so a rename does not silently drop months of attributed
 // sessions. Matching is anchored to a hostname boundary; see classifySource.
@@ -60,7 +60,7 @@ const AI_SOURCES = [
 // Sources that carry BOTH assistant traffic and ordinary search traffic, with
 // no way to split them. bing.com sends Copilot answer clicks and plain Bing
 // searches under one name. These are counted separately and never folded into
-// the headline number — inflating AI referrals with plain search traffic is
+// the headline number - inflating AI referrals with plain search traffic is
 // the exact failure this feature exists to avoid.
 const AMBIGUOUS_SOURCES = [
   {
@@ -72,8 +72,8 @@ const AMBIGUOUS_SOURCES = [
 
 // Classifies one GA4 sessionSource string. Returns null for everything that is
 // not an assistant, which is most of the property's traffic.
-// Matching is anchored to a hostname boundary — the whole host, or a subdomain
-// of it — never a bare substring. A substring test looks harmless until a
+// Matching is anchored to a hostname boundary - the whole host, or a subdomain
+// of it - never a bare substring. A substring test looks harmless until a
 // referrer like "foryou.com" is attributed to You.com, or "linux.ai" to Grok,
 // and a silently inflated AI number is worse than no number at all.
 function hostMatches(source, token) {
@@ -161,7 +161,7 @@ async function run({
 
     // One report, every source, classified here rather than filtered in the
     // API. A dimensionFilter would have to enumerate hostnames, which is the
-    // enum this module deliberately avoids — a renamed assistant would vanish
+    // enum this module deliberately avoids - a renamed assistant would vanish
     // from the report with no error to notice.
     const rows = await google.ga4RunReport(userId, brand.ga4_property_id, {
       startDate,
@@ -220,7 +220,7 @@ async function run({
     const trend = halfOverHalf(series);
     const share = totalSessions > 0 ? aiSessions / totalSessions : 0;
 
-    // Which pages the assistants actually send people to — the only part of
+    // Which pages the assistants actually send people to - the only part of
     // this feature that says something actionable about individual pages.
     let landingPages = [];
     if (includeLandingPages && aiSessions > 0) {
@@ -261,7 +261,7 @@ async function run({
         title: `No AI assistant sent a single visitor in ${window} days`,
         detail: 'Not one session from ChatGPT, Perplexity, Copilot, Gemini, Claude or any other assistant that passes a referrer. '
           + 'Read this as a floor rather than a verdict: an assistant that named the brand without the reader clicking leaves no trace here, and Google AI Overviews are indistinguishable from ordinary organic traffic in GA4. '
-          + 'What it does rule out is the thing worth ruling out — that the brand is being cited AND clicked at any measurable rate.',
+          + 'What it does rule out is the thing worth ruling out - that the brand is being cited AND clicked at any measurable rate.',
         severity: 'high',
         affectedUrl: brand.site_url || null,
         action: 'Run the AI-crawler readiness check first: a retrieval fetcher that cannot read the site cannot cite it, and that is the most common cause of a flat zero here.',
@@ -275,7 +275,7 @@ async function run({
           + 'A drop this size usually has a supply-side cause visible elsewhere in this app: a retrieval fetcher newly blocked at the edge, a page that started rendering client-side, or a nosnippet directive added.',
         severity: 'medium',
         affectedUrl: brand.site_url || null,
-        action: 'Re-run AI-crawler readiness and compare against the previous run — the change is usually there.',
+        action: 'Re-run AI-crawler readiness and compare against the previous run - the change is usually there.',
         evidence: { trend, engines },
         dedupeKey: `aiseo:ai_referrals_falling:${brandId}`,
       });
@@ -288,7 +288,7 @@ async function run({
       findings.push({
         checkKey: 'ai_referrals_single_engine',
         title: `Every AI referral came from ${engines[0].label} alone`,
-        detail: `${aiSessions} sessions, all from one assistant, with nothing from the others in ${window} days. On a site readable to all of them this is unusual — the usual explanation is that only one retrieval fetcher can reach the content.`,
+        detail: `${aiSessions} sessions, all from one assistant, with nothing from the others in ${window} days. On a site readable to all of them this is unusual - the usual explanation is that only one retrieval fetcher can reach the content.`,
         severity: 'medium',
         affectedUrl: brand.site_url || null,
         action: 'Check the per-agent verdict table in AI-crawler readiness for the assistants that sent nothing.',

@@ -9,7 +9,7 @@
 // starts a second identical run.
 //
 // So the route creates the run row synchronously, redirects the browser to a
-// result page that polls, and the work continues detached — exactly the shape
+// result page that polls, and the work continues detached - exactly the shape
 // the existing /audit and /linking features already use, except that these
 // stay in this process instead of spawning a child.
 //
@@ -80,7 +80,7 @@ function launch({
   // Not awaited: that is the point. Errors are handled inside so nothing
   // escapes as an unhandled rejection.
   // Crawl credentials for the brand, if it has any, made available to every
-  // fetch this analysis makes — see fetcher.runWithAuth for the two rules that
+  // fetch this analysis makes - see fetcher.runWithAuth for the two rules that
   // keep that safe (scoped to the brand's own site; the AI-crawler checks opt
   // out). Held in async context rather than a module global because two
   // analyses run at once and they may belong to different brands.
@@ -93,7 +93,7 @@ function launch({
     .then(() => withAuth(() => engine.run({ ...args, userId, brand, adoptRunId: row.id })))
     .then(() => {
       // The engine has already written the completed row through store.finish.
-      // Turn its findings into tasks right away — the same call the "Create
+      // Turn its findings into tasks right away - the same call the "Create
       // tasks" button makes, just without waiting for anyone to click it.
       // upsertTask is dedupe-key-safe, so a later manual click is a no-op.
       try {
@@ -132,7 +132,7 @@ function reconcileOnBoot() {
   const stale = db.prepare("SELECT id, kind, started_at FROM aiseo_runs WHERE status='running'").all();
   if (!stale.length) return { reconciled: 0 };
   db.prepare(`UPDATE aiseo_runs SET status='error',
-      error='Interrupted — the application was stopped or restarted while this analysis was running. Start it again.',
+      error='Interrupted - the application was stopped or restarted while this analysis was running. Start it again.',
       finished_at=datetime('now')
     WHERE status='running'`).run();
   console.log(`[aiseo] marked ${stale.length} interrupted run(s) as failed: ${stale.map((s) => `${s.kind}#${s.id}`).join(', ')}`);

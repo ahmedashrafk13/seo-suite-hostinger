@@ -6,12 +6,12 @@
 // available without any key at all: search the web for pages that mention a
 // domain without being that domain, via DuckDuckGo's keyless HTML endpoint
 // (the same one used for keyword suggestion elsewhere in this codebase has a
-// sibling — this one returns organic results, not autocomplete).
+// sibling - this one returns organic results, not autocomplete).
 //
 // WHAT THIS IS AND IS NOT
 //   IS   a same-day, zero-cost list of pages currently indexed by DuckDuckGo
 //        (itself backed by Bing) that mention the domain and are not the
-//        domain's own pages — a real, if partial, sample of the earned web.
+//        domain's own pages - a real, if partial, sample of the earned web.
 //   IS NOT a referring-domain COUNT in the Ahrefs/Moz sense: it has no crawl
 //        depth guarantee, no link-vs-mention distinction (a page that types
 //        "example.com" in running text counts the same as one that links to
@@ -19,13 +19,13 @@
 //        index does. Every caller must label it "referring pages found in a
 //        web search", never "backlinks" or "referring domains".
 //
-// So it is reported as its own thing — a distinct signal, not a stand-in for
+// So it is reported as its own thing - a distinct signal, not a stand-in for
 // the metric competitive.js already says it cannot provide.
 const { sleep } = require('./fetcher');
 const serpLite = require('./serpLite');
 
 // The DuckDuckGo/Bing parsing that used to live here has been removed
-// entirely — it is now in ./serpLite.js, which owns every result-page fetch in
+// entirely - it is now in ./serpLite.js, which owns every result-page fetch in
 // the suite. See referringPages() below for the two bugs that made the local
 // copy return zero results while reporting success.
 
@@ -42,7 +42,7 @@ async function referringPages(domain, { limit = 30, excludeHost = null, market =
   //
   // First, it requested the page with a self-identifying bot user agent
   // ("seo-suite-hostinger/1.0"). DuckDuckGo answers that with HTTP 202 and a
-  // 14KB challenge page — a 2xx status, so `fetchPage` reported success and the
+  // 14KB challenge page - a 2xx status, so `fetchPage` reported success and the
   // caller had no way to know the request had been refused.
   //
   // Second, its regex required `class="result__a"` to appear BEFORE `href=` in

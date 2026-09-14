@@ -1,8 +1,8 @@
 // 7. REPUTATION AND AMBIENT SIGNAL MONITORING
 //
 // Scans the human-led sources AI answer engines lean on when they decide
-// whether to trust what a brand says about itself — Reddit, forums, news, and
-// discussion aggregators — and reports mentions, sentiment, and claims that
+// whether to trust what a brand says about itself - Reddit, forums, news, and
+// discussion aggregators - and reports mentions, sentiment, and claims that
 // would be damaging if repeated.
 //
 // WHY THIS IS AN SEO FEATURE AND NOT A MARKETING ONE
@@ -10,24 +10,24 @@
 // brand's own site and stop. It weights third-party discussion heavily,
 // because that is the part the brand did not write. A single confident Reddit
 // thread asserting something false about a company can become the assistant's
-// stated answer, repeated to every person who asks, indefinitely — and nothing
+// stated answer, repeated to every person who asks, indefinitely - and nothing
 // on the brand's own site displaces it. Monitoring those sources is therefore
 // part of search visibility, not adjacent to it.
 //
 // SOURCES
-//   Reddit        ./redditClient.js — a tiered, block-aware scraper. Reddit is
+//   Reddit        ./redditClient.js - a tiered, block-aware scraper. Reddit is
 //                 the most valuable source here and the most defended, so it
 //                 gets its own module: four endpoints tried in order, browser
 //                 client hints, paced requests, escalating backoff, and a hard
 //                 stop that keeps what it already has. Ported from the
 //                 lead-gen agent's Reddit scraper.
-//   Hacker News   Algolia's public search API — keyless
-//   Google News   the RSS feed behind news.google.com — keyless
-//   Bing News     the RSS feed behind bing.com/news — keyless
+//   Hacker News   Algolia's public search API - keyless
+//   Google News   the RSS feed behind news.google.com - keyless
+//   Bing News     the RSS feed behind bing.com/news - keyless
 //
 // A brand's own review profiles (Trustpilot, G2, Google) are NOT scraped: each
 // blocks automated access, and a scrape that silently starts returning nothing
-// would look identical to "no new reviews" — the worst possible failure for a
+// would look identical to "no new reviews" - the worst possible failure for a
 // monitoring feature. Where those matter they belong behind their own API
 // credential, and are declared unavailable rather than faked.
 //
@@ -41,7 +41,7 @@
 // would make the same comment score differently between runs. The lexicon in
 // ./nlp.js classifies everything deterministically; the model is asked only
 // about the handful of items carrying a damaging factual claim, where the
-// judgement — assertion versus opinion, and what would settle it — genuinely
+// judgement - assertion versus opinion, and what would settle it - genuinely
 // needs reading comprehension.
 const crypto = require('crypto');
 const db = require('../../db');
@@ -64,7 +64,7 @@ const SOURCES = {
 // "acme legal" does not return every page containing "legal".
 //
 // THE LENGTH FLOOR IS 3, NOT 4, AND THAT MATTERS
-// It was 4, which silently excluded real brand names — "Wix", "IBM", "SAP".
+// It was 4, which silently excluded real brand names - "Wix", "IBM", "SAP".
 // Measured consequence: a scan of Wix searched only "wix.com", Reddit returned
 // 50 posts, and the brand-match filter then rejected all 50 because Reddit
 // posts say "Wix", not "wix.com". Fifty relevant mentions collected and thrown
@@ -89,7 +89,7 @@ function watchTerms(brand) {
   String(brand.mention_terms || '').split(/[\n,;]+/).map((t) => t.trim()).filter(Boolean)
     .forEach((t) => terms.push(t));
 
-  // Case-insensitively unique, preserving the first spelling seen — "Wix" and
+  // Case-insensitively unique, preserving the first spelling seen - "Wix" and
   // "wix" are one term, and the one the user wrote is the one to show.
   const seen = new Set();
   return terms
@@ -105,7 +105,7 @@ function watchTerms(brand) {
 // ------------------------------------------------- is it the RIGHT company?
 //
 // A brand name is rarely unique. Searching "Wix" returns the website builder
-// AND WIX Filters, the automotive parts manufacturer — a real result from a
+// AND WIX Filters, the automotive parts manufacturer - a real result from a
 // real scan, which brought back "Huskee Log Splitter Hydraulic Fluid and Filter
 // Change Spec" and "2023 Hybrid SE Air filters" as brand mentions. Both are
 // genuine keyword matches about the wrong company, and both were being counted
@@ -116,7 +116,7 @@ function watchTerms(brand) {
 // talks about something this brand does.
 //
 // Context terms come from the brand's own Search Console queries with its
-// branded terms removed — the most reliable statement of what a brand is about
+// branded terms removed - the most reliable statement of what a brand is about
 // that this app holds, because it is what people actually searched before
 // arriving. Where a brand has no such history the confidence is reported as
 // unassessable rather than guessed, and nothing is excluded on the strength of
@@ -139,7 +139,7 @@ function topicContext(brandId, brand) {
     } catch { /* malformed settings must not break a scan */ }
   }
 
-  // 2. Its own non-branded Search Console queries — the strongest signal here.
+  // 2. Its own non-branded Search Console queries - the strongest signal here.
   if (brandId) {
     try {
       const anchor = db.prepare('SELECT MAX(date) d FROM gsc_query_daily WHERE brand_id=?').get(brandId);
@@ -176,13 +176,13 @@ function topicContext(brandId, brand) {
 
 // How sure are we this mention is about THIS company?
 //
-//   certain       it names the brand's own domain — nothing else does that
+//   certain       it names the brand's own domain - nothing else does that
 //   likely        it also talks about something the brand does
 //   unclear       the name is there and nothing else corroborates it
 //   unassessable  there is no topic context to judge against
 //
 // Only `unclear` is held back from the headline numbers, and it is still stored
-// and listed — a mention wrongly excluded is worse than one shown with a
+// and listed - a mention wrongly excluded is worse than one shown with a
 // caveat, so the caveat is the mechanism.
 function mentionConfidence(item, { context, domain, watchedContainers = [] }) {
   const text = `${item.title || ''} ${item.snippet || ''}`.toLowerCase();
@@ -206,7 +206,7 @@ function mentionConfidence(item, { context, domain, watchedContainers = [] }) {
       return { level: 'likely', why: `posted in ${item.context}, a subreddit being watched for this brand` };
     }
     // Subreddit names are usually run-together words ("webdesign",
-    // "smallbusiness"), so a substring test is the right one here — token
+    // "smallbusiness"), so a substring test is the right one here - token
     // splitting would find nothing.
     const containerHit = [...context.terms].find((t) => t.length > 3 && bare.includes(t));
     if (containerHit) {
@@ -342,14 +342,14 @@ function dedupeKeyFor(url) {
 // WORD BOUNDARIES, NOT SUBSTRINGS
 // A substring test cannot tell "Wix" from "Wixom" or "SAP" from "sapling", so
 // short brand names had to be excluded from searching altogether to keep the
-// noise out — which threw away every mention of them. Matching on boundaries
+// noise out - which threw away every mention of them. Matching on boundaries
 // makes a short name safe, so it can be searched.
 //
 // The boundary is "not a word character" on each side. Excluding the dot and
 // hyphen as well was tried first and was wrong in the other direction: it
 // stopped the term "Wix" matching the text "Is Wix.com worth it?", which is
 // plainly a mention of Wix. A dot or hyphen next to the term is a boundary, not
-// part of it — "wix.com", "sub.wix.com" and "wix-alternatives" all mention Wix,
+// part of it - "wix.com", "sub.wix.com" and "wix-alternatives" all mention Wix,
 // while "wixom", "wixel" and "wix2" do not.
 const termMatchers = new Map();
 
@@ -375,7 +375,7 @@ function upsertMention({ userId, brandId, item, sentimentInfo, confidence = null
   const existing = db.prepare('SELECT * FROM mentions WHERE brand_id=? AND dedupe_key=?').get(brandId, key);
   if (existing) {
     // Engagement grows; sentiment can change as a thread develops. Both are
-    // refreshed, but first_seen_at is preserved — it is what "new mention"
+    // refreshed, but first_seen_at is preserved - it is what "new mention"
     // alerting keys on, and overwriting it would re-alert every scan.
     db.prepare(`UPDATE mentions SET snippet=?, sentiment=?, sentiment_score=?, engagement=?,
         risk=?, confidence=COALESCE(?, confidence), confidence_why=COALESCE(?, confidence_why),
@@ -441,7 +441,7 @@ async function run({ userId, brand, adoptRunId = null, wantAi = true, window = '
         score: null,
         result: {
           empty: true,
-          reason: 'No usable search terms. The brand name is too short or generic to search on its own — add specific terms (the legal name, a product name, a common misspelling) in the brand\'s mention terms.',
+          reason: 'No usable search terms. The brand name is too short or generic to search on its own - add specific terms (the legal name, a product name, a common misspelling) in the brand\'s mention terms.',
           terms: [],
         },
         findings: [],
@@ -471,7 +471,7 @@ async function run({ userId, brand, adoptRunId = null, wantAi = true, window = '
     // interleaved with the other sources, because its client owns the pacing
     // and the block state. Interleaving would reset nothing but would scatter
     // its requests among three other hosts' latencies, making the 4-second
-    // spacing it depends on impossible to hold — and a block costs the whole
+    // spacing it depends on impossible to hold - and a block costs the whole
     // source, not one term.
     const watchSubreddits = String((brand.mention_subreddits || '')).split(/[\s,;]+/)
       .map((x) => x.replace(/^\/?r\//i, '').trim()).filter(Boolean).slice(0, 6);
@@ -529,7 +529,7 @@ async function run({ userId, brand, adoptRunId = null, wantAi = true, window = '
       });
     });
 
-    // Triage the damaging claims with the model — a small, high-value subset.
+    // Triage the damaging claims with the model - a small, high-value subset.
     const flagged = kept.filter((k) => k.sentiment.risk).slice(0, 12);
     let triage = null;
     if (wantAi && flagged.length) {
@@ -542,7 +542,7 @@ async function run({ userId, brand, adoptRunId = null, wantAi = true, window = '
     }
 
     // Sentiment mix, over everything stored for this brand rather than only
-    // this scan — one scan is a sample, the stored set is the picture.
+    // this scan - one scan is a sample, the stored set is the picture.
     const allStored = listMentions(brandId, { limit: 1000 });
     // Mentions that name the brand but relate to nothing it does are stored and
     // listed, and kept OUT of the headline numbers. This is what stops WIX
@@ -612,7 +612,7 @@ async function run({ userId, brand, adoptRunId = null, wantAi = true, window = '
         detail: `${mix.negative} negative against ${mix.positive} positive, out of ${mix.total} mentions stored. Neutral mentions are excluded from the ratio.`,
         severity: netSentiment < -50 ? 'high' : 'medium',
         affectedCount: mix.negative,
-        action: 'Work the specific complaints rather than the aggregate. Read the negative mentions for a repeated cause — one operational problem usually accounts for most of them.',
+        action: 'Work the specific complaints rather than the aggregate. Read the negative mentions for a repeated cause - one operational problem usually accounts for most of them.',
         evidence: { mix, netSentiment },
         dedupeKey: `reputation:sentiment:${brandId}:${new Date().toISOString().slice(0, 7)}`,
       });
@@ -625,7 +625,7 @@ async function run({ userId, brand, adoptRunId = null, wantAi = true, window = '
         detail: `"${terms[0]}" appears to be shared with something else. Those mentions are stored and listed but excluded from the sentiment and damaging-claim totals, because counting them would describe a different company.`
           + (context.usable ? ` Topic context was derived from ${context.source}.` : ' No topic context was available, so this is based on the domain alone.'),
         severity: 'info',
-        action: 'Add more specific watch terms — the legal name, a product name, or the brand plus a qualifier — so the search itself excludes the other company rather than the filter having to.',
+        action: 'Add more specific watch terms - the legal name, a product name, or the brand plus a qualifier - so the search itself excludes the other company rather than the filter having to.',
         evidence: { unclear: mix.unclear, total: allStored.length, contextSource: context.source, sample: unclear.slice(0, 8).map((m) => ({ url: m.url, title: m.title })) },
         dedupeKey: `reputation:ambiguous:${brandId}`,
       });
@@ -652,7 +652,7 @@ async function run({ userId, brand, adoptRunId = null, wantAi = true, window = '
           + 'Reddit is the source an assistant leans on hardest for "is this brand any good", so a blocked scan leaves a real gap rather than a cosmetic one.',
         severity: 'medium',
         action: redditStats.authenticated
-          ? 'The authenticated endpoint is configured but still blocked — check the app credentials are valid.'
+          ? 'The authenticated endpoint is configured but still blocked - check the app credentials are valid.'
           : 'Raise REDDIT_DELAY_MS, wait 15-60 minutes, or create a free "script" app at reddit.com/prefs/apps and set REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET to use the authenticated endpoint, which is not rate-limited this way.',
         evidence: { stats: redditStats },
         dedupeKey: `reputation:redditblocked:${brandId}:${new Date().toISOString().slice(0, 10)}`,
@@ -707,7 +707,7 @@ async function run({ userId, brand, adoptRunId = null, wantAi = true, window = '
         notMonitored: [
           { label: 'Trustpilot, G2, Capterra, Google reviews', why: 'All block automated access. A scrape that starts returning nothing would be indistinguishable from "no new reviews", so these are left to a dedicated API credential rather than faked.' },
           { label: 'X / Twitter, LinkedIn, Facebook', why: 'No keyless public search endpoint remains for any of them.' },
-          { label: 'Reddit comment bodies', why: 'The tier that currently answers is the RSS feed, which carries the post body but not the comment thread beneath it, and no score. The authenticated API returns both — set REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET.' },
+          { label: 'Reddit comment bodies', why: 'The tier that currently answers is the RSS feed, which carries the post body but not the comment thread beneath it, and no score. The authenticated API returns both - set REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET.' },
         ],
         provenance: providers.provenance(sources),
       },

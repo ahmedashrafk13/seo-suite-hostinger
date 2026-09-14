@@ -1,4 +1,4 @@
-// PAGE TYPE — what kind of page is this, and therefore which schema fits.
+// PAGE TYPE - what kind of page is this, and therefore which schema fits.
 //
 // THE BUG THIS FIXES
 // ./schemaAuto.js generated schema from three signals: a breadcrumb trail, a
@@ -13,7 +13,7 @@
 //
 // HOW THE TYPE IS DECIDED
 // Weighted evidence from four independent places, scored and reported:
-//   URL PATH      /services/, /product/, /blog/, /about, /contact — the
+//   URL PATH      /services/, /product/, /blog/, /about, /contact - the
 //                 strongest single signal, because it is a deliberate
 //                 architectural choice rather than a coincidence of wording.
 //   COMMERCE DOM  a price near an add-to-cart control, an SKU, a variant
@@ -22,8 +22,8 @@
 //                 TRANSACTION APPARATUS, not the presence of a number.
 //   HEADINGS      what the page's own outline says it is about.
 //   EXISTING MARKUP  what the site already claims. Read as evidence, not as
-//                 truth — the whole point of the check is that the existing
-//                 claim may be wrong — but a site that marks every page
+//                 truth - the whole point of the check is that the existing
+//                 claim may be wrong - but a site that marks every page
 //                 Product is telling us something about its CMS.
 //
 // Every type comes back with its score and the evidence that produced it, so a
@@ -48,7 +48,7 @@ const PAGE_TYPES = {
     schema: ['Service', 'Offer', 'BreadcrumbList', 'FAQPage'],
     also: ['Organization', 'LocalBusiness', 'WebSite', 'WebPage'],
     never: {
-      Product: 'Product requires a purchasable item with an offer, price and availability. A service described on a page — even one with a fee — is a Service. Google validates Product against retail expectations and a mismatched Product block is commonly ignored across the whole site.',
+      Product: 'Product requires a purchasable item with an offer, price and availability. A service described on a page - even one with a fee - is a Service. Google validates Product against retail expectations and a mismatched Product block is commonly ignored across the whole site.',
       Article: 'a service page is a commercial landing page, not editorial content; Article markup on it misrepresents the page to every AI answer engine',
     },
     requires: 'a described offering with no purchase apparatus',
@@ -136,7 +136,7 @@ const PAGE_TYPES = {
   },
 };
 
-// URL-path evidence. Weight 40 — the heaviest single signal.
+// URL-path evidence. Weight 40 - the heaviest single signal.
 const PATH_SIGNALS = [
   { type: 'product', rx: /\/(?:product|products|shop|store|item|items|p)\/[^/]+/i, weight: 40, why: 'the URL sits under a product path with a specific item slug' },
   { type: 'category', rx: /\/(?:category|categories|collections?|shop|catalog|browse|tag|tags)\/?$|\/(?:category|collections?|tag)\//i, weight: 32, why: 'the URL is a category or collection path' },
@@ -163,7 +163,7 @@ function commerceSignals(doc) {
   const add = (key, weight, why) => found.push({ key, weight, why });
 
   // A purchase control. Matched on the visible label of a button or a link,
-  // which is what a shopper clicks — not on a class name, which any theme may
+  // which is what a shopper clicks - not on a class name, which any theme may
   // carry on a page that sells nothing.
   const purchaseLabels = /(add to (?:cart|basket|bag)|buy now|buy it now|add to trolley|proceed to checkout|order now)/i;
   let hasPurchase = false;
@@ -179,7 +179,7 @@ function commerceSignals(doc) {
     add('sku', 22, 'a labelled SKU, MPN, GTIN or product code appears in the content');
   }
 
-  // A variant selector — size, colour, quantity.
+  // A variant selector - size, colour, quantity.
   if ($('select[name*="variant" i], select[name*="size" i], select[name*="colour" i], select[name*="color" i], [data-variant-id], input[name="quantity"], select[name="quantity"]').length) {
     add('variant_selector', 18, 'a variant or quantity selector is present');
   }
@@ -198,7 +198,7 @@ function commerceSignals(doc) {
   // nothing on its own: service pages, pricing pages and course pages all
   // quote prices. Its job is to confirm a purchase control, not to imply one.
   const priceCount = (text.match(/[$£€¥₹]\s?\d[\d,]*(?:\.\d{2})?/g) || []).length;
-  if (priceCount) add('price', priceCount >= 1 && hasPurchase ? 10 : 3, `${priceCount} price${priceCount === 1 ? '' : 's'} in the content (weak on its own — service and pricing pages quote prices too)`);
+  if (priceCount) add('price', priceCount >= 1 && hasPurchase ? 10 : 3, `${priceCount} price${priceCount === 1 ? '' : 's'} in the content (weak on its own - service and pricing pages quote prices too)`);
 
   return { found, score: found.reduce((a, f) => a + f.weight, 0), priceCount, hasPurchase };
 }
@@ -217,7 +217,7 @@ function contentSignals(doc) {
   const questionHeadings = headings.filter((x) => x.level >= 2
     && (String(x.text).trim().endsWith('?') || /^(what|why|how|when|where|which|who|can|do|does|is|are|should|will)\b/i.test(x.text)));
   if (questionHeadings.length >= 4) add('faq', 26, `${questionHeadings.length} question-shaped subheadings`);
-  else if (questionHeadings.length >= 2) add('faq', 8, `${questionHeadings.length} question-shaped subheadings — enough for an FAQ section, not necessarily an FAQ page`);
+  else if (questionHeadings.length >= 2) add('faq', 8, `${questionHeadings.length} question-shaped subheadings - enough for an FAQ section, not necessarily an FAQ page`);
 
   if (/\b(?:syllabus|curriculum|learning outcomes?|modules?|units?|accredit|credential|exam|assessment|enrol|enroll|cpd|ceu|prerequisite)\b/.test(text)
     && /\b(?:course|training|certification|programme|program|diploma|qualification)\b/.test(`${joined} ${text.slice(0, 3000)}`)) {
@@ -228,7 +228,7 @@ function contentSignals(doc) {
     add('service', 18, 'the content describes an offering in service language');
   }
 
-  if (/\b(?:opening hours|monday|mon\s*[-–]\s*fri|find us|parking|directions|located (?:at|in)|our address)\b/.test(text)
+  if (/\b(?:opening hours|monday|mon\s*[--]\s*fri|find us|parking|directions|located (?:at|in)|our address)\b/.test(text)
     && /\b(?:street|road|avenue|suite|floor|postcode|zip|city)\b/i.test(text)) {
     add('localBusiness', 22, 'the content carries an address alongside hours or directions');
   }
@@ -246,7 +246,7 @@ function contentSignals(doc) {
   if (doc && doc.links) {
     const mainInternal = doc.links.filter((l) => l.internal && l.inMain).length;
     if (mainInternal >= 15 && words < 500) {
-      add('category', 30, `${mainInternal} internal links inside the main content region against only ${words} words of prose — the page's content IS its links`);
+      add('category', 30, `${mainInternal} internal links inside the main content region against only ${words} words of prose - the page's content IS its links`);
     } else if (mainInternal >= 25 && words < 900) {
       add('category', 18, `${mainInternal} internal links in the main region with ${words} words of prose`);
     }
@@ -318,7 +318,7 @@ function classify(doc, { brand = null } = {}) {
 
   const commerce = commerceSignals(doc);
   // The commerce apparatus only argues for `product` when a PURCHASE CONTROL
-  // or an SKU is present. A price alone argues for nothing — this is the exact
+  // or an SKU is present. A price alone argues for nothing - this is the exact
   // inversion that produced the Product-on-a-service-page bug.
   const strongCommerce = commerce.found.filter((f) => ['purchase_control', 'sku', 'variant_selector'].includes(f.key));
   if (strongCommerce.length) {
@@ -330,7 +330,7 @@ function classify(doc, { brand = null } = {}) {
     evidence.push({
       type: 'product',
       weight: 0,
-      why: `${commerce.found.map((f) => f.why).join('; ')} — but no purchase control, SKU or variant selector, so this is not a product page`,
+      why: `${commerce.found.map((f) => f.why).join('; ')} - but no purchase control, SKU or variant selector, so this is not a product page`,
       source: 'commerce',
       counterEvidence: true,
     });
@@ -350,7 +350,7 @@ function classify(doc, { brand = null } = {}) {
   };
   declared.forEach((t) => {
     const mapped = markupHints[t];
-    if (mapped) add(mapped, 6, `the page already declares ${t} markup (weak evidence — the point of this check is that the existing claim may be wrong)`, 'existing-markup');
+    if (mapped) add(mapped, 6, `the page already declares ${t} markup (weak evidence - the point of this check is that the existing claim may be wrong)`, 'existing-markup');
   });
 
   const ranked = [...scores.entries()]

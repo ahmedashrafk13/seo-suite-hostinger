@@ -9,12 +9,12 @@
   <div class="notice warn">
     <span class="notice-icon">&#9888;</span>
     <div class="notice-body">
-      No brands yet. <a href="/brands">Add a brand</a> — these analyses run against a brand's website, its Search Console history, or both.
+      No brands yet. <a href="/brands">Add a brand</a> - these analyses run against a brand's website, its Search Console history, or both.
     </div>
   </div>
 <% } else if (brands.length === 1) { %>
   <p class="hint mt-0">
-    Analysing <strong><%= brands[0].name %></strong> — <span class="muted"><%= brands[0].site_url %></span>
+    Analysing <strong><%= brands[0].name %></strong> - <span class="muted"><%= brands[0].site_url %></span>
     <% if (!brands[0].gsc_property) { %>
       · <span class="badge medium">No Search Console property paired</span>
     <% } %>

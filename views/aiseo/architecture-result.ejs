@@ -65,7 +65,7 @@
               <span class="badge neutral"><%= c.connectedness %>% connected</span>
             </div>
             <div class="alert-body">
-              <p class="mt-0"><strong>Shared subjects:</strong> <%= c.sharedEntities.join(', ') || '—' %></p>
+              <p class="mt-0"><strong>Shared subjects:</strong> <%= c.sharedEntities.join(', ') || ' - ' %></p>
               <div class="table-wrap"><table class="data">
                 <thead><tr><th>Page</th><th>Depth</th><th>Inbound</th><th>Outbound</th><th>Words</th></tr></thead>
                 <tbody>
@@ -88,7 +88,7 @@
           </div>
         <% }) %>
         <p class="hint" style="margin-bottom:0">
-          The hub is chosen as the shallowest page with the broadest entity coverage — which is what a topic's
+          The hub is chosen as the shallowest page with the broadest entity coverage - which is what a topic's
           overview page normally is. A cluster whose hub links to few of its own spokes is not functioning as a
           hub whatever the site map says.
         </p>
@@ -138,9 +138,9 @@
                   <% if (ai && ai.skip) { %><span class="badge neutral">model says skip</span>
                   <% } else if (ai) { %><strong><%= ai.anchor %></strong>
                     <% if (ai.placement) { %><div class="muted" style="font-size:11px"><%= ai.placement %></div><% } %>
-                  <% } else { %><span class="muted">—</span><% } %>
+                  <% } else { %><span class="muted"> - </span><% } %>
                 </td>
-                <td class="muted" style="font-size:11px;max-width:260px"><%= ai ? ai.reason : '—' %></td>
+                <td class="muted" style="font-size:11px;max-width:260px"><%= ai ? ai.reason : ' - ' %></td>
               </tr>
             <% }) %>
             </tbody>
@@ -150,7 +150,7 @@
           <strong>Review before applying.</strong> Bulk internal-link changes require sign-off in this system
           for a reason: a link nobody needs makes the site harder to navigate, and a hub diluted by
           indiscriminate outbound links is worse than one with fewer, deliberate ones. Direction is chosen
-          deliberately — from the narrower page toward the broader, better-linked one.
+          deliberately - from the narrower page toward the broader, better-linked one.
         </p>
       <% } %>
     </div>
@@ -189,7 +189,7 @@
             </table>
           </div>
           <p class="hint" style="margin-bottom:0">
-            Trails are proposed from the URL path, because that is the hierarchy the site already commits to —
+            Trails are proposed from the URL path, because that is the hierarchy the site already commits to - 
             proposing one that contradicts the URL would be worse than proposing none. A level flagged
             "no page for" would render as a link to a 404, so either build that listing page (usually worth
             having as a hub) or render that level as plain text.
@@ -215,7 +215,7 @@
                   <% if (n.inLinks === 0) { %><span class="badge critical">0</span><% } else { %><%= n.inLinks %><% } %>
                 </td>
                 <td><%= n.depth %></td>
-                <td><%= n.performance ? fmtInt(n.performance.impressions) : '—' %></td>
+                <td><%= n.performance ? fmtInt(n.performance.impressions) : ' - ' %></td>
               </tr>
             <% }) %>
             </tbody>
@@ -237,7 +237,7 @@
         <thead><tr><th>URL</th><th>Status</th><th>Error</th></tr></thead>
         <tbody>
         <% r.crawl.failures.forEach(function (f) { %>
-          <tr><td class="truncate"><%= f.url %></td><td><%= f.status || '—' %></td><td class="muted"><%= f.error || '—' %></td></tr>
+          <tr><td class="truncate"><%= f.url %></td><td><%= f.status || ' - ' %></td><td class="muted"><%= f.error || ' - ' %></td></tr>
         <% }) %>
         </tbody>
       </table></div>

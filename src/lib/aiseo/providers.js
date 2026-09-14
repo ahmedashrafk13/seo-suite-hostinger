@@ -1,14 +1,14 @@
 // WHICH DATA SOURCES THIS DEPLOYMENT ACTUALLY HAS
 //
-// The AI SEO features were specified against a list of tools — Semrush,
+// The AI SEO features were specified against a list of tools - Semrush,
 // Ahrefs, Moz, Google Keyword Planner, GtMetrix, aicrawlercheck.com. This
 // deployment holds credentials for none of them. Pretending otherwise would
 // produce the worst possible outcome: a dashboard full of invented keyword
 // volumes and backlink counts that read exactly like real ones.
 //
-// So every feature is built on the sources that ARE present and verifiable —
+// So every feature is built on the sources that ARE present and verifiable - 
 // Search Console, GA4, PageSpeed Insights / CrUX, this app's own crawler, the
-// public endpoints that need no key, and Azure OpenAI — and every provider
+// public endpoints that need no key, and Azure OpenAI - and every provider
 // that would improve a given feature is declared here as an OPTIONAL adapter.
 // A feature checks `has()` before reaching for one, and states in its own
 // output which sources its numbers came from. Add a key to .env and the
@@ -33,7 +33,7 @@ const config = require('../../config');
 //              is scraped successfully with no credential at all, and a
 //              credential only removes the rate limiting and adds post scores.
 //              Rendering that as "not configured" told the reader the source
-//              was dead when it was returning data — the opposite of true.
+//              was dead when it was returning data - the opposite of true.
 //   enhancedNote  what the enhancement buys, shown when it is NOT yet set
 const PROVIDERS = [
   {
@@ -88,7 +88,7 @@ const PROVIDERS = [
     // Google Suggest, the Hacker News search API and Google/Bing News RSS all
     // answer unauthenticated requests. Reddit is also keyless but has its own
     // row, because it is the one source with a meaningful upgrade path and its
-    // own tiered client — listing it here as well would give two rows claiming
+    // own tiered client - listing it here as well would give two rows claiming
     // the same capability.
     detect: () => process.env.AISEO_DISABLE_PUBLIC_SOURCES !== '1',
     provides: ['autocomplete', 'hackernews', 'news-rss'],
@@ -101,13 +101,13 @@ const PROVIDERS = [
     kind: 'public',
     // A free proxy for "who mentions this domain": a same-day DuckDuckGo HTML
     // search for the domain, excluding the domain's own pages. See
-    // ./webMentions.js for exactly what this is and is not — it is reported
+    // ./webMentions.js for exactly what this is and is not - it is reported
     // as "referring pages found in a web search", never as a backlink or
     // referring-domain count, which needs a real link index.
     envKeys: [],
     detect: () => process.env.AISEO_DISABLE_PUBLIC_SOURCES !== '1',
     provides: ['referring-pages'],
-    note: 'Disabled by AISEO_DISABLE_PUBLIC_SOURCES=1. Not a substitute for a verified backlink index (Ahrefs/Moz/Semrush) — a same-day search-result sample.',
+    note: 'Disabled by AISEO_DISABLE_PUBLIC_SOURCES=1. Not a substitute for a verified backlink index (Ahrefs/Moz/Semrush) - a same-day search-result sample.',
   },
 
   {
@@ -116,13 +116,13 @@ const PROVIDERS = [
     kind: 'public',
     // A country-aware sample of a NON-GOOGLE result page. See ./serpLite.js
     // for exactly what it is. It powers the keyword-difficulty proxy, the
-    // keyword-gap table and the review-platform presence check — three things
+    // keyword-gap table and the review-platform presence check - three things
     // that were previously impossible here and are now possible with the basis
     // stated on every number.
     envKeys: [],
     detect: () => process.env.AISEO_DISABLE_PUBLIC_SOURCES !== '1',
     provides: ['serp-sample', 'keyword-difficulty-proxy', 'related-searches', 'competitor-visibility'],
-    note: 'Disabled by AISEO_DISABLE_PUBLIC_SOURCES=1. Samples DuckDuckGo and Bing, not Google — every metric derived from it is labelled a proxy.',
+    note: 'Disabled by AISEO_DISABLE_PUBLIC_SOURCES=1. Samples DuckDuckGo and Bing, not Google - every metric derived from it is labelled a proxy.',
     enhancedBy: ['DATAFORSEO_LOGIN', 'DATAFORSEO_PASSWORD'],
     enhancedNote: 'Sampling a non-Google index. DataForSEO credentials would replace the sample with a live Google SERP for the same checks, turning the difficulty proxy into a measured keyword difficulty.',
   },
@@ -132,11 +132,11 @@ const PROVIDERS = [
     label: 'Google Trends (keyless)',
     kind: 'public',
     // The only free, country-filterable demand signal available. Returns
-    // RELATIVE interest 0-100, never a count — see ./keywordMetrics.js.
+    // RELATIVE interest 0-100, never a count - see ./keywordMetrics.js.
     envKeys: [],
     detect: () => process.env.AISEO_DISABLE_PUBLIC_SOURCES !== '1',
     provides: ['relative-interest', 'country-demand', 'demand-trend'],
-    note: 'Disabled by AISEO_DISABLE_PUBLIC_SOURCES=1. Gives relative interest per country (0-100), which is the shape of demand rather than its size — it is never rendered as a search volume.',
+    note: 'Disabled by AISEO_DISABLE_PUBLIC_SOURCES=1. Gives relative interest per country (0-100), which is the shape of demand rather than its size - it is never rendered as a search volume.',
   },
 
   {
@@ -144,7 +144,7 @@ const PROVIDERS = [
     label: 'Reddit',
     kind: 'public',
     // No credential is required. src/lib/aiseo/redditClient.js scrapes Reddit
-    // through a tiered chain whose RSS tier currently answers — verified
+    // through a tiered chain whose RSS tier currently answers - verified
     // against the live endpoints, where /search.json 403s and old.reddit
     // redirects to a login wall. So availability tracks whether outbound
     // public calls are permitted at all, exactly like the other keyless
@@ -180,7 +180,7 @@ const PROVIDERS = [
     envKeys: ['GOOGLE_ADS_DEVELOPER_TOKEN'],
     // Availability is NOT a pure env check. The developer token is the app's
     // and lives in .env, but the Ads ACCOUNT is chosen per team on /connect,
-    // and the OAuth connection must carry the `adwords` scope — a connection
+    // and the OAuth connection must carry the `adwords` scope - a connection
     // authorised before that scope was added can never answer an Ads call.
     // So this asks the database whether any team is actually set up, and env
     // GOOGLE_ADS_CUSTOMER_ID remains a fallback for a single-tenant install.
@@ -226,7 +226,7 @@ const PROVIDERS = [
     // The only FREE source of a measured search count in this registry, and
     // therefore the practical answer to Google refusing an Ads API token for
     // this tool. An API key is free from bing.com/webmasters (Settings > API
-    // access). What it reports is Bing demand, not Google demand — every view
+    // access). What it reports is Bing demand, not Google demand - every view
     // that shows it says so.
     envKeys: ['BING_WEBMASTER_API_KEY'],
     provides: ['keyword-volume', 'country-volume'],
@@ -320,7 +320,7 @@ function missing() {
 }
 
 // A short provenance line for a result page: the sources that produced it,
-// and — stated plainly — the ones that would have improved it.
+// and - stated plainly - the ones that would have improved it.
 //
 // `used` is the list of provider keys a run actually read from.
 function provenance(used = []) {

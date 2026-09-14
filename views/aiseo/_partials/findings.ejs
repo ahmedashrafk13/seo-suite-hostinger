@@ -3,7 +3,7 @@
 
    Info-severity findings are rendered in the same list rather than hidden,
    because several of them are the honest "this could not be measured, and
-   here is why" notes — which are exactly what must not be filtered out of a
+   here is why" notes - which are exactly what must not be filtered out of a
    report. They are visually de-emphasised, not removed. */
 const findings = run.findings || [];
 const urgent = findings.filter(function (f) { return f.severity === 'critical' || f.severity === 'high'; });
@@ -21,7 +21,7 @@ const info = findings.filter(function (f) { return f.severity === 'info'; });
   <div class="card-body">
     <% if (!findings.length) { %>
       <div class="empty-state">
-        Nothing flagged. Read the detail below before treating that as a clean bill of health — an analysis
+        Nothing flagged. Read the detail below before treating that as a clean bill of health - an analysis
         with a narrow basis can be quiet for the wrong reason.
       </div>
     <% } else { %>

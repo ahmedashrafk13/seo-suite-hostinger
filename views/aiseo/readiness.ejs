@@ -10,7 +10,7 @@
     <div class="card-body">
       <p class="hint mt-0">
         <strong>Asks each AI crawler's own question: can I reach this page, and can I read it?</strong>
-        Tested twice — against robots.txt, and by actually requesting the page as that user agent. The second
+        Tested twice - against robots.txt, and by actually requesting the page as that user agent. The second
         test is the one that finds real problems: the usual cause of a blocked AI fetcher is not a rule someone
         wrote but a Cloudflare bot-fight setting, a "block AI scrapers" plugin, or a WAF rule, all of which
         answer 403 or a challenge page while robots.txt says Allow.
@@ -39,7 +39,7 @@
           <label class="check">
             <input type="checkbox" name="probe_edge" checked>
             Request the page as each AI user agent
-            <span class="muted">(<%= agents.filter(function(a){ return a.ua; }).length %> live requests — the only way to see an edge block)</span>
+            <span class="muted">(<%= agents.filter(function(a){ return a.ua; }).length %> live requests - the only way to see an edge block)</span>
           </label>
         </div>
         <div class="checkbox-row">
@@ -74,7 +74,7 @@
                 ? 'Cannot cite this brand in an answer.'
                 : 'Nothing, in visibility terms. Often blocked on purpose.' %>
             </td>
-            <td><%= a.ua ? 'yes' : 'no — publishes no user-agent string' %></td>
+            <td><%= a.ua ? 'yes' : 'no - publishes no user-agent string' %></td>
           </tr>
         <% }) %>
         </tbody>
@@ -89,7 +89,7 @@
         <thead><tr><th>Metric</th><th>Target for this project</th><th>Google's "good" boundary</th><th>Google's "poor" boundary</th></tr></thead>
         <tbody>
           <tr><td>TTFB</td><td><%= thresholds.ttfbMs.target %>ms</td><td><%= thresholds.ttfbMs.googleGood %>ms</td><td>&gt; <%= thresholds.ttfbMs.googleNeedsWork %>ms</td></tr>
-          <tr><td>Document load</td><td><%= thresholds.loadMs.target %>ms</td><td class="muted">—</td><td class="muted">—</td></tr>
+          <tr><td>Document load</td><td><%= thresholds.loadMs.target %>ms</td><td class="muted"></td><td class="muted"></td></tr>
           <tr><td>LCP</td><td><%= thresholds.lcpMs.target %>ms</td><td><%= thresholds.lcpMs.googleGood %>ms</td><td>&gt; <%= thresholds.lcpMs.googleNeedsWork %>ms</td></tr>
           <tr><td>INP</td><td><%= thresholds.inpMs.target %>ms</td><td><%= thresholds.inpMs.googleGood %>ms</td><td>&gt; <%= thresholds.inpMs.googleNeedsWork %>ms</td></tr>
           <tr><td>CLS</td><td><%= thresholds.cls.target %></td><td><%= thresholds.cls.googleGood %></td><td>&gt; <%= thresholds.cls.googleNeedsWork %></td></tr>

@@ -4,7 +4,7 @@
    Rendered on every result page, and not optional. The whole design of this
    suite rests on never presenting an estimate as a measurement, and that
    promise is only kept if the reader can see the basis. It also states, in
-   plain language, which questions the deployment cannot answer — which is more
+   plain language, which questions the deployment cannot answer - which is more
    useful to a practitioner than a silence they have to infer.
 
    Expects `prov` = { used: [{key,label}], wouldImprove: [{label,note}] }. */
@@ -24,7 +24,7 @@
         <strong>Not available in this deployment:</strong>
         <%= prov.wouldImprove.map(function (p) { return p.label; }).join(', ') %>.
         No credential is configured for any of them, so nothing on this page claims a search volume,
-        keyword difficulty, backlink count, competitor traffic estimate or AI citation share —
+        keyword difficulty, backlink count, competitor traffic estimate or AI citation share - 
         those numbers are not knowable here, and an invented one would be indistinguishable on screen
         from a real one. Adding a key activates the adapter; until then the page states its narrower basis.
       </p>

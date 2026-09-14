@@ -1,4 +1,4 @@
-// SERP-LITE — a keyless, country-aware sample of a result page.
+// SERP-LITE - a keyless, country-aware sample of a result page.
 //
 // WHY THIS EXISTS
 // Four of the requested features are impossible without SEEING a result page:
@@ -6,7 +6,7 @@
 // platforms rank for this brand", and "is my page or theirs the one Google
 // returns". This deployment has no SERP API credential, and scraping
 // google.com/search is both against its terms and unreliable enough that a
-// blocked scrape would silently degrade to "no competition found" — the worst
+// blocked scrape would silently degrade to "no competition found" - the worst
 // possible failure for a difficulty score.
 //
 // So this module samples DuckDuckGo's HTML endpoint and Bing's, both of which
@@ -26,7 +26,7 @@
 // minimum gap, and a 202/403/429 backs off rather than retrying immediately.
 // A research run that fires forty concurrent SERP requests gets an empty
 // result set for the last thirty, which reads as "no competition" instead of
-// "throttled" — the same trap ./research.js already avoids for autocomplete.
+// "throttled" - the same trap ./research.js already avoids for autocomplete.
 const cheerio = require('cheerio');
 const markets = require('./markets');
 const { fetchPage, sleep } = require('./fetcher');
@@ -140,7 +140,7 @@ async function ddg(query, { market = 'ZZ', limit = 10 } = {}) {
   // Verified against the live endpoint: it is NOT. DuckDuckGo's HTML endpoint
   // carries no related-searches markup, and Bing's result page omits its `.b_rs`
   // block from a plain request. The selectors are kept because they cost
-  // nothing and would start working if either endpoint changed — but nothing
+  // nothing and would start working if either endpoint changed - but nothing
   // depends on them: relatedSearches() below uses Bing's suggestion index
   // instead, precisely so the feature is not silently empty forever.
   const related = [];
@@ -250,7 +250,7 @@ async function search(query, { market = 'ZZ', limit = 10, engine = 'auto' } = {}
 // HTML endpoint has no related-searches markup at all, and Bing's result page
 // does not include its `.b_rs` block in the HTML returned to a plain request.
 // Scraping a block that is not there returns an empty list forever, which reads
-// on screen as "this seed has no alternative phrasings" — a false statement
+// on screen as "this seed has no alternative phrasings" - a false statement
 // dressed as a measurement, which is the one outcome this codebase refuses.
 //
 // WHAT IT DOES INSTEAD, AND WHY IT IS GENUINELY ADDITIVE
@@ -258,7 +258,7 @@ async function search(query, { market = 'ZZ', limit = 10, engine = 'auto' } = {}
 // returns completions from BING's index rather than Google's. That is not the
 // same list. Verified live against the same seed, Google offered
 // "…cost per square metre / …cost calculator uk / …cost ireland" while Bing
-// offered "…cost per foot / …near me cost / …company cost" — different
+// offered "…cost per foot / …near me cost / …company cost" - different
 // framings of the same intent, which is exactly what ./research.js was missing
 // when it had only Google autocomplete to work from.
 //

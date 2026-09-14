@@ -1,4 +1,4 @@
-// MARKETS — the country/locale registry every geo-aware call reads from.
+// MARKETS - the country/locale registry every geo-aware call reads from.
 //
 // "Add a country filter for volume" is not one parameter. Every source that
 // can be localised wants a DIFFERENT identifier for the same country:
@@ -68,7 +68,7 @@ const BY_CODE = new Map(MARKETS.map((m) => [m.code, m]));
 //
 // Accepts an ISO code ('GB'), a lowercase Google gl ('gb'), or null. Anything
 // unrecognised resolves to worldwide rather than throwing, because a stale
-// brand row must not break a research run — but the resolved market is always
+// brand row must not break a research run - but the resolved market is always
 // returned so the caller can render WHICH country the numbers are for.
 function resolve(input) {
   if (!input) return BY_CODE.get('ZZ');

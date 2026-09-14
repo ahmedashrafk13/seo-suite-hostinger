@@ -7,7 +7,7 @@
 // WHY THE EXISTING FEATURES DID NOT ANSWER IT
 // There were two internal-linking tools and neither did this. /linking is a
 // whole-site child-process crawl producing a spreadsheet of every pair on the
-// site — right for an audit, useless when the question is "this one page needs
+// site - right for an audit, useless when the question is "this one page needs
 // links, where from". ./architecture.js builds the graph and proposes links,
 // but it proposes them across the WHOLE graph and orders them by global
 // overlap, so a specific target page's opportunities are scattered through
@@ -19,7 +19,7 @@
 //
 // THE ANCHOR RULE, AND WHY IT IS ABSOLUTE
 // A recommendation of the form "link from /blog/x with the anchor 'commercial
-// roof repair'" is worthless if that phrase does not appear on /blog/x — the
+// roof repair'" is worthless if that phrase does not appear on /blog/x - the
 // implementer has to write a new sentence, judge where it goes, and the
 // recommendation becomes a writing brief. So every anchor returned here is a
 // substring of the source page's own rendered text, with the sentence it sits
@@ -28,19 +28,19 @@
 // list that gets filed.
 //
 // WHAT IS EXCLUDED, AND WHY
-//   - the target itself, and pages already linking to it
-//   - anchors inside the nav, header, footer or any boilerplate region: a link
+//  - the target itself, and pages already linking to it
+//  - anchors inside the nav, header, footer or any boilerplate region: a link
 //     added there is sitewide and is not an editorial link
-//   - anchors whose SENTENCE repeats verbatim across most of the crawled site.
+//  - anchors whose SENTENCE repeats verbatim across most of the crawled site.
 //     This is the case the markup-based filter cannot catch and it matters more
 //     than it sounds: verified against a live site, the top six recommendations
 //     were all the anchor "Unique Design" inside the sentence "Unlimited Pages
-//     Website with Unique Design" — a feature block rendered on every page, in
+//     Website with Unique Design" - a feature block rendered on every page, in
 //     a plain <div> with no nav, footer or template class on it. Six identical
 //     recommendations pointing at one repeated banner is worse than none, and no
 //     selector list would ever have found it. Cross-page repetition would.
-//   - anchors that are generic UI text ("Learn More"), which carry no signal
-//   - anchors already used on the source page to point somewhere ELSE, because
+//  - anchors that are generic UI text ("Learn More"), which carry no signal
+//  - anchors already used on the source page to point somewhere ELSE, because
 //     wrapping the same phrase twice on one page to two destinations is worse
 //     than not linking
 const cheerio = require('cheerio');
@@ -63,7 +63,7 @@ function targetPhrases(doc, { extra = [], templateBlocks = null } = {}) {
     // A phrase of only stopwords identifies nothing.
     if (nlp.contentWords(p).length < 2) return;
     // A phrase lifted from the site's own repeated template is not a phrase
-    // that identifies THIS page — it identifies every page.
+    // that identifies THIS page - it identifies every page.
     if (templateBlocks && templateBlocks.has && templateBlocks.has(p)) return;
     const cur = out.get(p);
     if (cur) { cur.weight = Math.max(cur.weight, weight); cur.origins.add(origin); return; }
@@ -71,7 +71,7 @@ function targetPhrases(doc, { extra = [], templateBlocks = null } = {}) {
   };
 
   // The title's brand suffix is not part of the subject.
-  const cleanTitle = String(doc.title || '').split(/\s+[|–—·•]\s+/)[0];
+  const cleanTitle = String(doc.title || '').split(/\s+[|–—·•-]\s+/)[0];
   (doc.h1s || []).forEach((h) => add(h, 100, 'H1'));
   add(cleanTitle, 90, 'title');
 
@@ -98,7 +98,7 @@ function targetPhrases(doc, { extra = [], templateBlocks = null } = {}) {
 // ------------------------------------------------- anchor discovery in a page
 
 // Escapes a phrase for a whole-phrase regex, tolerating any whitespace run and
-// an optional trailing 's' on the last word — "roof repair" should match "roof
+// an optional trailing 's' on the last word - "roof repair" should match "roof
 // repairs", which is how the phrase actually appears in prose.
 function phraseRegex(phrase) {
   const escaped = phrase.split(/\s+/)
@@ -161,7 +161,7 @@ function anchorIn(sourceDoc, phrases, { targetKey, templateBlocks = null }) {
       const sentence = nlp.sentences(block).find((sn) => rx.test(sn)) || block;
       // A sentence that repeats across most of the site is a template block,
       // whatever markup it sits in. Wrapping a link around it puts the same
-      // anchor on every page, which is the opposite of an editorial link — and
+      // anchor on every page, which is the opposite of an editorial link - and
       // recommending it once per page produces a list of identical rows.
       if (isTemplate(sentence) || isTemplate(block)) continue;
       return {
@@ -186,7 +186,7 @@ function anchorIn(sourceDoc, phrases, { targetKey, templateBlocks = null }) {
 // The whole job.
 //
 // `targetUrl` is the page that needs links. Returns one row per source page,
-// with the columns asked for — URL (the target), Source URL, Anchor text — plus
+// with the columns asked for - URL (the target), Source URL, Anchor text - plus
 // the sentence, the relevance evidence and the reason each candidate ranks
 // where it does.
 async function find(targetUrl, {
@@ -216,7 +216,7 @@ async function find(targetUrl, {
   //
   // This has to happen BEFORE the anchor phrases are derived, because the
   // template detection below needs several pages of the same site to work at
-  // all — and a phrase drawn from the site's own repeated furniture must never
+  // all - and a phrase drawn from the site's own repeated furniture must never
   // reach the phrase list in the first place.
   const startFrom = site ? normalizeUrl(site) : (() => {
     try { return new URL(target).origin; } catch { return target; }
@@ -228,7 +228,7 @@ async function find(targetUrl, {
   //
   // Any string appearing verbatim on most pages of the site is that site's
   // furniture, whatever markup it sits in. This is the only filter that catches
-  // a feature banner in a bare <div> with no nav, footer or template class —
+  // a feature banner in a bare <div> with no nav, footer or template class - 
   // and without it, the top recommendations on a real site were six identical
   // rows all anchoring the same sitewide banner.
   const template = boilerplate.repeatedBlocks([targetDoc, ...pages.map((p) => p.doc)]);
@@ -241,15 +241,15 @@ async function find(targetUrl, {
       ok: false,
       target,
       reason: template.usable
-        ? `No usable anchor phrase could be read from the target page. Its H1, title, slug and repeated phrases are all either too short, too long, generic UI text, or part of the site template that appears on ${template.threshold}+ of the ${template.pages} pages crawled — so any anchor recommended would have to be invented, and this tool does not invent anchors.`
-        : 'No usable anchor phrase could be read from the target page. Its H1, title, slug and repeated phrases are all either too short, too long, or generic UI text — so any anchor recommended would have to be invented, and this tool does not invent anchors.',
+        ? `No usable anchor phrase could be read from the target page. Its H1, title, slug and repeated phrases are all either too short, too long, generic UI text, or part of the site template that appears on ${template.threshold}+ of the ${template.pages} pages crawled - so any anchor recommended would have to be invented, and this tool does not invent anchors.`
+        : 'No usable anchor phrase could be read from the target page. Its H1, title, slug and repeated phrases are all either too short, too long, or generic UI text - so any anchor recommended would have to be invented, and this tool does not invent anchors.',
       rows: [],
       targetDoc: { title: targetDoc.title, h1s: targetDoc.h1s, wordCount: targetDoc.wordCount },
       template: template.usable ? { pages: template.pages, threshold: template.threshold, examples: template.examples } : null,
     };
   }
 
-  // Who already links to the target. These are excluded, and counted — "12
+  // Who already links to the target. These are excluded, and counted - "12
   // pages already link here" is the first thing a reader needs to know before
   // reading a list of thirty more.
   const alreadyLinking = [];
@@ -315,7 +315,7 @@ async function find(targetUrl, {
         sourceTitle: c.page.doc.title,
         relevance: c.relevance,
         sharedEntities: c.sharedEntities,
-        reason: 'relevant, but none of the target page\'s own phrases appear verbatim in this page\'s editorial content outside the site template — an anchor here would have to be written rather than found',
+        reason: 'relevant, but none of the target page\'s own phrases appear verbatim in this page\'s editorial content outside the site template - an anchor here would have to be written rather than found',
       });
       continue;
     }
@@ -388,7 +388,7 @@ async function find(targetUrl, {
       belowRelevanceThreshold: candidates.length - scored.length,
     },
     basis: `${pages.length} page${pages.length === 1 ? '' : 's'} crawled from ${crawl.startUrl}; a page qualifies when its entity/vocabulary overlap with the target clears ${minRelevance} AND one of the target's own phrases appears verbatim in its editorial content`
-      + ` — with the nav, header, footer, generic labels`
+      + ` - with the nav, header, footer, generic labels`
       + (template.usable ? ` and the ${template.blocks.size} strings that repeat across ${template.threshold}+ of the crawled pages` : '')
       + ' all excluded',
     truncated: rows.length >= limit && scored.length > rows.length,

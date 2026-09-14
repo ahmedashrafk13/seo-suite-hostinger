@@ -2,7 +2,7 @@
 //
 // THE GAP THIS CLOSES
 // ./research.js already produces the two halves of the demand side: the
-// keywords people type into a search box, and — through the model — the whole
+// keywords people type into a search box, and - through the model - the whole
 // questions they type into ChatGPT, Perplexity and Gemini. What it never
 // answered is the question that follows immediately, and the one a client
 // actually asks: when somebody asks that, whose site does the answer come
@@ -13,13 +13,13 @@
 // This deployment holds no citation-tracking credential (no Profound, no SE
 // Ranking AI visibility, no DataForSEO LLM endpoints), and there is no keyless
 // way to ask ChatGPT which sources it cited for a prompt. So the thing a
-// client wants most — "we were cited in 12% of ChatGPT answers" — is NOT
+// client wants most - "we were cited in 12% of ChatGPT answers" - is NOT
 // knowable here, and this module does not produce it. Inventing that number
 // would be the exact failure ./providers.js exists to prevent.
 //
 // What IS knowable, keylessly, is the retrieval pool: the pages a web-grounded
 // assistant would have to choose from. Every grounded assistant answers a
-// question by running a search behind the scenes and reading the top results —
+// question by running a search behind the scenes and reading the top results - 
 // ChatGPT and Copilot over Bing's index, Perplexity over its own blend of web
 // indexes. So the set of pages ranking for the question is the population that
 // citations are drawn FROM. Being in it is not proof of citation; being absent
@@ -33,7 +33,7 @@
 //             not sufficient. Reported as "eligible to be cited".
 //   ABSENT    the brand is not in the pool. Reported as "cannot currently be
 //             cited for this question", which is a real, actionable finding.
-//   UNKNOWN   the sample failed — blocked, timed out, no results. Reported as
+//   UNKNOWN   the sample failed - blocked, timed out, no results. Reported as
 //             unknown and EXCLUDED from both sides of every ratio.
 //
 // The third case is why this module is longer than it looks. A blocked sample
@@ -45,7 +45,7 @@
 //
 // GROUND TRUTH, WHERE IT EXISTS
 // ./aiReferrals.js measures something this cannot: humans who read an AI
-// answer, clicked the citation, and arrived — recorded by GA4 as an assistant
+// answer, clicked the citation, and arrived - recorded by GA4 as an assistant
 // referral. That is proof of citation rather than eligibility for it. Where
 // the brand has AI referral sessions, this module says so alongside its own
 // numbers, because one measured arrival outweighs any amount of pool analysis.
@@ -109,7 +109,7 @@ function promptsFromResearch(runData, { limit = MAX_PROMPTS } = {}) {
   });
 
   // Question-shaped keywords from the keyless side. Included because they are
-  // real observed demand — someone typed them into Google — and they are the
+  // real observed demand - someone typed them into Google - and they are the
   // only question source available when the AI half is switched off.
   const QUESTION_START = /^(how|what|why|when|which|who|can|is|are|does|do|should|will)\b/i;
   ((runData || {}).keywords || []).forEach((k) => {
@@ -223,7 +223,7 @@ async function analyse({
       domain: d.domain,
       prompts: d.prompts,
       // Share is over MEASURED prompts, not over the whole list, and the
-      // measured count travels with it — see the header. A leaderboard whose
+      // measured count travels with it - see the header. A leaderboard whose
       // denominator silently included failed samples would rank every domain
       // too low by the same unknown amount.
       share: measured ? Number(((d.prompts / measured) * 100).toFixed(1)) : null,
@@ -239,7 +239,7 @@ async function analyse({
   const brandRow = leaderboard.find((d) => d.isBrand) || null;
 
   // The gap list: questions where a named competitor is in the pool and the
-  // brand is not. This is the actionable half of the whole analysis — each row
+  // brand is not. This is the actionable half of the whole analysis - each row
   // is a question the client's rival can be quoted on and they cannot.
   const gaps = rows
     .filter((r) => r.state === 'absent' && r.competitors.length)
@@ -254,7 +254,7 @@ async function analyse({
 
   // Questions nobody strong answers: no named competitor and no brand in the
   // pool. Worth a separate list because these are the cheapest wins available
-  // — an unclaimed question with an intent the brand can actually serve.
+  // - an unclaimed question with an intent the brand can actually serve.
   const openQuestions = rows
     .filter((r) => r.state === 'absent' && !r.competitors.length)
     .map((r) => ({ prompt: r.prompt, job: r.job, intent: r.intent, pool: r.pool }));
@@ -279,7 +279,7 @@ async function analyse({
     },
     eligibility: measured
       ? {
-        // Named for what it is. NOT "citation rate" — see the header.
+        // Named for what it is. NOT "citation rate" - see the header.
         label: 'Retrieval-pool presence',
         pct: Number(((present / measured) * 100).toFixed(1)),
         basis: `${present} of ${measured} question(s) where a keyless index sample returned this site in the top ${perPrompt}.`,
@@ -294,7 +294,7 @@ async function analyse({
     // existing provenance block can render it unchanged.
     sources: ['serp-lite (DuckDuckGo/Bing HTML sample)'],
     limits: [
-      'This measures the retrieval pool a grounded assistant would choose sources from — not the citations an assistant actually made. No keyless endpoint reports real ChatGPT, Gemini or Perplexity citations, and this deployment holds no citation-tracking credential.',
+      'This measures the retrieval pool a grounded assistant would choose sources from - not the citations an assistant actually made. No keyless endpoint reports real ChatGPT, Gemini or Perplexity citations, and this deployment holds no citation-tracking credential.',
       'The sample comes from DuckDuckGo and Bing, not Google. That is the right index for ChatGPT and Copilot, which are Bing-grounded, and an approximation for Gemini and AI Overviews, which are not.',
       unknown ? `${unknown} question(s) could not be sampled and are excluded from every percentage rather than counted as absent.` : null,
       'Presence in the pool is necessary but not sufficient for a citation. Absence from it is near-conclusive that no citation is possible for that question today.',
@@ -302,7 +302,7 @@ async function analyse({
     // Ground truth, when GA4 has any.
     referralEvidence: aiReferrals && aiReferrals.ok ? {
       sessions: aiReferrals.totals ? aiReferrals.totals.sessions : null,
-      note: 'GA4 recorded real sessions arriving from AI assistants for this site. Those are proof of citation, unlike everything above — read them first.',
+      note: 'GA4 recorded real sessions arriving from AI assistants for this site. Those are proof of citation, unlike everything above - read them first.',
     } : null,
   };
 }
@@ -321,7 +321,7 @@ function toFindings(result, brand) {
       detail: `${result.eligibility.basis} An assistant can only quote a page an index returns for the question, so the remaining ${100 - pct}% are questions this site cannot currently be cited on.`,
       action: pct < 50
         ? 'Work the gap list below: each row is a question a named competitor can be quoted on and this site cannot. Answer it on a page that states the answer in a liftable passage near the top.'
-        : 'Hold the pool presence and shift attention to citability — whether the passage an assistant would lift is actually quotable. The on-page score measures that.',
+        : 'Hold the pool presence and shift attention to citability - whether the passage an assistant would lift is actually quotable. The on-page score measures that.',
       dedupeKey: `prompt-citations:eligibility:${brand.id}`,
     });
   }
@@ -330,7 +330,7 @@ function toFindings(result, brand) {
     out.push({
       severity: 'medium',
       title: `${result.gaps.length} question(s) where a competitor is in the pool and this site is not`,
-      detail: result.gaps.slice(0, 6).map((g) => `"${g.prompt}" — ${g.competitors[0].domain} at #${g.competitors[0].position}`).join('; '),
+      detail: result.gaps.slice(0, 6).map((g) => `"${g.prompt}" - ${g.competitors[0].domain} at #${g.competitors[0].position}`).join('; '),
       action: 'Each of these is a question with demonstrated retrieval demand and a rival already eligible to answer it. Brief a page per cluster rather than per question.',
       evidence: { gaps: result.gaps.slice(0, 25) },
       dedupeKey: `prompt-citations:gaps:${brand.id}`,
@@ -352,7 +352,7 @@ function toFindings(result, brand) {
     out.push({
       severity: 'low',
       title: `Only ${result.counts.coverage}% of the question set could be sampled`,
-      detail: `${result.counts.unknown} of ${result.counts.requested} questions returned nothing — normally a rate limit on the keyless endpoints rather than an empty result page.`,
+      detail: `${result.counts.unknown} of ${result.counts.requested} questions returned nothing - normally a rate limit on the keyless endpoints rather than an empty result page.`,
       action: 'Re-run with a smaller question set, or later in the day. The percentages above describe only the sampled questions and should not be read as a site-wide figure at this coverage.',
       dedupeKey: `prompt-citations:coverage:${brand.id}`,
     });
@@ -372,7 +372,7 @@ function toFindings(result, brand) {
 //
 // WHERE THE QUESTIONS COME FROM, IN PRIORITY ORDER
 //   1. A pasted list, when the user typed one. Explicit beats derived.
-//   2. The brand's most recent completed keyword-research run — the prompts
+//   2. The brand's most recent completed keyword-research run - the prompts
 //      the model generated for this brand, plus the question-shaped keywords
 //      the keyless expansion found.
 // If neither exists the run finishes with an explanation rather than an empty
@@ -424,8 +424,8 @@ async function run({
           site,
           promptSource: null,
           reason: 'no-questions',
-          note: 'No questions were available to check. Run keyword research for this brand first — its '
-            + 'assistant prompts and question keywords are used automatically — or paste a question list on '
+          note: 'No questions were available to check. Run keyword research for this brand first - its '
+            + 'assistant prompts and question keywords are used automatically - or paste a question list on '
             + 'the form.',
           provenance: providers.provenance([]),
         },
@@ -511,7 +511,7 @@ function toTasks(runRecord, brand, { userId }) {
         : 'A keyless index sample does not return this site for this question.')
         + '\n\nAnswer the question directly on one page, in a passage that states the answer in the first two '
         + 'sentences and reads correctly lifted out of its context. Then run the on-page score against that '
-        + 'page — being in the retrieval pool and being quotable are different properties.'
+        + 'page - being in the retrieval pool and being quotable are different properties.'
         + '\n\nThis is retrieval-pool evidence, not a measured citation: it says an assistant COULD quote the '
         + 'pages listed, not that it did.',
       source: 'aiseo',

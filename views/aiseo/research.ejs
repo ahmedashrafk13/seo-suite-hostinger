@@ -10,14 +10,14 @@
     <div class="card-body">
       <p class="hint mt-0">
         <strong>Two kinds of demand, discovered separately.</strong>
-        Search-box queries come from Search Console — real impressions for this exact site, not an estimate —
+        Search-box queries come from Search Console - real impressions for this exact site, not an estimate - 
         extended with Google's own autocomplete, an alphabet sweep of it, and the engine's own related-search
         suggestions. Assistant prompts are written by the AI model, because the sentences people type into
         ChatGPT are whole questions with a stated situation and cannot be derived from a keyword list.
       </p>
       <p class="hint">
         <strong>Volume and difficulty, with the source named on every value.</strong>
-        Volume is taken from the best source configured — Google Ads Keyword Planner, DataForSEO or Semrush —
+        Volume is taken from the best source configured - Google Ads Keyword Planner, DataForSEO or Semrush - 
         and where none is configured the two honest alternatives are shown in their own columns instead: Search
         Console impressions (a measurement of this site) and Google Trends relative interest for the country you
         pick (0-100, the shape of demand rather than its size). Difficulty is the vendor's where a credential
@@ -36,7 +36,7 @@
       <form method="POST" action="/ai-seo/research/run"><%- csrfField %>
         <input type="hidden" name="brand_id" value="<%= brand.id %>">
         <div class="field">
-          <label for="seeds">Seed topics <span class="muted">(one per line — leave empty to use this site's own top non-branded queries)</span></label>
+          <label for="seeds">Seed topics <span class="muted">(one per line - leave empty to use this site's own top non-branded queries)</span></label>
           <textarea id="seeds" name="seeds" rows="4" placeholder="compliance certification&#10;aml training&#10;basel iii course"><%= brand.seed_topics || '' %></textarea>
         </div>
         <div class="field-row">
@@ -60,11 +60,11 @@
           <label class="field">
             <span>Difficulty for the top</span>
             <select name="difficulty_limit">
-              <option value="0">none — skip difficulty</option>
-              <option value="6">6 keywords — fastest</option>
+              <option value="0">none - skip difficulty</option>
+              <option value="6">6 keywords - fastest</option>
               <option value="12" selected>12 keywords</option>
               <option value="25">25 keywords</option>
-              <option value="40">40 keywords — slow</option>
+              <option value="40">40 keywords - slow</option>
             </select>
           </label>
         </div>
@@ -76,7 +76,7 @@
         </p>
         <p class="hint mt-0">
           Difficulty is capped because, with no vendor credential, each keyword costs one paced request to a
-          result page. Whatever the cap leaves out is reported rather than left blank-looking — a keyword with no
+          result page. Whatever the cap leaves out is reported rather than left blank-looking - a keyword with no
           difficulty shows an em dash, never a zero.
         </p>
         <div class="checkbox-row">
@@ -86,28 +86,28 @@
           <label class="check">
             <input type="checkbox" name="alphabet_sweep" checked>
             Also sweep the alphabet
-            <span class="muted">— "&lt;seed&gt; a", "&lt;seed&gt; b" … Google completes each prefix differently, and this is where the long-tail phrasings a modifier list cannot anticipate come from. It is the technique behind every keyword tool's long tail, and it is free.</span>
+            <span class="muted"> - "&lt;seed&gt; a", "&lt;seed&gt; b" … Google completes each prefix differently, and this is where the long-tail phrasings a modifier list cannot anticipate come from. It is the technique behind every keyword tool's long tail, and it is free.</span>
           </label>
         </div>
         <div class="checkbox-row">
           <label class="check">
             <input type="checkbox" name="include_related" checked>
             Add related searches
-            <span class="muted">— autocomplete completes what you typed; related searches are the engine's own list of other ways to ask the same thing, which is where a topic's synonyms and adjacent framings come from. Autocomplete alone was missing half of "keyword suggestions based on Google data".</span>
+            <span class="muted"> - autocomplete completes what you typed; related searches are the engine's own list of other ways to ask the same thing, which is where a topic's synonyms and adjacent framings come from. Autocomplete alone was missing half of "keyword suggestions based on Google data".</span>
           </label>
         </div>
         <div class="checkbox-row">
           <label class="check">
             <input type="checkbox" name="include_metrics" checked>
             Look up search volume and keyword difficulty
-            <span class="muted">— tries Keyword Planner, DataForSEO and Semrush in order, then falls back to Google Trends relative interest and a SERP-based difficulty proxy. Every rung tried is reported on the result page, including the ones that were not configured.</span>
+            <span class="muted"> - tries Keyword Planner, DataForSEO and Semrush in order, then falls back to Google Trends relative interest and a SERP-based difficulty proxy. Every rung tried is reported on the result page, including the ones that were not configured.</span>
           </label>
         </div>
         <div class="checkbox-row">
           <label class="check">
             <input type="checkbox" name="include_prompts" <%= aiAvailable ? 'checked' : 'disabled' %>>
             Write the AI-assistant prompts for these topics
-            <% if (!aiAvailable) { %><span class="muted">— needs an Azure OpenAI credential</span><% } %>
+            <% if (!aiAvailable) { %><span class="muted"> - needs an Azure OpenAI credential</span><% } %>
           </label>
         </div>
         <div class="checkbox-row">

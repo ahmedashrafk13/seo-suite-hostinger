@@ -2,8 +2,8 @@
 //
 // competitive.js's velocityFromSitemap() infers a publish rate from a
 // SINGLE sitemap's lastmod dates. It already detects and refuses the worst
-// failure mode of that approach — a CMS that stamps every URL with today's
-// date at deploy time — but even where lastmod is genuine, a single
+// failure mode of that approach - a CMS that stamps every URL with today's
+// date at deploy time - but even where lastmod is genuine, a single
 // snapshot cannot see what was REMOVED, and "genuine lastmod" is itself a
 // guess about a platform this app does not run.
 //
@@ -11,12 +11,12 @@
 // run reads a site's sitemap, it is diffed against every URL this app has
 // ever seen for that (brand, site) pair. A URL that appears for the first
 // time is new; a URL that was there last run and is not this run is
-// removed. That is a fact, not an inference, and it costs nothing extra —
+// removed. That is a fact, not an inference, and it costs nothing extra - 
 // the sitemap fetch already happens as part of the competitive run.
 //
 // THE ONE HONEST LIMITATION
 // The history starts empty. The first run for a site has no prior snapshot
-// to diff against, so every URL looks "new" — which is not a velocity
+// to diff against, so every URL looks "new" - which is not a velocity
 // figure, it is the starting inventory. That run is marked `baseline: true`
 // and its counts are not offered as a rate. A real rate needs at least one
 // earlier run to compare against, and callers must check `usable` before
@@ -81,7 +81,7 @@ function run({ brandId, site, urls }) {
     usable: !baseline,
     baseline,
     reason: baseline
-      ? 'This is the first time this site\'s sitemap has been observed here — there is no prior snapshot to diff against, so this run is the starting inventory, not a velocity figure. Run competitive analysis again after some time has passed to see a real rate.'
+      ? 'This is the first time this site\'s sitemap has been observed here - there is no prior snapshot to diff against, so this run is the starting inventory, not a velocity figure. Run competitive analysis again after some time has passed to see a real rate.'
       : null,
     priorRuns: priorRunCount,
     totalUrls: incoming.size,

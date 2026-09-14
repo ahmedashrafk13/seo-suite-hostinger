@@ -27,7 +27,7 @@
 // Cloudflare bot-fight setting, a security plugin's "block AI scrapers"
 // toggle, a WAF rule matching on user agent. Those return 403 or a challenge
 // page while robots.txt says Allow. The only way to find them is to make the
-// request as that agent and look at what comes back — which is what this does.
+// request as that agent and look at what comes back - which is what this does.
 const store = require('./store');
 const providers = require('./providers');
 const psi = require('../psi');
@@ -39,7 +39,7 @@ const {
 
 // Thresholds, taken from the requirement and from Google's own published
 // Core Web Vitals bands. Where the requirement is stricter than Google's, both
-// are reported — a site at LCP 2.3s passes Google and misses the brief, and
+// are reported - a site at LCP 2.3s passes Google and misses the brief, and
 // conflating those two produces an argument nobody can settle.
 const THRESHOLDS = {
   ttfbMs: { target: 200, googleGood: 800, googleNeedsWork: 1800 },
@@ -85,7 +85,7 @@ async function probeAgents(url, { agents = AI_AGENTS, baselineDoc = null, baseli
   const results = await mapLimit(probeable, 3, async (agent) => {
     // noAuth: the entire question here is what an UNauthenticated agent can
     // read. Answering it with the run's session cookie would report that
-    // GPTBot can read a page only a logged-in member can see — a green light
+    // GPTBot can read a page only a logged-in member can see - a green light
     // meaning the opposite of what it says. See fetcher.runWithAuth.
     const res = await fetchPage(url, { ua: agent.ua, timeout: 20000, noAuth: true });
     const challenge = looksLikeChallenge(res.body, res.status);
@@ -136,7 +136,7 @@ async function probeAgents(url, { agents = AI_AGENTS, baselineDoc = null, baseli
 //   UNVERIFIED-CLIENT BLOCK: the edge rejects every client it cannot verify,
 //   AI token or not. Cloudflare's verified-bot enforcement is the common case.
 //   The real GPTBot, arriving from OpenAI's published IP range with matching
-//   reverse DNS, is verified and let through — while this tool, impersonating
+//   reverse DNS, is verified and let through - while this tool, impersonating
 //   it from an ordinary IP, is not. Reporting that as "GPTBot is blocked" is a
 //   false positive, and it is the single biggest way a check like this lies.
 //
@@ -184,7 +184,7 @@ async function run({
 
     // --- baseline fetch, as a browser -----------------------------------
     // The baseline every agent is compared against, so it must be fetched on
-    // the same unauthenticated terms — a logged-in baseline would make every
+    // the same unauthenticated terms - a logged-in baseline would make every
     // agent look like it was served a stripped page.
     const baseline = await fetchPage(target, { timeout: 25000, noAuth: true });
     const doc = baseline.ok && baseline.body ? parseDocument(baseline.url, baseline.body) : null;
@@ -220,7 +220,7 @@ async function run({
     const controlDiscriminates = Boolean(control && control.discriminates);
 
     // Merged per-agent verdict: robots says one thing, the wire says another,
-    // and the wire wins — an Allow line is worth nothing if the WAF 403s.
+    // and the wire wins - an Allow line is worth nothing if the WAF 403s.
     const agentStatus = robotsVerdicts.map((v) => {
       const probe = probeByKey.get(v.key) || null;
       let verdict = 'unknown';
@@ -228,16 +228,16 @@ async function run({
       if (!v.allowed) { verdict = 'blocked'; reason = `robots.txt: ${v.rule}`; }
       else if (probe && probe.challenge && controlDiscriminates) {
         verdict = 'blocked';
-        reason = `robots.txt allows it, but the server answered with ${probe.challenge} — while an unrecognised control agent was served normally, so the block targets this user agent specifically`;
+        reason = `robots.txt allows it, but the server answered with ${probe.challenge} - while an unrecognised control agent was served normally, so the block targets this user agent specifically`;
       } else if (probe && probe.challenge) {
         // The edge refused the control too. It refuses unverified clients as a
         // class, and the real crawler authenticates by source IP and reverse
         // DNS, which cannot be reproduced here. Calling this "blocked" would be
         // a guess presented as a measurement.
         verdict = 'unverifiable';
-        reason = `the server answered with ${probe.challenge}, but it answered the same way to a neutral control agent — this edge refuses every client it cannot verify, and the real crawler may still be let through on its published IP range. Confirm in server logs.`;
+        reason = `the server answered with ${probe.challenge}, but it answered the same way to a neutral control agent - this edge refuses every client it cannot verify, and the real crawler may still be let through on its published IP range. Confirm in server logs.`;
       }
-      else if (probe && probe.stripped) { verdict = 'degraded'; reason = `served ${Math.round(probe.contentRatio * 100)}% of the bytes a browser gets — the content may be stripped for this agent`; }
+      else if (probe && probe.stripped) { verdict = 'degraded'; reason = `served ${Math.round(probe.contentRatio * 100)}% of the bytes a browser gets - the content may be stripped for this agent`; }
       else if (probe && probe.ok) { verdict = 'reachable'; reason = `HTTP ${probe.status} with a full-size body`; }
       else if (probe && probe.error) { verdict = 'unknown'; reason = `probe failed: ${probe.error}`; }
       else if (!probe) { verdict = v.allowed ? 'allowed-by-robots' : 'blocked'; reason = 'no live probe (this agent publishes no user-agent string to test with)'; }
@@ -303,7 +303,7 @@ async function run({
     // The single most damaging AI-readiness problem, and invisible in a
     // browser. Every AI retrieval fetcher reads the served HTML and executes
     // no JavaScript. A page whose content arrives via script is, to them, a
-    // blank page — while looking perfect to the author.
+    // blank page - while looking perfect to the author.
     const jsDependence = doc ? {
       spaMarker: doc.spaMarker,
       scriptCount: doc.scriptCount,
@@ -337,7 +337,7 @@ async function run({
         checkKey: 'ai_retrieval_blocked',
         title: `${retrievalBlocked.length} AI retrieval fetcher${retrievalBlocked.length === 1 ? '' : 's'} cannot read this page`,
         detail: retrievalBlocked.map((a) => `${a.label}: ${a.reason}`).join('; ')
-          + '. These fetch pages at the moment a user asks a question, in order to cite them — while they are blocked, this page cannot appear in those assistants\' answers.',
+          + '. These fetch pages at the moment a user asks a question, in order to cite them - while they are blocked, this page cannot appear in those assistants\' answers.',
         severity: 'critical',
         affectedUrl: target,
         affectedCount: retrievalBlocked.length,
@@ -352,8 +352,8 @@ async function run({
     if (retrievalUnverifiable.length) {
       findings.push({
         checkKey: 'ai_retrieval_unverifiable',
-        title: `${retrievalUnverifiable.length} AI retrieval fetcher${retrievalUnverifiable.length === 1 ? '' : 's'} could not be tested — the edge blocks all unverified clients`,
-        detail: `${retrievalUnverifiable.map((a) => a.label).join(', ')}. Each was refused, but so was a neutral control agent, so the refusal is blanket anti-bot enforcement rather than an AI-specific rule. Cloudflare and similar edges verify a crawler by source IP and reverse DNS, which this probe cannot reproduce — the real fetcher may well be admitted. This is deliberately not reported as a block, because guessing either way would be wrong.`,
+        title: `${retrievalUnverifiable.length} AI retrieval fetcher${retrievalUnverifiable.length === 1 ? '' : 's'} could not be tested - the edge blocks all unverified clients`,
+        detail: `${retrievalUnverifiable.map((a) => a.label).join(', ')}. Each was refused, but so was a neutral control agent, so the refusal is blanket anti-bot enforcement rather than an AI-specific rule. Cloudflare and similar edges verify a crawler by source IP and reverse DNS, which this probe cannot reproduce - the real fetcher may well be admitted. This is deliberately not reported as a block, because guessing either way would be wrong.`,
         severity: 'medium',
         affectedUrl: target,
         affectedCount: retrievalUnverifiable.length,
@@ -367,7 +367,7 @@ async function run({
       findings.push({
         checkKey: 'ai_training_blocked',
         title: `${trainingBlocked.length} AI training crawler${trainingBlocked.length === 1 ? ' is' : 's are'} blocked`,
-        detail: `${trainingBlocked.map((a) => a.label).join(', ')}. This is reported for completeness, not as a problem — blocking training crawlers does not affect whether the brand can be cited in AI answers, and many publishers block them deliberately.`,
+        detail: `${trainingBlocked.map((a) => a.label).join(', ')}. This is reported for completeness, not as a problem - blocking training crawlers does not affect whether the brand can be cited in AI answers, and many publishers block them deliberately.`,
         severity: 'info',
         affectedUrl: target,
         affectedCount: trainingBlocked.length,
@@ -380,7 +380,7 @@ async function run({
     if (jsDependence && jsDependence.likelyClientRendered) {
       findings.push({
         checkKey: 'client_rendered',
-        title: 'The served HTML carries almost no content — the page is rendered by JavaScript',
+        title: 'The served HTML carries almost no content - the page is rendered by JavaScript',
         detail: `The HTML this server returns contains ${jsDependence.servedWordCount} words of main content and shows single-page-app markers. Every AI retrieval fetcher reads this HTML and runs no JavaScript, so to them the page is effectively blank. Googlebot does render, but on a delay and not always.`,
         severity: 'critical',
         affectedUrl: target,
@@ -416,7 +416,7 @@ async function run({
         findings.push({
           checkKey: 'html_load',
           title: `The HTML document took ${baseline.totalMs}ms to download (target under ${THRESHOLDS.loadMs.target}ms)`,
-          detail: `${(baseline.bytes / 1024).toFixed(0)} KB of HTML. This is document time only — no images, scripts or stylesheets — so it is a floor on how fast the page can possibly be.`,
+          detail: `${(baseline.bytes / 1024).toFixed(0)} KB of HTML. This is document time only - no images, scripts or stylesheets - so it is a floor on how fast the page can possibly be.`,
           severity: baseline.totalMs > 3000 ? 'high' : 'medium',
           affectedUrl: target,
           action: 'Reduce the HTML payload and the server time behind it. Compression, and removing inlined data blocks, are the usual wins.',
@@ -449,7 +449,7 @@ async function run({
           detail: `${cert.authorizationError}. Browsers will interstitial, and crawlers treat this as unreachable.`,
           severity: 'critical',
           affectedUrl: target,
-          action: 'Fix the certificate chain — a missing intermediate certificate is the usual cause and is invisible in some browsers.',
+          action: 'Fix the certificate chain - a missing intermediate certificate is the usual cause and is invisible in some browsers.',
           evidence: cert,
           dedupeKey: `readiness:sslinvalid:${target}`,
         });
@@ -461,7 +461,7 @@ async function run({
         detail: cert.error,
         severity: 'medium',
         affectedUrl: target,
-        action: 'Check the certificate manually — this usually means the handshake itself is failing.',
+        action: 'Check the certificate manually - this usually means the handshake itself is failing.',
         dedupeKey: `readiness:sslunknown:${target}`,
       });
     }
@@ -496,7 +496,7 @@ async function run({
         detail: `robots meta: "${robotsMeta || '(none)'}"; X-Robots-Tag: "${xRobots || '(none)'}". The page will not appear in search results, and Google-derived AI surfaces will not cite it.`,
         severity: 'critical',
         affectedUrl: target,
-        action: 'Remove the noindex if this page is meant to be indexed. If it is deliberate, no action — but confirm nothing links to it expecting indexation.',
+        action: 'Remove the noindex if this page is meant to be indexed. If it is deliberate, no action - but confirm nothing links to it expecting indexation.',
         dedupeKey: `readiness:noindex:${target}`,
       });
     }
@@ -504,7 +504,7 @@ async function run({
       findings.push({
         checkKey: 'nosnippet',
         title: 'The page forbids snippets',
-        detail: 'nosnippet (or max-snippet:0) is set. This prevents Google from showing any text extract — which also means the page cannot be used in an AI Overview, since those are built from snippet-eligible content.',
+        detail: 'nosnippet (or max-snippet:0) is set. This prevents Google from showing any text extract - which also means the page cannot be used in an AI Overview, since those are built from snippet-eligible content.',
         severity: 'high',
         affectedUrl: target,
         action: 'Remove nosnippet unless it was set deliberately for licensing reasons. If content control is the goal, use max-snippet with a length rather than forbidding snippets entirely.',
@@ -516,7 +516,7 @@ async function run({
       findings.push({
         checkKey: 'no_robots',
         title: 'No robots.txt',
-        detail: `${origin}/robots.txt returned ${robots.status || 'nothing'}. Crawling still works — the default is allow — but there is no way to state a sitemap location or to control any agent.`,
+        detail: `${origin}/robots.txt returned ${robots.status || 'nothing'}. Crawling still works - the default is allow - but there is no way to state a sitemap location or to control any agent.`,
         severity: 'low',
         affectedUrl: `${origin}/robots.txt`,
         action: 'Add a robots.txt with a Sitemap line. It is also where any future AI-agent policy has to live.',
@@ -553,7 +553,7 @@ async function run({
       findings.push({
         checkKey: 'no_llms_txt',
         title: 'No llms.txt',
-        detail: 'Optional, and explicitly not used by Google — reported as an opportunity, not a defect. It gives retrieval pipelines that do read it a canonical statement of what the brand is, and writing one forces the brand facts to be settled in one place.',
+        detail: 'Optional, and explicitly not used by Google - reported as an opportunity, not a defect. It gives retrieval pipelines that do read it a canonical statement of what the brand is, and writing one forces the brand facts to be settled in one place.',
         severity: 'info',
         affectedUrl: `${origin}/llms.txt`,
         action: 'Generate one from the brand facts on the Schema & brand hub page, then publish it at the site root.',
@@ -568,7 +568,7 @@ async function run({
         findings.push({
           checkKey: 'semantic_html',
           title: `The page uses few semantic landmarks (missing ${missingLandmarks.join(', ')})`,
-          detail: 'AI retrieval systems chunk pages by structure. Without landmarks, boilerplate — navigation, footers, cookie notices — is indistinguishable from the content, so extracted passages are diluted with it.',
+          detail: 'AI retrieval systems chunk pages by structure. Without landmarks, boilerplate - navigation, footers, cookie notices - is indistinguishable from the content, so extracted passages are diluted with it.',
           severity: 'medium',
           affectedUrl: target,
           action: `Wrap the primary content in <main> (or <article>) and mark navigation as <nav>. Currently the best guess at the content container is "${doc.mainSelector}".`,
@@ -636,7 +636,7 @@ async function run({
     // Core Web Vitals from real Chrome users.
     //
     // CrUX reports the 75th percentile, which is the number Google's own
-    // ranking systems use — so it is the one worth alerting on. The lab
+    // ranking systems use - so it is the one worth alerting on. The lab
     // (Lighthouse) score is kept in the payload for the opportunity list, but
     // never used for a pass/fail verdict: lab numbers move with the test
     // machine, and a finding that flips between runs on an unchanged page
@@ -665,11 +665,11 @@ async function run({
         const shown = m.unit === 'ms' ? `${Math.round(value)}ms` : value.toFixed(3);
         findings.push({
           checkKey: m.key,
-          title: `${m.label} is ${shown} — ${band === 'fail' ? 'poor' : 'needs improvement'}`,
+          title: `${m.label} is ${shown} - ${band === 'fail' ? 'poor' : 'needs improvement'}`,
           detail: `${scopeNote} Google's "good" boundary is ${m.unit === 'ms' ? `${m.good}ms` : m.good}; the target set for this project is ${m.unit === 'ms' ? `${m.brief}ms` : m.brief}.`,
           severity: band === 'fail' ? 'high' : 'medium',
           affectedUrl: target,
-          action: `Open the PageSpeed report for this URL — its opportunity list names the specific causes for ${m.label}.`,
+          action: `Open the PageSpeed report for this URL - its opportunity list names the specific causes for ${m.label}.`,
           evidence: { value, scope: cruxRaw.scope, googleGood: m.good, googlePoor: m.poor, projectTarget: m.brief },
           dedupeKey: `readiness:${m.key}:${target}`,
         });
@@ -696,7 +696,7 @@ async function run({
     score = Math.max(0, Math.min(100, score));
 
     metrics.push({ key: 'readiness.score', url: target, value: score, status: score >= 80 ? 'good' : (score >= 55 ? 'warn' : 'fail') });
-    metrics.push({ key: 'readiness.retrieval_agents_ok', url: target, value: retrievalOk, status: retrievalOk === retrievalMeasured ? 'good' : 'fail', detail: `${retrievalOk} of ${retrievalMeasured} testable${retrievalUnverifiable.length ? ` (${retrievalUnverifiable.length} untestable — edge blocks unverified clients)` : ''}` });
+    metrics.push({ key: 'readiness.retrieval_agents_ok', url: target, value: retrievalOk, status: retrievalOk === retrievalMeasured ? 'good' : 'fail', detail: `${retrievalOk} of ${retrievalMeasured} testable${retrievalUnverifiable.length ? ` (${retrievalUnverifiable.length} untestable - edge blocks unverified clients)` : ''}` });
 
     return store.finish(runRow.id, {
       score,

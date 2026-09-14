@@ -1,11 +1,11 @@
-// BOILERPLATE AND NOISE — what to exclude before measuring content.
+// BOILERPLATE AND NOISE - what to exclude before measuring content.
 //
 // THE THREE BUGS THIS FIXES
 //
 // 1. SKEWED CONTENT METRICS. ./fetcher.js picks a main-content container and,
 //    when no candidate holds enough of the page's text, falls back to <body>.
-//    That fallback is the right call for word count — it is never wrong in the
-//    direction that matters — but it means readability, entity density,
+//    That fallback is the right call for word count - it is never wrong in the
+//    direction that matters - but it means readability, entity density,
 //    keyword density and semantic coverage were all being computed over the
 //    navigation, the cookie banner, the footer link farm and the social icon
 //    row. On a short page that is most of the words, and it moves every score.
@@ -17,7 +17,7 @@
 //    not", which sends a writer to add a button.
 //
 // 3. COMPETITOR BRAND NAMES REPORTED AS MISSING ENTITIES. "Starfish", "Saint
-//    Urbain" — a competitor's own brand, product and location names are the
+//    Urbain" - a competitor's own brand, product and location names are the
 //    single most common thing a competitor page names and this brand's page
 //    does not, and they are the one thing that must never be recommended. A
 //    gap analysis that says "add Starfish to your page" is worse than no gap
@@ -66,7 +66,7 @@ const CONTROL_SELECTORS = ['button', 'select', 'option', '[role="button"]', 'inp
 
 // Exact-match phrases that are UI chrome wherever they appear. Matched
 // case-insensitively against a WHOLE candidate entity or heading, never as a
-// substring — "Check" is chrome, "Check Point Software" is a company.
+// substring - "Check" is chrome, "Check Point Software" is a company.
 const GENERIC_UI = new Set([
   // buttons and links
   'learn more', 'read more', 'find out more', 'discover more', 'see more', 'show more',
@@ -123,7 +123,7 @@ const BARE_PRICE_RX = /^(?:[$£€¥₹]\s?\d[\d,.]*(?:\s?(?:\/|per)\s?\w+)?|\d[
 
 function isGenericUi(text) {
   const t = String(text || '').toLowerCase().replace(/\s+/g, ' ').trim()
-    .replace(/[–—>»→←→]+$/g, '')
+    .replace(/[–—>»→←-]+$/g, '')
     .replace(/[.:!?]+$/g, '')
     .trim();
   if (!t) return true;
@@ -141,20 +141,25 @@ function isGenericUi(text) {
 //
 // Returns BOTH the cleaned text and what was taken out, and never returns an
 // empty string when the page had text: if stripping would remove nearly
-// everything — which happens on a page built entirely of <div class="widget">
-// — the original is kept and `fellBack` says so. An empty contentText would
+// everything - which happens on a page built entirely of <div class="widget">
+// - the original is kept and `fellBack` says so. An empty contentText would
 // make every downstream score read as "thin content", which is precisely the
 // class of bug ./fetcher.js already guards against for the main selector.
 function contentText(doc, { minRetainedShare = 0.25 } = {}) {
   if (!doc) return { text: '', words: 0, removed: [], fellBack: false, selectorsMatched: [] };
 
-  const html = doc.$ ? doc.$.html() : null;
+  // The raw served HTML, not doc.$.html(). This function needs its own tree
+  // because it removes nodes, and reading the string straight off the doc
+  // means the original tree is never materialised here at all - asking for
+  // doc.$ would parse the page a second time and, in a loop over a whole
+  // crawl, keep every one of those trees alive. Same input either way.
+  const html = doc.html || (doc.domLoaded ? doc.$.html() : null);
   const source = doc.mainText || doc.bodyText || '';
   if (!html) return { text: source, words: wordCount(source), removed: [], fellBack: true, reason: 'no parsed document', selectorsMatched: [] };
 
-  // Reparsing rather than mutating doc.$ — doc.$ is shared with every other
-  // feature that received this document, and removing nodes from it would
-  // silently change their link counts, image counts and heading lists.
+  // A tree of our own, because the pass below removes nodes: mutating the
+  // shared doc.$ would silently change the link counts, image counts and
+  // heading lists of every other feature that received this document.
   const $ = cheerio.load(html, { scriptingEnabled: false });
   const removed = [];
   const selectorsMatched = [];
@@ -178,7 +183,7 @@ function contentText(doc, { minRetainedShare = 0.25 } = {}) {
   });
 
   // Anchors whose entire visible text is generic UI chrome. The anchor goes,
-  // the surrounding sentence stays — which is the opposite of removing the
+  // the surrounding sentence stays - which is the opposite of removing the
   // whole paragraph a "Learn more" link happens to sit in.
   $('a').each((_, el) => {
     const t = textOf($, $(el));
@@ -236,7 +241,7 @@ function contentText(doc, { minRetainedShare = 0.25 } = {}) {
   //                          ratio to mean anything.
   //   NOTHING LEFT           the filter took everything. This is checked at ANY
   //                          length, because a short page reduced to zero words
-  //                          is the worst possible outcome — every downstream
+  //                          is the worst possible outcome - every downstream
   //                          metric then reads it as thin content, which is
   //                          precisely the class of bug the main-selector guard
   //                          in ./fetcher.js exists to prevent, reintroduced one
@@ -250,7 +255,7 @@ function contentText(doc, { minRetainedShare = 0.25 } = {}) {
       selectorsMatched,
       fellBack: true,
       reason: strippedToNothing
-        ? `stripping boilerplate left NO text at all (${originalWords} words before), which means the page's entire content sits inside elements this pass treats as chrome — a bare <div class="widget"> wrapper is the usual cause. Measured from the unstripped text instead so the page is not misread as empty.`
+        ? `stripping boilerplate left NO text at all (${originalWords} words before), which means the page's entire content sits inside elements this pass treats as chrome - a bare <div class="widget"> wrapper is the usual cause. Measured from the unstripped text instead so the page is not misread as empty.`
         : `stripping boilerplate left only ${Math.round(share * 100)}% of the text (${cleanedWords} of ${originalWords} words), which means the page's real content is inside elements this pass treats as chrome. Measured from the unstripped text instead so the page is not misread as thin.`,
       strippedWords: cleanedWords,
     };
@@ -303,7 +308,7 @@ function wordCount(text) {
 //
 // Verified against a live site: a feature list rendered on every page as
 // `<li>Unlimited Pages Website with Unique Design</li>` was invisible to a
-// sentence-boundary split — it has no terminating punctuation, so it merged
+// sentence-boundary split - it has no terminating punctuation, so it merged
 // into a longer run with its neighbours and never repeated verbatim. It sat in
 // a plain <div> with no nav, footer or template class, so the selector pass
 // missed it too. The link finder then recommended it as an anchor once per
@@ -327,6 +332,12 @@ function repeatedBlocks(docs, { minShare = 0.6, minLength = 12, maxLength = 400 
       counts.set(key, (counts.get(key) || 0) + 1);
     };
 
+    // Whether this doc's tree was already in memory decides whether we may
+    // drop it again at the end of this iteration. Over a full crawl these
+    // trees are the single largest thing the process holds, so keeping more
+    // than one alive here is what an OOM looks like.
+    const domWasLoaded = doc.domLoaded;
+
     const text = doc.bodyText || doc.mainText || '';
     // Sentence-ish segments, so a repeated footer paragraph is caught whole.
     text.split(/(?<=[.!?])\s+|\s{2,}|\|/).forEach(record);
@@ -347,6 +358,8 @@ function repeatedBlocks(docs, { minShare = 0.6, minLength = 12, maxLength = 400 
     }
 
     (doc.headings || []).forEach((h) => record(h.text));
+
+    if (!domWasLoaded && typeof doc.releaseDom === 'function') doc.releaseDom();
   });
 
   const threshold = Math.max(3, Math.ceil(usable.length * minShare));
@@ -406,7 +419,7 @@ function competitorBrandTerms(competitors = []) {
 // Should this candidate entity be reported at all?
 //
 // Returns null when it is fine, or a string reason when it must be dropped.
-// A reason rather than a boolean, because the reasons are shown in the UI —
+// A reason rather than a boolean, because the reasons are shown in the UI - 
 // "12 entities suppressed: 7 competitor brand names, 5 generic UI labels" is a
 // line a practitioner trusts, and a silent filter is one they cannot audit.
 function entityNoiseReason(surface, {
@@ -453,7 +466,7 @@ function pluraliseReason(reason, count) {
 
 // Counts grouped by reason, as a plain object, so a caller merging two filter
 // results can ADD the counts rather than concatenating two pre-rendered
-// strings — which is how "21 competitor brand names" and "30 competitor brand
+// strings - which is how "21 competitor brand names" and "30 competitor brand
 // names" both ended up in one summary line.
 function byReasonCounts(suppressed) {
   const out = {};

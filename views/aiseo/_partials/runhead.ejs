@@ -14,7 +14,7 @@ const delta = (run.score != null && previous && previous.score != null)
   <div class="card-body">
     <div class="psi-head" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
       <div class="psi-gauge <%= scoreBand(run.score) %>">
-        <span class="health-num"><%= run.score == null ? '—' : Math.round(run.score) %></span>
+        <span class="health-num"><%= run.score == null ? ' - ' : Math.round(run.score) %></span>
       </div>
       <div style="flex:1;min-width:240px">
         <h3 style="margin:0 0 4px"><%= run.kindLabel %></h3>
@@ -39,7 +39,7 @@ const delta = (run.score != null && previous && previous.score != null)
           </div>
           <div class="muted" style="font-size:12px"><%= fmtDate(previous.finished_at) %> · scored <%= Math.round(previous.score) %></div>
         <% } else if (run.score != null) { %>
-          <div class="muted" style="font-size:12px">First run — no baseline to compare against yet.</div>
+          <div class="muted" style="font-size:12px">First run - no baseline to compare against yet.</div>
         <% } %>
       </div>
     </div>
@@ -70,11 +70,11 @@ const delta = (run.score != null && previous && previous.score != null)
     <span class="notice-icon"><%= orphaned ? '&#9888;' : '&#8635;' %></span>
     <div class="notice-body">
       <% if (orphaned) { %>
-        <strong>This run was interrupted.</strong> The application restarted while it was working — on shared
+        <strong>This run was interrupted.</strong> The application restarted while it was working - on shared
         hosting that happens whenever the app is idled out. Nothing was saved. Start it again.
       <% } else { %>
         <strong>Working…</strong> This analysis fetches live pages, so it takes anywhere from a few seconds
-        to a couple of minutes. This page refreshes itself when it finishes — you can also leave and come back.
+        to a couple of minutes. This page refreshes itself when it finishes - you can also leave and come back.
       <% } %>
     </div>
   </div>

@@ -30,7 +30,7 @@
       <div class="stat">
         <div class="label">Retrieval-pool presence</div>
         <div class="value <%= r.eligibility && r.eligibility.pct < 20 ? 'bad' : (r.eligibility && r.eligibility.pct < 50 ? 'warn' : '') %>">
-          <%= r.eligibility ? r.eligibility.pct + '%' : '—' %>
+          <%= r.eligibility ? r.eligibility.pct + '%' : ' - ' %>
         </div>
         <div class="meta"><%= r.counts.present %> of <%= r.counts.measured %> question(s) return this site</div>
       </div>
@@ -62,7 +62,7 @@
           <br><strong>Ground truth is available for this brand:</strong> GA4 measured
           <%= fmtInt(r.referralEvidence.sessions) %> session(s) arriving from AI assistants.
           <a href="/ai-seo/ai-referrals<%= run.brand_id ? '?brand=' + run.brand_id : '' %>">Those are real
-          citations that were clicked</a> — read them ahead of anything on this page.
+          citations that were clicked</a> - read them ahead of anything on this page.
         <% } %>
       </div>
     </div>
@@ -71,7 +71,7 @@
       <div class="notice error">
         <span class="notice-icon">&#9888;</span>
         <div class="notice-body">
-          <strong>Thin sample — do not report the percentage above as a site-level figure.</strong>
+          <strong>Thin sample - do not report the percentage above as a site-level figure.</strong>
           Only <%= r.counts.coverage %>% of the question set returned a result, normally because the keyless
           endpoints rate-limited the run. The questions that failed are listed as "not sampled" below and are
           excluded from every percentage rather than counted as absent. Re-run with fewer questions, or later.
@@ -84,7 +84,7 @@
     <% if (r.gaps.length) { %>
       <div class="card">
         <div class="card-head">
-          <h3>Gaps — a competitor is in the pool and this site is not</h3>
+          <h3>Gaps - a competitor is in the pool and this site is not</h3>
           <span class="muted" style="font-size:12px"><%= r.gaps.length %> question(s)</span>
         </div>
         <div class="card-body">
@@ -101,8 +101,8 @@
             <% r.gaps.forEach(function (g) { %>
               <tr>
                 <td><strong><%= g.prompt %></strong></td>
-                <td class="muted" style="font-size:12px"><%= g.job || '—' %></td>
-                <td><% if (g.intent) { %><span class="badge neutral"><%= g.intent %></span><% } else { %>—<% } %></td>
+                <td class="muted" style="font-size:12px"><%= g.job || ' - ' %></td>
+                <td><% if (g.intent) { %><span class="badge neutral"><%= g.intent %></span><% } else { %> - <% } %></td>
                 <td>
                   <% g.competitors.forEach(function (c) { %>
                     <span class="chip">#<%= c.position %> <%= c.domain %></span>
@@ -122,7 +122,7 @@
       </div>
       <div class="card-body">
         <p class="hint mt-0">
-          Share is the percentage of <strong>sampled</strong> questions each domain appears in — not of the
+          Share is the percentage of <strong>sampled</strong> questions each domain appears in - not of the
           whole question set. A denominator that quietly included the questions that failed would rank every
           domain too low by the same unknown amount.
         </p>
@@ -140,9 +140,9 @@
                 <% if (d.isNamedCompetitor) { %><span class="badge medium">named competitor</span><% } %>
               </td>
               <td class="num"><%= d.prompts %></td>
-              <td class="num"><%= d.share == null ? '—' : d.share + '%' %></td>
-              <td class="num"><%= d.bestPosition == null ? '—' : '#' + d.bestPosition %></td>
-              <td class="num"><%= d.avgPosition == null ? '—' : d.avgPosition %></td>
+              <td class="num"><%= d.share == null ? ' - ' : d.share + '%' %></td>
+              <td class="num"><%= d.bestPosition == null ? ' - ' : '#' + d.bestPosition %></td>
+              <td class="num"><%= d.avgPosition == null ? ' - ' : d.avgPosition %></td>
             </tr>
           <% }) %>
           </tbody>
@@ -150,7 +150,7 @@
         <% if (!r.brandSummary) { %>
           <p class="hint" style="margin-bottom:0;color:var(--critical,#b91c1c)">
             <strong>This site appears nowhere in the sampled pools.</strong> For these questions, no grounded
-            assistant can currently quote it — not because of how the pages are written, but because no index
+            assistant can currently quote it - not because of how the pages are written, but because no index
             returns them for the question. That is a content and retrieval problem before it is a citability one.
           </p>
         <% } %>
@@ -165,7 +165,7 @@
         </div>
         <div class="card-body">
           <p class="hint mt-0">
-            Neither this site nor any named competitor is in the pool. Cheapest available wins — but check the
+            Neither this site nor any named competitor is in the pool. Cheapest available wins - but check the
             pool column: a question answered only by forums and directories is usually one where the intent is
             not commercial, and worth answering for citation reach rather than for pipeline.
           </p>
@@ -175,9 +175,9 @@
             <% r.openQuestions.forEach(function (q) { %>
               <tr>
                 <td><%= q.prompt %></td>
-                <td><% if (q.intent) { %><span class="badge neutral"><%= q.intent %></span><% } else { %>—<% } %></td>
+                <td><% if (q.intent) { %><span class="badge neutral"><%= q.intent %></span><% } else { %> - <% } %></td>
                 <td class="muted" style="font-size:12px">
-                  <%= (q.pool || []).slice(0, 3).map(function (p) { return p.domain; }).join(', ') || '—' %>
+                  <%= (q.pool || []).slice(0, 3).map(function (p) { return p.domain; }).join(', ') || ' - ' %>
                 </td>
               </tr>
             <% }) %>
@@ -207,7 +207,7 @@
                   <span class="badge neutral" title="<%= row.error || '' %>">not sampled</span>
                 <% } %>
               </td>
-              <td><%= row.brand ? '#' + row.brand.position : '—' %></td>
+              <td><%= row.brand ? '#' + row.brand.position : ' - ' %></td>
               <td class="muted" style="font-size:12px">
                 <% if (row.state === 'unknown') { %>
                   <%= row.error || 'no result' %>
@@ -215,7 +215,7 @@
                   <%= (row.pool || []).slice(0, 3).map(function (p) { return '#' + p.position + ' ' + p.domain; }).join(' · ') %>
                 <% } %>
               </td>
-              <td class="muted" style="font-size:12px"><%= row.engine || '—' %></td>
+              <td class="muted" style="font-size:12px"><%= row.engine || ' - ' %></td>
             </tr>
           <% }) %>
           </tbody>

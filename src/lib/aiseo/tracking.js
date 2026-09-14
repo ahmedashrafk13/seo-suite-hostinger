@@ -4,7 +4,7 @@
 // as a point in a time series, and turns the failures into findings.
 //
 // THE SAMPLE, AND WHY IT IS CHOSEN THIS WAY
-// A page-scoped check cannot run on every URL — a 5,000-page site would take
+// A page-scoped check cannot run on every URL - a 5,000-page site would take
 // hours and would exhaust the PageSpeed quota on the first run. The sample is
 // therefore built deliberately, in this order:
 //
@@ -24,13 +24,13 @@
 //
 // SITEWIDE SCOPE
 // A sample answers "is there a problem"; it cannot answer "which pages". Two of
-// the requested items — a list of 4xx pages, and sitewide tracking rather than
-// sampled — need the whole URL set, so the sweep now runs in one of two scopes:
+// the requested items - a list of 4xx pages, and sitewide tracking rather than
+// sampled - need the whole URL set, so the sweep now runs in one of two scopes:
 //
 //   'sample'   the deliberate 12-URL sample described above. Default. Every
 //              check runs, including the expensive ones (PageSpeed, TLS).
-//   'sitewide' the same checks PLUS the full URL set — the union of the sitemap
-//              and a link crawl — made available to the checks that can absorb
+//   'sitewide' the same checks PLUS the full URL set - the union of the sitemap
+//              and a link crawl - made available to the checks that can absorb
 //              the volume. A check declares `sitewideCapable: true` to receive
 //              it; the rest keep the sample, because running PageSpeed against
 //              4,000 URLs would exhaust the daily quota on the first brand.
@@ -52,7 +52,7 @@ const {
   fetchRobots, fetchSitemapUrls, normalizeUrl, canonUrl,
 } = require('./fetcher');
 
-// Builds the sample. `size` is a target, not a guarantee — a small site
+// Builds the sample. `size` is a target, not a guarantee - a small site
 // legitimately produces a smaller one.
 async function buildSample(brand, { size = 12, sitewide = false, sitewideCap = 3000 } = {}) {
   const site = normalizeUrl(brand.site_url);
@@ -102,7 +102,7 @@ async function buildSample(brand, { size = 12, sitewide = false, sitewideCap = 3
       if (!bySection.has(section)) bySection.set(section, []);
       bySection.get(section).push(u.loc);
     });
-    // Largest sections first — a section with 400 pages matters more than one
+    // Largest sections first - a section with 400 pages matters more than one
     // with two.
     const sections = [...bySection.entries()].sort((a, b) => b[1].length - a[1].length);
     for (const [, urls] of sections) {
@@ -112,7 +112,7 @@ async function buildSample(brand, { size = 12, sitewide = false, sitewideCap = 3
   }
 
   // The full URL set, for sitewide scope. The union of the sitemap and the
-  // pages the traffic data names, deduplicated — a link crawl is added by the
+  // pages the traffic data names, deduplicated - a link crawl is added by the
   // check that needs it, since only the broken-page check follows links and
   // paying for a crawl the other checks ignore would double every sweep.
   let allUrls = null;
@@ -169,7 +169,7 @@ async function run({
   const runRow = store.begin({
     adoptRunId,
     userId, brandId, kind: 'tracking', target: site,
-    label: `${only ? (Array.isArray(only) ? only.join(', ') : only) : 'full sweep'}${scope === 'sitewide' ? ' — sitewide' : ''}`,
+    label: `${only ? (Array.isArray(only) ? only.join(', ') : only) : 'full sweep'}${scope === 'sitewide' ? ' - sitewide' : ''}`,
     params: { only, sampleSize, scope, sitewideCap },
   });
 
@@ -180,7 +180,7 @@ async function run({
       userId, brand, brandId, site, origin,
       sample: sample.urls,
       // Present only in sitewide scope. A check must test for it rather than
-      // assume it, and only checks declaring sitewideCapable receive it — see
+      // assume it, and only checks declaring sitewideCapable receive it - see
       // the loop below.
       scope,
       allUrls: sample.allUrls,
@@ -258,8 +258,8 @@ async function run({
       // Unknown metrics are excluded from that comparison rather than ranked
       // between warn and good. Ranking them made a check whose schema coverage
       // was 100% with zero errors report as 'unknown', purely because one of
-      // its three metrics — rich-result eligibility, which needs URL Inspection
-      // data the nightly sync had not collected yet — had nothing to read. A
+      // its three metrics - rich-result eligibility, which needs URL Inspection
+      // data the nightly sync had not collected yet - had nothing to read. A
       // check is only 'unknown' when it measured NOTHING; if it measured
       // anything at all, its verdict comes from what it measured.
       const rank = { fail: 0, warn: 1, good: 2 };
@@ -291,7 +291,7 @@ async function run({
     }
 
     // Board score: the share of measured metrics in a good state. Metrics that
-    // could not be measured are excluded from BOTH sides of the ratio — a site
+    // could not be measured are excluded from BOTH sides of the ratio - a site
     // with no CrUX data must not score badly for it, and must not score well
     // for it either.
     const measured = allMetrics.filter((m) => m.status && m.status !== 'unknown');
@@ -318,7 +318,7 @@ async function run({
         scope,
         scopeNote: sitewide
           ? `Sitewide scope. ${results.filter((r) => r.ranAgainst === 'sitewide').length} of ${results.length} checks ran against the full URL set (${sample.allUrlsBasis}); the rest ran against the ${sample.urls.length}-URL sample because they call a rate-limited or quota-limited API. Each check says which it used.`
-          : `Sampled scope. Every check ran against the same ${sample.urls.length}-URL sample: ${sample.basis}. A count here is a count within that sample, not a sitewide total — switch to sitewide scope for a full list of affected URLs.`,
+          : `Sampled scope. Every check ran against the same ${sample.urls.length}-URL sample: ${sample.basis}. A count here is a count within that sample, not a sitewide total - switch to sitewide scope for a full list of affected URLs.`,
         checks: results,
         byGroup,
         counts: {

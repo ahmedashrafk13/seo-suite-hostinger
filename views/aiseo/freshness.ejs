@@ -10,7 +10,7 @@
     <div class="card-body">
       <p class="hint mt-0">
         <strong>Two questions, both answered from Search Console history.</strong>
-        Freshness asks which pages have not been touched in a long time <em>and</em> are losing ground — the
+        Freshness asks which pages have not been touched in a long time <em>and</em> are losing ground - the
         second clause is what makes the answer usable, since a list of pages older than a year is most of any
         real site. Decay is measured relative to the whole site, so a month when everything fell does not
         produce forty page-level refresh tasks.
@@ -19,7 +19,7 @@
         <strong>Intent drift is the harder one.</strong> The topic has not changed but what people want from it
         has: a guide that ranked for "what is X" now gets impressions for "X vs Y" and "X pricing". Traffic
         often falls slowly enough that no alert fires, and the page reads perfectly well on inspection.
-        Measured as Jensen-Shannon divergence over the impression-weighted query mix between two snapshots —
+        Measured as Jensen-Shannon divergence over the impression-weighted query mix between two snapshots - 
         symmetric, always finite, and bounded at 1 bit, so one threshold means the same thing on every page.
       </p>
     </div>
@@ -40,7 +40,7 @@
               <option value="20">20</option>
               <option value="40" selected>40</option>
               <option value="80">80</option>
-              <option value="150">150 — slow</option>
+              <option value="150">150 - slow</option>
             </select>
           </label>
           <label class="field">
@@ -59,8 +59,8 @@
         <div class="checkbox-row">
           <label class="check">
             <input type="checkbox" name="want_ai" <%= aiAvailable ? 'checked' : 'disabled' %>>
-            Ask the model to read each drifted page — seasonal noise, a re-angle, or a split?
-            <% if (!aiAvailable) { %><span class="muted">— needs an Azure OpenAI credential</span><% } %>
+            Ask the model to read each drifted page - seasonal noise, a re-angle, or a split?
+            <% if (!aiAvailable) { %><span class="muted"> - needs an Azure OpenAI credential</span><% } %>
           </label>
         </div>
         <div class="checkbox-row">
@@ -72,7 +72,7 @@
         <% if (!brand.gsc_property) { %>
           <p class="hint">
             This brand has no Search Console property paired, so neither decay nor drift can be measured.
-            <a href="/brands/<%= brand.id %>">Pair one</a> and let a nightly sync run — drift needs two query
+            <a href="/brands/<%= brand.id %>">Pair one</a> and let a nightly sync run - drift needs two query
             snapshots, which is roughly two weeks of history.
           </p>
         <% } %>

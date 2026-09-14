@@ -22,12 +22,12 @@
       <div class="value"><%= fmtInt(r.mix.total) %></div>
       <div class="meta">
         <%= r.newThisScan %> new in this scan · <%= r.scanned %> screened, <%= r.rejected %> did not name the brand
-        <% if (r.mix.unclear) { %><br><%= r.mix.unclear %> named it but are about something else — excluded below<% } %>
+        <% if (r.mix.unclear) { %><br><%= r.mix.unclear %> named it but are about something else - excluded below<% } %>
       </div>
     </div>
     <div class="stat">
       <div class="label">Net sentiment</div>
-      <div class="value"><%= r.netSentiment == null ? '—' : r.netSentiment %></div>
+      <div class="value"><%= r.netSentiment == null ? ' - ' : r.netSentiment %></div>
       <div class="meta"><%= r.mix.positive %> positive · <%= r.mix.negative %> negative · <%= r.mix.neutral %> neutral</div>
     </div>
     <div class="stat">
@@ -53,7 +53,7 @@
     <div class="card-body">
       <p class="hint mt-0">
         A brand name is rarely unique. Searching "Wix" returns the website builder <em>and</em> WIX Filters, the
-        car-parts manufacturer — a real result from a real scan. Word-boundary matching cannot separate them,
+        car-parts manufacturer - a real result from a real scan. Word-boundary matching cannot separate them,
         because the word really is there; only the topic can. Each mention is therefore scored for whether it
         also discusses something this brand actually does.
       </p>
@@ -62,7 +62,7 @@
         <tbody>
         <%
         const MEANING = {
-          certain: 'Names the brand\'s own domain — nothing else does that.',
+          certain: 'Names the brand\'s own domain - nothing else does that.',
           likely: 'Also discusses something the brand does.',
           unassessable: 'No topic context exists for this brand yet, so this could not be judged.',
           unclear: 'The name appears, but nothing in the text relates to what this brand does.',
@@ -77,7 +77,7 @@
             </td>
             <td><%= fmtInt(b.count) %></td>
             <td class="muted"><%= MEANING[b.level] %></td>
-            <td><%= b.level === 'unclear' ? 'no — stored and listed below' : 'yes' %></td>
+            <td><%= b.level === 'unclear' ? 'no - stored and listed below' : 'yes' %></td>
           </tr>
         <% }) %>
         </tbody>
@@ -86,7 +86,7 @@
         <p class="hint" style="margin-bottom:0">
           <strong>Confidence could not be assessed.</strong> Topic context is derived from the brand's own
           non-branded Search Console queries, and there is not enough history yet. Nothing has been excluded on
-          the strength of a signal that does not exist — every mention is counted, and a name shared with
+          the strength of a signal that does not exist - every mention is counted, and a name shared with
           another company would inflate these numbers until the history arrives.
         </p>
       <% } %>
@@ -102,7 +102,7 @@
     <div class="card-body">
       <p class="hint mt-0">
         Listed rather than discarded: the judgement is a heuristic, so a wrongly-excluded mention must still be
-        visible. If these <em>are</em> about the brand, the topic context is too narrow — if they are not, add a
+        visible. If these <em>are</em> about the brand, the topic context is too narrow - if they are not, add a
         more specific watch term so the search stops returning them.
       </p>
       <div class="table-wrap scroll-y" style="max-height:360px">
@@ -113,7 +113,7 @@
             <tr>
               <td class="muted"><%= m.source %></td>
               <td class="truncate" style="max-width:420px"><a href="<%= m.url %>" target="_blank" rel="noopener"><%= m.title || m.url %></a></td>
-              <td class="muted" style="font-size:11px"><%= m.confidence_why || '—' %></td>
+              <td class="muted" style="font-size:11px"><%= m.confidence_why || ' - ' %></td>
             </tr>
           <% }) %>
           </tbody>
@@ -167,7 +167,7 @@
     <div class="card-head">
       <h3>How Reddit was reached</h3>
       <span class="muted" style="font-size:12px">
-        <%= r.reddit.authenticated ? 'authenticated API' : 'no credential — scraped' %>
+        <%= r.reddit.authenticated ? 'authenticated API' : 'no credential - scraped' %>
       </span>
     </div>
     <div class="card-body">
@@ -204,14 +204,14 @@
         <p class="hint" style="margin-bottom:0">
           <strong>Endpoints closed to us during this scan:</strong>
           <%= r.reddit.closedEndpoints.join(', ') %>.
-          Each answered HTTP 403 once and was then skipped for the rest of the run — retrying a
+          Each answered HTTP 403 once and was then skipped for the rest of the run - retrying a
           permanently-closed endpoint per search term would spend the request budget on a guaranteed failure
           and push the endpoints that DO work into the rate limit.
         </p>
       <% } %>
       <% if (!r.reddit.authenticated) { %>
         <p class="hint" style="margin-bottom:0">
-          Running without a Reddit credential. That works — the RSS tier answers — but it is rate-limited and
+          Running without a Reddit credential. That works - the RSS tier answers - but it is rate-limited and
           carries no post scores or comment bodies. A free "script" app at
           <code>reddit.com/prefs/apps</code> (<code>REDDIT_CLIENT_ID</code> / <code>REDDIT_CLIENT_SECRET</code>)
           removes the rate limiting and adds both.
@@ -238,7 +238,7 @@
             </div>
             <div class="alert-body">
               <p class="mt-0"><strong>Verifiable:</strong> <%= t.verifiable ? 'yes' : 'no' %>
-                <% if (t.whatWouldSettleIt) { %> — <%= t.whatWouldSettleIt %><% } %>
+                <% if (t.whatWouldSettleIt) { %> - <%= t.whatWouldSettleIt %><% } %>
               </p>
               <% if (t.draftResponse) { %>
                 <p class="mt-0"><strong>Draft response:</strong></p>
@@ -248,7 +248,7 @@
           </div>
         <% }) %>
         <p class="hint" style="margin-bottom:0">
-          The model is not asked whether a claim is true — it cannot know. It is asked what KIND of statement it
+          The model is not asked whether a claim is true - it cannot know. It is asked what KIND of statement it
           is, and what would establish it. Read every draft response before it goes anywhere near a public thread.
         </p>
       <% } %>
@@ -278,8 +278,8 @@
                         title="<%= m.confidence_why || '' %>"><%= m.confidence || 'unassessed' %></span>
                 </td>
                 <td><span class="badge <%= m.sentiment === 'negative' ? 'critical' : (m.sentiment === 'positive' ? 'good' : 'neutral') %>"><%= m.sentiment %></span></td>
-                <td><% if (m.risk) { %><span class="badge critical"><%= m.risk %></span><% } else { %>—<% } %></td>
-                <td><%= m.engagement || '—' %></td>
+                <td><% if (m.risk) { %><span class="badge critical"><%= m.risk %></span><% } else { %> - <% } %></td>
+                <td><%= m.engagement || ' - ' %></td>
                 <td class="muted"><%= fmtDate(m.published_at || m.first_seen_at) %></td>
               </tr>
             <% }) %>

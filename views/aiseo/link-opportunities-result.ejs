@@ -30,7 +30,7 @@
     <div class="stat">
       <div class="label">Relevant, no usable anchor</div>
       <div class="value"><%= fmtInt(r.counts.relevantWithoutAnchor) %></div>
-      <div class="meta">would need a sentence written — listed separately</div>
+      <div class="meta">would need a sentence written - listed separately</div>
     </div>
     <div class="stat">
       <div class="label">Pages crawled</div>
@@ -71,7 +71,7 @@
       <p class="hint">
         Ordered by how strongly each identifies the page: the H1 and title first, then the URL slug, then its own
         H2s, then the phrases the page repeats. A phrase of only stopwords, one shorter than 8 characters, or one
-        that is a generic UI label is excluded — none of those identify anything.
+        that is a generic UI label is excluded - none of those identify anything.
       </p>
     </div>
   </div>
@@ -87,7 +87,7 @@
       <% if (!r.rows.length) { %>
         <div class="empty-state">
           No page carried a verbatim anchor phrase for this target. The pages that were topically relevant but
-          had no usable phrase are listed below — those need a sentence writing, which is a content task rather
+          had no usable phrase are listed below - those need a sentence writing, which is a content task rather
           than a linking one.
         </div>
       <% } else { %>
@@ -128,11 +128,11 @@
           </tbody>
         </table></div>
         <% if (r.truncated) { %>
-          <p class="hint"><strong>Truncated.</strong> More qualifying pages exist than the row limit set for this run. Raise the limit and re-run to see the rest — nothing has been silently dropped from the counts above.</p>
+          <p class="hint"><strong>Truncated.</strong> More qualifying pages exist than the row limit set for this run. Raise the limit and re-run to see the rest - nothing has been silently dropped from the counts above.</p>
         <% } %>
         <p class="hint">
           <strong>How to implement a row:</strong> open the Source URL, find the sentence shown, wrap the anchor
-          phrase in a link to the target. No new copy is required for any row in this table — that is what the
+          phrase in a link to the target. No new copy is required for any row in this table - that is what the
           anchor rule buys.
         </p>
       <% } %>
@@ -151,13 +151,13 @@
             <td class="mono-sm"><%= a.sourceUrl %></td>
             <td class="mono-sm"><%= a.anchor %></td>
             <td><% if (a.inMain) { %><span class="badge good">yes</span><% } else { %><span class="badge neutral">nav / footer</span><% } %></td>
-            <td class="muted"><%= a.nofollow ? 'nofollow' : '—' %></td>
+            <td class="muted"><%= a.nofollow ? 'nofollow' : ' - ' %></td>
           </tr>
         <% }) %>
         </tbody>
       </table></div>
       <p class="hint">
-        A link from a nav or footer is sitewide and carries little topical signal — it tells a search engine the
+        A link from a nav or footer is sitewide and carries little topical signal - it tells a search engine the
         page exists, not what it is about. Editorial links from the main content are what the table above
         proposes.
       </p>
@@ -179,7 +179,7 @@
           <tr>
             <td class="mono-sm"><%= x.sourceUrl %><% if (x.sourceTitle) { %><div class="muted" style="font-size:11px"><%= x.sourceTitle %></div><% } %></td>
             <td><%= x.relevance %></td>
-            <td class="muted" style="font-size:12px"><%= (x.sharedEntities || []).slice(0, 6).join(', ') || '—' %></td>
+            <td class="muted" style="font-size:12px"><%= (x.sharedEntities || []).slice(0, 6).join(', ') || ' - ' %></td>
             <td class="muted" style="font-size:12px"><%= x.reason %></td>
           </tr>
         <% }) %>
@@ -187,7 +187,7 @@
       </table></div>
       <p class="hint">
         Treat each as a small content edit: add one sentence that genuinely belongs on the page, then link from
-        it. Do not bolt on a sentence purely to carry a link — a paragraph that exists only to hold an anchor
+        it. Do not bolt on a sentence purely to carry a link - a paragraph that exists only to hold an anchor
         reads as one to a reader and to a ranking system.
       </p>
     </div>

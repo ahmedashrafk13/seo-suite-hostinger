@@ -52,14 +52,14 @@ const SEVERITY_RANK = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
 // Opens a run.
 //
 // `adoptRunId` exists for the background runner in ./runner.js. These analyses
-// crawl sites and call PageSpeed, which regularly takes a minute or more —
+// crawl sites and call PageSpeed, which regularly takes a minute or more - 
 // far too long to hold an HTTP request open on shared hosting, where Passenger
 // will time it out. So the runner creates the row synchronously, hands the
 // browser a URL that can be polled, and starts the work detached; the engine
 // then ADOPTS that row instead of inserting a second one.
 //
-// Without adoption the same analysis would produce two rows — one 'running'
-// forever from the runner and one real one from the engine — and the result
+// Without adoption the same analysis would produce two rows - one 'running'
+// forever from the runner and one real one from the engine - and the result
 // page would poll the wrong one indefinitely.
 function begin({
   userId, brandId = null, kind, target = null, label = null,
@@ -69,8 +69,8 @@ function begin({
   if (adoptRunId) {
     const existing = db.prepare('SELECT id, kind FROM aiseo_runs WHERE id=?').get(adoptRunId);
     if (existing) {
-      // The runner may not have known the final target or label — it is
-      // derived inside the engine for several of these — so they are filled
+      // The runner may not have known the final target or label - it is
+      // derived inside the engine for several of these - so they are filled
       // in here rather than left null on the row the UI is already showing.
       db.prepare(`UPDATE aiseo_runs SET target=COALESCE(?, target), label=COALESCE(?, label),
         params_json=COALESCE(?, params_json) WHERE id=?`)
@@ -90,7 +90,7 @@ function begin({
 // Writes the result and normalises the findings.
 //
 // The whole thing is one transaction. Without that, a crash between the run
-// row and the findings leaves a "completed" run whose findings are missing —
+// row and the findings leaves a "completed" run whose findings are missing - 
 // which reads on screen as "this page has no problems" rather than as a
 // failure, and is the worst way for this to break.
 function finish(runId, { score = null, result = null, findings = [], metrics = [], sources = [] } = {}) {
@@ -213,8 +213,8 @@ function removeRun(runId, userId) {
 
 // A metric: { key, url?, value, status?, detail? }
 //
-// `status` is the tracking board's verdict for that capture — 'good',
-// 'warn', 'fail' or 'unknown' — stored alongside the value because the
+// `status` is the tracking board's verdict for that capture - 'good',
+// 'warn', 'fail' or 'unknown' - stored alongside the value because the
 // threshold that produced it can change, and a historical row should keep the
 // verdict it was given at the time rather than be re-judged by today's rule.
 function recordMetrics(brandId, metrics, capturedAt = null) {
@@ -242,7 +242,7 @@ function metricSeries(brandId, metricKey, { url = '', limit = 90 } = {}) {
 function latestMetrics(brandId, { metricKeys = null } = {}) {
   // The newest capture per (metric, url). A plain MAX(captured_at) GROUP BY
   // would give the right timestamp with a value from an arbitrary row, which
-  // is the classic SQL mistake here — the correlated subquery avoids it.
+  // is the classic SQL mistake here - the correlated subquery avoids it.
   const rows = db.prepare(`SELECT m.* FROM aiseo_metrics m
     WHERE m.brand_id = ? AND m.captured_at = (
       SELECT MAX(m2.captured_at) FROM aiseo_metrics m2
@@ -254,7 +254,7 @@ function latestMetrics(brandId, { metricKeys = null } = {}) {
 }
 
 // The value one capture earlier, so a check can report a delta. Returns null
-// when there is no history — which the UI must render as "first capture",
+// when there is no history - which the UI must render as "first capture",
 // never as "no change".
 function previousMetric(brandId, metricKey, url = '') {
   return db.prepare(`SELECT captured_at, value, status, detail FROM aiseo_metrics

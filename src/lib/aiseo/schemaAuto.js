@@ -1,8 +1,8 @@
 // 3. SCHEMA AND STRUCTURED DATA AUTOMATION
 //
 // Three jobs: read what structured data a page already has and validate it,
-// generate what is missing, and maintain the brand's canonical-facts hub —
-// llms.txt plus an Organization block — so the answer to "what is this
+// generate what is missing, and maintain the brand's canonical-facts hub - 
+// llms.txt plus an Organization block - so the answer to "what is this
 // company" is written down once and served identically everywhere.
 //
 // WHY VALIDATION IS LOCAL AND NOT A CALL TO GOOGLE
@@ -16,7 +16,7 @@
 // The distinction the tables preserve is the one that matters in practice:
 // Google separates properties REQUIRED for rich-result eligibility from those
 // merely RECOMMENDED. A missing required property means the rich result will
-// not appear at all — a hard failure. A missing recommended one is a
+// not appear at all - a hard failure. A missing recommended one is a
 // competitive disadvantage. Collapsing them into "errors" is how a report ends
 // up demanding work that changes nothing.
 const db = require('../../db');
@@ -31,9 +31,9 @@ const {
 } = require('./fetcher');
 
 // Requirements per type, from Google's structured-data documentation.
-// `required` — absence means no rich result.
-// `recommended` — absence means a weaker one.
-// `oneOf` — at least one of the listed properties must be present.
+// `required` - absence means no rich result.
+// `recommended` - absence means a weaker one.
+// `oneOf` - at least one of the listed properties must be present.
 const TYPE_RULES = {
   Article: {
     label: 'Article / NewsArticle / BlogPosting',
@@ -46,11 +46,11 @@ const TYPE_RULES = {
     label: 'FAQPage',
     required: ['mainEntity'],
     recommended: [],
-    notes: 'Every question must be VISIBLE on the page. Marking up questions a user cannot see is a policy violation, and FAQ rich results are now shown only for authoritative government and health sites — the markup is still read by AI answer engines, which is the reason to keep it.',
+    notes: 'Every question must be VISIBLE on the page. Marking up questions a user cannot see is a policy violation, and FAQ rich results are now shown only for authoritative government and health sites - the markup is still read by AI answer engines, which is the reason to keep it.',
     validate(node) {
       const problems = [];
       const entities = Array.isArray(node.mainEntity) ? node.mainEntity : (node.mainEntity ? [node.mainEntity] : []);
-      if (!entities.length) problems.push({ severity: 'error', message: 'mainEntity is empty — no questions declared.' });
+      if (!entities.length) problems.push({ severity: 'error', message: 'mainEntity is empty - no questions declared.' });
       entities.forEach((q, i) => {
         if (!q || String(q['@type'] || '') !== 'Question') problems.push({ severity: 'error', message: `mainEntity[${i}] is not a Question.` });
         else {
@@ -70,7 +70,7 @@ const TYPE_RULES = {
     validate(node) {
       const problems = [];
       const steps = Array.isArray(node.step) ? node.step : (node.step ? [node.step] : []);
-      if (steps.length < 2) problems.push({ severity: 'warning', message: `Only ${steps.length} step declared — a HowTo with fewer than two steps is not a procedure.` });
+      if (steps.length < 2) problems.push({ severity: 'warning', message: `Only ${steps.length} step declared - a HowTo with fewer than two steps is not a procedure.` });
       steps.forEach((s, i) => {
         if (!s) return;
         if (!s.text && !s.itemListElement) problems.push({ severity: 'error', message: `Step ${i + 1} has neither text nor itemListElement.` });
@@ -83,7 +83,7 @@ const TYPE_RULES = {
     required: ['name'],
     oneOf: [['offers', 'review', 'aggregateRating']],
     recommended: ['image', 'description', 'sku', 'brand', 'offers'],
-    notes: 'A Product with no offers, review or aggregateRating is ineligible for a product rich result. aggregateRating must reflect ratings genuinely collected and displayed on the page — inventing one is the single most commonly penalised structured-data abuse.',
+    notes: 'A Product with no offers, review or aggregateRating is ineligible for a product rich result. aggregateRating must reflect ratings genuinely collected and displayed on the page - inventing one is the single most commonly penalised structured-data abuse.',
     validate(node) {
       const problems = [];
       if (node.offers) {
@@ -117,7 +117,7 @@ const TYPE_RULES = {
     notes: 'address must be a PostalAddress object. A string address is accepted by the validator but is far weaker for local matching.',
     validate(node) {
       const problems = [];
-      if (typeof node.address === 'string') problems.push({ severity: 'warning', message: 'address is a plain string — use a PostalAddress object with streetAddress, addressLocality, postalCode and addressCountry.' });
+      if (typeof node.address === 'string') problems.push({ severity: 'warning', message: 'address is a plain string - use a PostalAddress object with streetAddress, addressLocality, postalCode and addressCountry.' });
       else if (node.address && !node.address.addressCountry) problems.push({ severity: 'warning', message: 'address has no addressCountry.' });
       return problems;
     },
@@ -136,7 +136,7 @@ const TYPE_RULES = {
     validate(node) {
       const problems = [];
       const items = Array.isArray(node.itemListElement) ? node.itemListElement : [];
-      if (items.length < 2) problems.push({ severity: 'warning', message: `Only ${items.length} breadcrumb item — a trail needs at least two.` });
+      if (items.length < 2) problems.push({ severity: 'warning', message: `Only ${items.length} breadcrumb item - a trail needs at least two.` });
       items.forEach((it, i) => {
         if (!it) return;
         if (it.position == null) problems.push({ severity: 'error', message: `itemListElement[${i}] has no position.` });
@@ -155,7 +155,7 @@ const TYPE_RULES = {
     label: 'Person',
     required: ['name'],
     recommended: ['jobTitle', 'worksFor', 'sameAs', 'image', 'description'],
-    notes: 'The author-credibility block. For any page making professional claims — medical, financial, legal, certification — an author Person with a real jobTitle and sameAs profile is the strongest experience signal available in markup.',
+    notes: 'The author-credibility block. For any page making professional claims - medical, financial, legal, certification - an author Person with a real jobTitle and sameAs profile is the strongest experience signal available in markup.',
   },
   Course: {
     label: 'Course',
@@ -173,7 +173,7 @@ const TYPE_RULES = {
     label: 'Review',
     required: ['itemReviewed', 'reviewRating', 'author'],
     recommended: ['datePublished', 'reviewBody', 'publisher'],
-    notes: 'A business must not mark up reviews of itself on its own site as Review — that is self-serving review markup and Google ignores or penalises it. Use aggregateRating on the reviewed item instead, and only for ratings genuinely collected.',
+    notes: 'A business must not mark up reviews of itself on its own site as Review - that is self-serving review markup and Google ignores or penalises it. Use aggregateRating on the reviewed item instead, and only for ratings genuinely collected.',
   },
 };
 
@@ -193,7 +193,7 @@ function canonicalType(type) {
 // ----------------------------------------------------------- node extraction
 
 // Flattens a JSON-LD document into the individual typed nodes worth checking,
-// following @graph — which is how most CMS plugins now emit schema, and which a
+// following @graph - which is how most CMS plugins now emit schema, and which a
 // naive top-level-only reader misses entirely.
 function extractNodes(data, out = [], depth = 0) {
   if (!data || typeof data !== 'object' || depth > 6) return out;
@@ -222,7 +222,7 @@ function validateNode(entry) {
       ...entry,
       known: false,
       problems: [],
-      note: `No requirement table for "${entry.type}" — it is valid Schema.org vocabulary but has no Google rich-result requirements to check against.`,
+      note: `No requirement table for "${entry.type}" - it is valid Schema.org vocabulary but has no Google rich-result requirements to check against.`,
     };
   }
 
@@ -234,7 +234,7 @@ function validateNode(entry) {
     if (!present(prop)) {
       problems.push({
         severity: 'error',
-        message: `Missing required property "${prop}" — without it this ${rule.label} is not eligible for its rich result.`,
+        message: `Missing required property "${prop}" - without it this ${rule.label} is not eligible for its rich result.`,
         property: prop,
       });
     }
@@ -254,7 +254,7 @@ function validateNode(entry) {
     if (!present(prop)) {
       problems.push({
         severity: 'warning',
-        message: `Recommended property "${prop}" is absent — the markup is valid but the result will be weaker than a competitor's that has it.`,
+        message: `Recommended property "${prop}" is absent - the markup is valid but the result will be weaker than a competitor's that has it.`,
         property: prop,
       });
     }
@@ -274,14 +274,14 @@ function validateNode(entry) {
 
 // Everything below can be read off the page, so it is generated locally with
 // no model involved and no possibility of invention. The model is asked only
-// about type SELECTION and about properties that need reading comprehension —
+// about type SELECTION and about properties that need reading comprehension - 
 // see aiCalls.schemaDraft.
 function generateFromPage(doc, brand, facts) {
   const generated = [];
   const site = brand ? normalizeUrl(brand.site_url) : null;
   const origin = site ? (() => { try { return new URL(site).origin; } catch { return null; } })() : null;
 
-  // BreadcrumbList — from the trail the page already renders. Generating this
+  // BreadcrumbList - from the trail the page already renders. Generating this
   // from a trail that exists is safe; inventing a hierarchy is not.
   if (doc.breadcrumbTrail.trail.length >= 2) {
     generated.push({
@@ -301,12 +301,12 @@ function generateFromPage(doc, brand, facts) {
         })),
       },
       needsHumanInput: doc.breadcrumbTrail.trail.length > 1
-        ? ['item URLs for the intermediate breadcrumb levels — they cannot be read from the trail text']
+        ? ['item URLs for the intermediate breadcrumb levels - they cannot be read from the trail text']
         : [],
     });
   }
 
-  // FAQPage — only from question/answer pairs genuinely visible in the markup.
+  // FAQPage - only from question/answer pairs genuinely visible in the markup.
   const faqPairs = [];
   doc.headings.forEach((h, i) => {
     const isQuestion = h.text.trim().endsWith('?') || /^(what|why|how|when|where|which|who|can|do|does|is|are|should|will)\b/i.test(h.text);
@@ -334,11 +334,11 @@ function generateFromPage(doc, brand, facts) {
           acceptedAnswer: { '@type': 'Answer', text: null },
         })),
       },
-      needsHumanInput: ['acceptedAnswer.text for each question — must be the exact answer text visible on the page'],
+      needsHumanInput: ['acceptedAnswer.text for each question - must be the exact answer text visible on the page'],
     });
   }
 
-  // Article — for a page that reads as one. Every field here is read off the
+  // Article - for a page that reads as one. Every field here is read off the
   // page; nothing is guessed.
   const looksLikeArticle = doc.wordCount > 400 && doc.h1s.length === 1 && doc.semantic.article;
   if (looksLikeArticle) {
@@ -365,7 +365,7 @@ function generateFromPage(doc, brand, facts) {
     });
   }
 
-  // Organization — assembled entirely from the declared brand facts, which is
+  // Organization - assembled entirely from the declared brand facts, which is
   // the whole point of keeping them: one source, three renderings.
   if (brand) {
     const factMap = new Map((facts || []).map((f) => [f.fact_key, f.fact_value]));
@@ -421,8 +421,8 @@ function generateFromPage(doc, brand, facts) {
 // Two honest caveats stated in the output itself, because they are the ones
 // people get wrong: Google has said publicly it does not use llms.txt, and it
 // is not a ranking factor anywhere. What it does is give retrieval pipelines
-// that DO read it an unambiguous statement of what the brand is, and — more
-// usefully — it forces the canonical facts to be written down once.
+// that DO read it an unambiguous statement of what the brand is, and - more
+// usefully - it forces the canonical facts to be written down once.
 function renderLlmsTxt({ brand, facts, sections = [] }) {
   const factMap = new Map((facts || []).map((f) => [f.fact_key, { value: f.fact_value, source: f.source_url }]));
   const get = (k) => (factMap.get(k) ? factMap.get(k).value : null);
@@ -482,7 +482,7 @@ function renderLlmsTxt({ brand, facts, sections = [] }) {
 
   // The content map. Sections come from the sitemap's own URL structure, so
   // this is a statement of what the site CONTAINS rather than of what has
-  // happened to rank — see contentSections() below for why that inversion
+  // happened to rank - see contentSections() below for why that inversion
   // matters. Where a section held more pages than are listed, the total is
   // stated, because a truncated list that does not say it is truncated reads as
   // a complete inventory.
@@ -513,7 +513,7 @@ function renderLlmsTxt({ brand, facts, sections = [] }) {
   return lines.join('\n');
 }
 
-// THE CONTENT MAP FOR llms.txt — BUILT FROM THE SITEMAP.
+// THE CONTENT MAP FOR llms.txt - BUILT FROM THE SITEMAP.
 //
 // This used to be built from Search Console: the pages with the most clicks
 // over 90 days. That was wrong for what llms.txt is for, in two ways that both
@@ -530,8 +530,8 @@ function renderLlmsTxt({ brand, facts, sections = [] }) {
 //   file can be grouped the way the site is organised, which is what makes it
 //   readable to a machine and to a person.
 //
-// So the sitemap is now the source of record, and Search Console — where it
-// exists — is used only to ORDER pages within each section and to annotate the
+// So the sitemap is now the source of record, and Search Console - where it
+// exists - is used only to ORDER pages within each section and to annotate the
 // busiest ones. That inverts the old relationship: coverage from the sitemap,
 // prominence from GSC. Where a brand has no GSC history the file is complete
 // and merely unordered, instead of empty.
@@ -712,7 +712,7 @@ async function run({ userId, brand, adoptRunId = null, url, wantedTypes = [], wa
     // how it is decided and what evidence is reported.
     const classified = pageTypeLib.classify(doc, { brand });
 
-    // The FINAL, pasteable blocks — one per type the page type permits, each
+    // The FINAL, pasteable blocks - one per type the page type permits, each
     // with its unknowable properties omitted rather than nulled, plus the
     // combined @graph that actually goes on the page. See ./schemaBuilder.js.
     const built = schemaBuilder.build({
@@ -720,7 +720,7 @@ async function run({ userId, brand, adoptRunId = null, url, wantedTypes = [], wa
     });
 
     // The old fragment generator is kept because two of its outputs are still
-    // the clearest way to show WHY a type was offered — but the pasteable
+    // the clearest way to show WHY a type was offered - but the pasteable
     // artefact is now `built`, and the UI leads with that.
     const generated = generateFromPage(doc, brand, facts);
 
@@ -755,7 +755,7 @@ async function run({ userId, brand, adoptRunId = null, url, wantedTypes = [], wa
     // THE WRONG-TYPE FINDING.
     //
     // A declared type the page's own content contradicts. Reported at high
-    // severity because it is not a missing improvement — it is markup that
+    // severity because it is not a missing improvement - it is markup that
     // actively misdescribes the page, and Google's response to a Product block
     // that fails retail validation is to distrust the site's structured data
     // more broadly, not only that one block.
@@ -767,7 +767,7 @@ async function run({ userId, brand, adoptRunId = null, url, wantedTypes = [], wa
           detail: `${mm.reason} The classification rests on: ${classified.evidence.filter((e) => e.type === classified.type).slice(0, 4).map((e) => e.why).join('; ')}.`
             + (classified.confident
               ? ''
-              : ` The classifier is NOT confident here — ${classified.label} scored ${classified.score} against ${classified.runnerUp ? `${classified.runnerUp.label} at ${classified.runnerUp.score}` : 'nothing else'} — so confirm the page type before removing anything.`),
+              : ` The classifier is NOT confident here - ${classified.label} scored ${classified.score} against ${classified.runnerUp ? `${classified.runnerUp.label} at ${classified.runnerUp.score}` : 'nothing else'} - so confirm the page type before removing anything.`),
           severity: classified.confident ? 'high' : 'medium',
           affectedUrl: target,
           action: built.blocks.length
@@ -796,7 +796,7 @@ async function run({ userId, brand, adoptRunId = null, url, wantedTypes = [], wa
         checkKey: 'generated_needs_input',
         title: `${needingInput.length} generated block${needingInput.length === 1 ? ' needs' : 's need'} a value that is not on the page`,
         detail: needingInput.map((b) => `${b.type}: ${b.requiredPlaceholders.map((x) => x.property).join(', ')}`).join('; ')
-          + '. These properties were OMITTED rather than written as null, so each block is valid JSON-LD as it stands — but the rich result it targets needs them.',
+          + '. These properties were OMITTED rather than written as null, so each block is valid JSON-LD as it stands - but the rich result it targets needs them.',
         severity: 'low',
         affectedUrl: target,
         affectedCount: built.counts.requiredPlaceholders,
@@ -814,7 +814,7 @@ async function run({ userId, brand, adoptRunId = null, url, wantedTypes = [], wa
         severity: 'high',
         affectedUrl: target,
         action: built.blocks.length
-          ? `This page is a ${classified.label.toLowerCase()}. Paste the combined @graph generated below — it carries ${built.blocks.map((g) => g.type).join(', ')}, all built from content already visible on the page, and ${built.counts.readyToPaste} of ${built.counts.blocks} block(s) need no further input.`
+          ? `This page is a ${classified.label.toLowerCase()}. Paste the combined @graph generated below - it carries ${built.blocks.map((g) => g.type).join(', ')}, all built from content already visible on the page, and ${built.counts.readyToPaste} of ${built.counts.blocks} block(s) need no further input.`
           : 'Add at least an Organization block sitewide and a page-type block here.',
         evidence: { generated: built.blocks.map((g) => g.type), pageType: classified.type },
         dedupeKey: `schema:none:${target}`,
@@ -825,7 +825,7 @@ async function run({ userId, brand, adoptRunId = null, url, wantedTypes = [], wa
       findings.push({
         checkKey: 'invalid_json',
         title: 'A JSON-LD block on the page does not parse',
-        detail: `${b.error}. This block is invisible to Google and to every AI crawler — the markup is present in the source but has no effect whatsoever.`,
+        detail: `${b.error}. This block is invisible to Google and to every AI crawler - the markup is present in the source but has no effect whatsoever.`,
         severity: 'critical',
         affectedUrl: target,
         action: 'Fix the JSON syntax. The usual causes are an unescaped quote in a description, a trailing comma, or a template variable that rendered empty.',
@@ -890,7 +890,7 @@ async function run({ userId, brand, adoptRunId = null, url, wantedTypes = [], wa
         severity: 'medium',
         affectedUrl: target,
         affectedCount: oughtTo.length,
-        action: 'Paste the combined @graph below. Organization and WebSite belong in the shared layout rather than on this page alone — the block list says which is which.',
+        action: 'Paste the combined @graph below. Organization and WebSite belong in the shared layout rather than on this page alone - the block list says which is which.',
         evidence: { types: oughtTo, pageType: classified.type },
         dedupeKey: `schema:missingtypes:${target}`,
       });
@@ -900,7 +900,7 @@ async function run({ userId, brand, adoptRunId = null, url, wantedTypes = [], wa
       findings.push({
         checkKey: 'duplicate_formats',
         title: 'The page carries both JSON-LD and microdata',
-        detail: `Microdata types present: ${[...new Set(microdata)].slice(0, 6).join(', ')}. Two formats describing the same thing is a common source of contradictory markup — Google reads both and does not always prefer the one you intend.`,
+        detail: `Microdata types present: ${[...new Set(microdata)].slice(0, 6).join(', ')}. Two formats describing the same thing is a common source of contradictory markup - Google reads both and does not always prefer the one you intend.`,
         severity: 'low',
         affectedUrl: target,
         action: 'Consolidate on JSON-LD and remove the microdata attributes, or confirm the two do not contradict each other.',
@@ -944,7 +944,7 @@ async function run({ userId, brand, adoptRunId = null, url, wantedTypes = [], wa
           readyToPaste: built.counts.readyToPaste,
           skippedTypes: built.counts.skipped,
         },
-        // What kind of page this is, with the evidence — the answer everything
+        // What kind of page this is, with the evidence - the answer everything
         // below depends on.
         pageType: built.pageType,
         // The pasteable artefact: one complete block per permitted type, the
@@ -1062,7 +1062,7 @@ function toTasks(run, brand, { userId }) {
     const r = tasksLib.upsertTask({
       userId,
       brandId: run.brand_id,
-      title: `${f.title} — ${run.target}`,
+      title: `${f.title} - ${run.target}`,
       detail: `${f.detail}\n\nRecommended: ${f.action || ''}`.trim(),
       source: 'aiseo',
       sourceRef: `aiseo:schema:${run.id}:${f.check_key}`,

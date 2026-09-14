@@ -1,7 +1,7 @@
 // 6. COMPETITIVE INTELLIGENCE AND GAP ANALYSIS
 //
 // Reverse-engineers what named competitors publish, how fast they publish it,
-// how they link internally, and where their coverage exceeds this brand's —
+// how they link internally, and where their coverage exceeds this brand's - 
 // then says which of those gaps are worth closing.
 //
 // WHAT IS MEASURED HERE AND WHAT CANNOT BE
@@ -9,20 +9,20 @@
 // where invented numbers do the most damage.
 //
 //   MEASURED, from a real fetch of their site:
-//     - their content inventory (sitemap + crawl)
-//     - which topics and entities they cover, and which this brand does not
-//     - their publishing velocity, from sitemap lastmod and on-page dates
-//     - their internal anchor-text patterns, which reveal what they think
+//    - their content inventory (sitemap + crawl)
+//    - which topics and entities they cover, and which this brand does not
+//    - their publishing velocity, from sitemap lastmod and on-page dates
+//    - their internal anchor-text patterns, which reveal what they think
 //       their own money pages are
-//     - their structured data, their schema types, their author markup
-//     - their page-level technical posture (TTFB, HTML size, JS dependence)
+//    - their structured data, their schema types, their author markup
+//    - their page-level technical posture (TTFB, HTML size, JS dependence)
 //
 //   MEASURED, from Search Console, for THIS brand only:
-//     - the queries this site is shown for, and at what position
+//    - the queries this site is shown for, and at what position
 //
 //   NOT AVAILABLE without a paid credential:
-//     - their organic traffic estimate (Semrush)
-//     - which pages AI assistants actually cite (DataForSEO/Profound)
+//    - their organic traffic estimate (Semrush)
+//    - which pages AI assistants actually cite (DataForSEO/Profound)
 //
 // The adapters for those exist in ./providers.js and activate on a key. The
 // report says, on the page, which questions it cannot answer. That is
@@ -53,7 +53,7 @@
 // AND THE NOISE IS GONE
 // Competitor brand names, generic button labels and marketing section headings
 // ("Learn More", "Why Choose Us", "Office Headquarters") were dominating every
-// gap list — structurally, because a competitor's own brand is the entity most
+// gap list - structurally, because a competitor's own brand is the entity most
 // certain to be on their pages and not on ours. ./boilerplate.js filters them
 // and reports what it removed, so the suppression is auditable rather than
 // silent.
@@ -64,7 +64,7 @@
 // component of it, is whether each site is READABLE by the retrieval fetchers
 // and structured to be quotable. That is computed for every competitor with the
 // same code that scores this brand (./readiness.js, ./nlp.citability) and
-// reported as a comparison — labelled as a readiness comparison, not as
+// reported as a comparison - labelled as a readiness comparison, not as
 // citation share.
 const db = require('../../db');
 const nlp = require('./nlp');
@@ -111,7 +111,7 @@ function remove(brandId, id) {
 //
 // Reported with an explicit caveat that the UI surfaces: many CMS platforms
 // stamp lastmod on every page at deploy time, which makes an inactive site look
-// prolific. The check detects that — if most lastmod values fall on one or two
+// prolific. The check detects that - if most lastmod values fall on one or two
 // days, the dates are a deploy artefact, and velocity is reported as unknown
 // rather than as a large number.
 function velocityFromSitemap(urls) {
@@ -137,7 +137,7 @@ function velocityFromSitemap(urls) {
   if (topDayShare > 0.5 && byDay.size < 8) {
     return {
       usable: false,
-      reason: `${Math.round(topDayShare * 100)}% of lastmod dates fall on ${days[0][0]} — these are almost certainly stamped at deploy time, not at edit time, so they say nothing about publishing activity`,
+      reason: `${Math.round(topDayShare * 100)}% of lastmod dates fall on ${days[0][0]} - these are almost certainly stamped at deploy time, not at edit time, so they say nothing about publishing activity`,
       dated: dated.length, total: urls.length, distinctDays: byDay.size,
     };
   }
@@ -187,7 +187,7 @@ function anchorPatterns(pages) {
       if (anchor.length > 70) return;
       // The hand-written stoplist here covered ten phrases. The shared filter
       // covers the whole generic-UI vocabulary plus pricing furniture, and is
-      // the same one the on-page and gap analyses use — so "what a competitor
+      // the same one the on-page and gap analyses use - so "what a competitor
       // links with" now means the same thing everywhere in the suite.
       if (boilerplate.isGenericUi(anchor)) return;
       counts.set(anchor, (counts.get(anchor) || 0) + 1);
@@ -222,7 +222,7 @@ function topicProfile(pages) {
 
   usablePages.forEach((p) => {
     const doc = p.doc;
-    // Word count stays on the full main region — it is a measure of page size,
+    // Word count stays on the full main region - it is a measure of page size,
     // and stripping the template would make it incomparable with every other
     // word count in the suite. Everything SEMANTIC below uses the clean text.
     words += doc.wordCount;
@@ -340,7 +340,7 @@ async function run({
         score: null,
         result: {
           empty: true,
-          reason: 'No competitors are configured for this brand. Add two to four domains you genuinely compete with — an automatically-guessed list is wrong often enough to waste the crawl.',
+          reason: 'No competitors are configured for this brand. Add two to four domains you genuinely compete with - an automatically-guessed list is wrong often enough to waste the crawl.',
           competitors: [],
         },
         findings: [{
@@ -413,7 +413,7 @@ async function run({
         referring,
         // The crawled pages are kept on the competitor record so the topic
         // matrix can score them without re-crawling. Dropped from the stored
-        // payload before it is written — see `theirsForStorage` below — because
+        // payload before it is written - see `theirsForStorage` below - because
         // a parsed cheerio document per page would be megabytes of JSON.
         pages: crawl.pages,
         homeTitle: posture && posture.reachable ? (crawl.pages.find((pp) => pp.ok && pp.doc) || { doc: {} }).doc.title : null,
@@ -446,11 +446,11 @@ async function run({
     //
     // Assembled once and applied to every gap list below. Three sources, all
     // evidence rather than guesswork:
-    //   - the competitors' own brand names, derived from their domains and the
+    //  - the competitors' own brand names, derived from their domains and the
     //     brand half of their homepage titles;
-    //   - our own brand terms, because a competitor naming us is not a gap in
+    //  - our own brand terms, because a competitor naming us is not a gap in
     //     our content;
-    //   - every string that repeats across most pages of any site in the run,
+    //  - every string that repeats across most pages of any site in the run,
     //     which is that site's template.
     const noiseOpts = {
       competitorTerms: boilerplate.competitorBrandTerms(theirs.map((t) => ({
@@ -494,8 +494,8 @@ async function run({
     const topicGaps = phraseFilter.kept.slice(0, 50);
 
     // What the cleaning removed, for the UI. A filter nobody can inspect is a
-    // filter nobody can trust, and the previous behaviour — surfacing these as
-    // recommendations — is exactly what this run has to be able to prove it
+    // filter nobody can trust, and the previous behaviour - surfacing these as
+    // recommendations - is exactly what this run has to be able to prove it
     // stopped doing.
     // The two filters are merged by ADDING their per-reason counts. Taking the
     // union of the two pre-rendered summary strings put "21 competitor brand
@@ -622,7 +622,7 @@ async function run({
     if (includeBacklinkGap) {
       // The referring-domain samples for every site were already gathered
       // above, so the gap table is assembled from those rather than re-fetching
-      // — except where a link-index credential exists, in which case
+      // - except where a link-index credential exists, in which case
       // backlinkGap() uses it and ignores the samples entirely.
       if (providers.has('moz')) {
         blGap = await gapAnalysis.backlinkGap(site, theirs.map((t) => t.domain), { sampleLimit: backlinkSampleLimit });
@@ -671,7 +671,7 @@ async function run({
           errors: [],
           mixedMethods: false,
           method: 'verified-sample',
-          caveat: `No link-index credential is configured, so each row is a VERIFIED SAMPLE: candidate pages found by a keyless web search were fetched and their outbound links read, and a domain counts only where a real link to the target was found. Capped at ${backlinkSampleLimit * 2} candidates per site, so every count is a FLOOR rather than a total — comparable between sites because the same cap applies to all of them, and not comparable to an Ahrefs or Semrush figure.`,
+          caveat: `No link-index credential is configured, so each row is a VERIFIED SAMPLE: candidate pages found by a keyless web search were fetched and their outbound links read, and a domain counts only where a real link to the target was found. Capped at ${backlinkSampleLimit * 2} candidates per site, so every count is a FLOOR rather than a total - comparable between sites because the same cap applies to all of them, and not comparable to an Ahrefs or Semrush figure.`,
         };
       }
     }
@@ -698,7 +698,7 @@ async function run({
         title: `${entityGaps.length} subjects at least half the competitors cover and this site does not`,
         detail: entityGaps.slice(0, 14).map((e) => `${e.surface} (${e.competitors} of ${theirs.length})`).join('; ') + '.'
           + (noiseRemoved.total
-            ? ` ${noiseRemoved.total} further candidate${noiseRemoved.total === 1 ? ' was' : 's were'} suppressed rather than reported (${noiseRemoved.summary.join(', ')}) — a competitor's own brand name and a generic button or section label are not subjects to write about.`
+            ? ` ${noiseRemoved.total} further candidate${noiseRemoved.total === 1 ? ' was' : 's were'} suppressed rather than reported (${noiseRemoved.summary.join(', ')}) - a competitor's own brand name and a generic button or section label are not subjects to write about.`
             : ''),
         severity: 'high',
         affectedCount: entityGaps.length,
@@ -719,7 +719,7 @@ async function run({
         detail: sectionGaps.slice(0, 8).map((g) => `/${g.section} (${g.competitors.map((c) => `${c.domain}: ${c.pages} pages`).join(', ')})`).join('; ') + '.',
         severity: 'medium',
         affectedCount: sectionGaps.length,
-        action: 'A section a competitor maintains at scale is a structural bet, not a content idea. Decide deliberately whether to match it — matching a 400-page glossary badly is worse than not having one.',
+        action: 'A section a competitor maintains at scale is a structural bet, not a content idea. Decide deliberately whether to match it - matching a 400-page glossary badly is worse than not having one.',
         evidence: { sections: sectionGaps.slice(0, 20) },
         dedupeKey: `competitive:sectiongap:${brandId}`,
       });
@@ -780,7 +780,7 @@ async function run({
             + kwGap.caveat,
           severity: absent.length >= 5 ? 'high' : 'medium',
           affectedCount: absent.length + behindOnKw.length,
-          action: 'Open the competitor URL shown against each row before deciding anything. The useful question is not "do they rank" but "what does their page do that ours does not" — and for a keyword where nobody ranks well, the answer is usually that the intent is served by a different page type entirely.',
+          action: 'Open the competitor URL shown against each row before deciding anything. The useful question is not "do they rank" but "what does their page do that ours does not" - and for a keyword where nobody ranks well, the answer is usually that the intent is served by a different page type entirely.',
           evidence: {
             columns: kwGap.columns,
             rows: kwGap.rows,
@@ -835,7 +835,7 @@ async function run({
         findings.push({
           checkKey: 'mentions_without_links',
           title: `${mentionsOnly} page${mentionsOnly === 1 ? '' : 's'} name a domain in this comparison without linking to it`,
-          detail: `Every candidate page found by search was fetched and its outbound links read. ${mentionsOnly} of them mention the domain in their text and carry no link to it. Those are unlinked mentions, not backlinks — and the previous version of this report counted them as referring domains, which is why the figures moved.`,
+          detail: `Every candidate page found by search was fetched and its outbound links read. ${mentionsOnly} of them mention the domain in their text and carry no link to it. Those are unlinked mentions, not backlinks - and the previous version of this report counted them as referring domains, which is why the figures moved.`,
           severity: 'low',
           affectedCount: mentionsOnly,
           action: 'Unlinked mentions of THIS brand are the easiest links available: the publisher already decided to write about you. Ask.',
@@ -845,13 +845,13 @@ async function run({
       }
     }
 
-    // Readiness comparison — labelled as what it is.
+    // Readiness comparison - labelled as what it is.
     const behindOn = theirs.filter((t) => (t.posture.homeCitability || 0) > (ourPosture.homeCitability || 0) + 10);
     if (behindOn.length) {
       findings.push({
         checkKey: 'citability_behind',
         title: `${behindOn.length} competitor${behindOn.length === 1 ? '' : 's'} score higher on AI-citability than this site`,
-        detail: `${behindOn.map((t) => `${t.domain}: ${t.posture.homeCitability}`).join(', ')} versus ${ourPosture.homeCitability} here. This is a structural readiness comparison — self-contained passages, structured blocks, visible dates, valid schema — not a measurement of actual AI citations, which needs a citation-tracking credential this deployment does not have.`,
+        detail: `${behindOn.map((t) => `${t.domain}: ${t.posture.homeCitability}`).join(', ')} versus ${ourPosture.homeCitability} here. This is a structural readiness comparison - self-contained passages, structured blocks, visible dates, valid schema - not a measurement of actual AI citations, which needs a citation-tracking credential this deployment does not have.`,
         severity: 'medium',
         affectedCount: behindOn.length,
         action: 'Run the on-page scorer on this site\'s key pages and act on the citability findings. The structural fixes are cheap and the gap closes quickly.',
@@ -909,9 +909,9 @@ async function run({
       findings.push({
         checkKey: 'velocity_baseline',
         title: 'Publishing-rate tracking is starting from scratch for at least one site in this run',
-        detail: `${baselineSites.join(', ')} — no prior sitemap snapshot exists for ${baselineSites.length === 1 ? 'it' : 'them'} yet, so this run recorded the starting inventory rather than a rate. A genuine observed publishing rate will appear once competitive analysis is run again after some time has passed.`,
+        detail: `${baselineSites.join(', ')} - no prior sitemap snapshot exists for ${baselineSites.length === 1 ? 'it' : 'them'} yet, so this run recorded the starting inventory rather than a rate. A genuine observed publishing rate will appear once competitive analysis is run again after some time has passed.`,
         severity: 'info',
-        action: 'Re-run competitive analysis periodically (e.g. monthly) — each run after the first sharpens the observed velocity figures for every site tracked.',
+        action: 'Re-run competitive analysis periodically (e.g. monthly) - each run after the first sharpens the observed velocity figures for every site tracked.',
         evidence: { ours: ourVelocityHistory, theirs: theirs.map((t) => ({ domain: t.domain, history: t.velocityHistory })) },
         dedupeKey: `competitive:velocitybaseline:${brandId}`,
       });
@@ -927,9 +927,9 @@ async function run({
       findings.push({
         checkKey: 'referring_pages_behind',
         title: `${referringAhead.length} competitor${referringAhead.length === 1 ? '' : 's'} have more verified referring domains in this sample than this site`,
-        detail: `${ourReferring.referringDomains.length} VERIFIED referring domain(s) found for this site versus ${referringAhead.map((t) => `${t.domain}: ${t.referring.referringDomains.length}`).join(', ')}. Each candidate page was fetched and its outbound links read, so every domain counted carries a real link — but the candidate list comes from a capped keyless web search, so these are floors, not totals. Not a substitute for a link index.`,
+        detail: `${ourReferring.referringDomains.length} VERIFIED referring domain(s) found for this site versus ${referringAhead.map((t) => `${t.domain}: ${t.referring.referringDomains.length}`).join(', ')}. Each candidate page was fetched and its outbound links read, so every domain counted carries a real link - but the candidate list comes from a capped keyless web search, so these are floors, not totals. Not a substitute for a link index.`,
         severity: 'low',
-        action: 'Open the referring pages listed for the ahead competitor(s) and see what they are being mentioned for — a directory listing, a review, a guest post — then judge whether the same opportunity exists for this brand.',
+        action: 'Open the referring pages listed for the ahead competitor(s) and see what they are being mentioned for - a directory listing, a review, a guest post - then judge whether the same opportunity exists for this brand.',
         evidence: {
           ours: { domain: hostKey(site), referringDomains: ourReferring.referringDomains },
           theirs: referringAhead.map((t) => ({ domain: t.domain, referringDomains: t.referring.referringDomains })),
@@ -946,7 +946,7 @@ async function run({
         checkKey: 'data_limits',
         title: `${missingProviders.length} competitive question${missingProviders.length === 1 ? '' : 's'} cannot be answered with the credentials configured`,
         detail: `Not measured: organic traffic estimates, and which pages AI assistants actually cite. `
-          + `Measured but SAMPLED rather than complete: referring domains (a verified sample — every counted domain carries a real link, but the candidate list is a capped web search, so counts are floors) and keyword positions (${kwGap && kwGap.ok ? `read from a ${kwGap.engine} result page, not from Google` : 'not read'}). `
+          + `Measured but SAMPLED rather than complete: referring domains (a verified sample - every counted domain carries a real link, but the candidate list is a capped web search, so counts are floors) and keyword positions (${kwGap && kwGap.ok ? `read from a ${kwGap.engine} result page, not from Google` : 'not read'}). `
           + `Adding a credential for ${missingProviders.map((p) => p.label).join(', ')} would replace the samples with complete counts and the non-Google positions with live Google SERPs. Everything else here is measured from a live fetch of the sites named.`,
         severity: 'info',
         action: missingProviders.map((p) => p.note).filter(Boolean).join(' '),
@@ -957,7 +957,7 @@ async function run({
 
     // Score: how this brand's measurable posture compares, averaged across the
     // dimensions that were actually measured. Deliberately not a "competitive
-    // strength" number — it is a coverage-and-readiness comparison and is
+    // strength" number - it is a coverage-and-readiness comparison and is
     // labelled as such in the UI.
     const dims = [];
     if (theirs.length) {

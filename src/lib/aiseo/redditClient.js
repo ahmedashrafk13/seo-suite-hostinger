@@ -1,10 +1,10 @@
-// REDDIT — the tiered, block-aware scraper.
+// REDDIT - the tiered, block-aware scraper.
 //
 // Ported from the lead-gen agent's `leadgen/scrapers/reddit.py` +
 // `leadgen/http_client.py`, because that design solves the problem this one has:
 // Reddit's anti-bot posture varies by endpoint, by IP reputation, and by week,
 // so a single endpoint is not a strategy. What carries over is the ARCHITECTURE
-// — a fallback chain, a paced session that backs off on a block and gives up
+// - a fallback chain, a paced session that backs off on a block and gives up
 // cleanly, and the distinction between "this endpoint failed" and "this
 // endpoint worked and there is genuinely nothing".
 //
@@ -15,7 +15,7 @@
 //   /search.json          HTTP 403 + a 185KB HTML block page, with or without
 //                         coherent client hints. Reddit has closed it to
 //                         anonymous server-side callers.
-//   old.reddit.com/search HTTP 200, but a 302 to /login/?reason=lor2 — a login
+//   old.reddit.com/search HTTP 200, but a 302 to /login/?reason=lor2 - a login
 //                         wall wearing a 200.
 //   /search/  (shreddit)  HTTP 200 and an 8KB JavaScript shell. No
 //                         <shreddit-post> elements: the results are rendered
@@ -112,12 +112,12 @@ class BrowserSession {
     this.lastError = null;
     // The last failure was a rate limit (429) rather than a closed door (403).
     // The caller uses this to decide whether falling through to the next tier
-    // makes sense — see the note in searchTerm.
+    // makes sense - see the note in searchTerm.
     this.rateLimited = false;
     // Tiers that answered 403. A 403 from Reddit is not "busy", it is "this
     // endpoint is closed to unauthenticated callers", and it will be 403 on
     // every subsequent request. Retrying it once per search term spent two
-    // thirds of the request budget on a guaranteed failure — and each wasted
+    // thirds of the request budget on a guaranteed failure - and each wasted
     // request pushed the session toward the rate limit that then broke the
     // tiers which DO work.
     this.deadTiers = new Set();
@@ -141,7 +141,7 @@ class BrowserSession {
     if (this.hardBlocked) return;
     const delay = Math.min(this.cooldownBaseMs * (2 ** (this.consecutiveBlocks - 1)), this.maxCooldownMs);
     // eslint-disable-next-line no-console
-    console.warn(`[reddit] blocked (#${this.consecutiveBlocks}) — cooling down ${Math.round(delay / 1000)}s`);
+    console.warn(`[reddit] blocked (#${this.consecutiveBlocks}) - cooling down ${Math.round(delay / 1000)}s`);
     await sleep(delay);
   }
 
@@ -239,7 +239,7 @@ const stripTags = (s) => decodeEntities(s).replace(/<[^>]+>/g, ' ').replace(/\s+
 
 // Reddit's feeds are ATOM (<entry>, <updated>, <link href="">), not RSS 2.0
 // (<item>, <pubDate>, <link>text</link>). Getting that wrong yields zero items
-// from a perfectly good 200, which is indistinguishable from "no mentions" —
+// from a perfectly good 200, which is indistinguishable from "no mentions" - 
 // so both shapes are handled.
 function parseFeed(xml) {
   const text = String(xml || '');
@@ -285,7 +285,7 @@ function toMention(entry, matchedTerm) {
     title: entry.title || null,
     snippet: (entry.body || entry.title || '').slice(0, 800),
     author: entry.author || null,
-    // The feeds carry no score. Reported as 0 rather than guessed — an invented
+    // The feeds carry no score. Reported as 0 rather than guessed - an invented
     // engagement number would sort the whole list wrongly.
     engagement: Number.isFinite(entry.engagement) ? entry.engagement : 0,
     publishedAt: entry.publishedAt || null,
@@ -306,7 +306,7 @@ function searchParams({ term, sort, window: t, limit }) {
 // Tier order is deliberate: RSS is the one verified to answer, JSON is the
 // richest when it answers, HTML is the last resort.
 //
-// Each tier returns an ARRAY (it worked — possibly empty) or NULL (it failed,
+// Each tier returns an ARRAY (it worked - possibly empty) or NULL (it failed,
 // try the next). That distinction is the whole reason the chain is cheap: a
 // genuinely empty result must not burn two more requests against a rate limit
 // that matters.
@@ -402,8 +402,8 @@ const TIERS = [
       });
 
       // An empty parse here is far more likely a markup change or a JavaScript
-      // shell than a genuinely empty result page — this endpoint currently
-      // returns an 8KB shell — so hand off rather than asserting "no results".
+      // shell than a genuinely empty result page - this endpoint currently
+      // returns an 8KB shell - so hand off rather than asserting "no results".
       return out.length ? out : null;
     },
   },
@@ -525,7 +525,7 @@ async function searchTerm(session, {
       // 429 becomes a hard block.
       //
       // But the cooldown has already been served by the time control gets here,
-      // and this tier is the one that works — so retry IT once rather than
+      // and this tier is the one that works - so retry IT once rather than
       // losing the term. Without this a single transient 429 silently dropped a
       // whole search term, and the UI reported that term as having no mentions.
       if (session.rateLimited && !retriedAfterCooldown && !session.hardBlocked) {
@@ -545,13 +545,13 @@ async function searchTerm(session, {
       }
 
       if (session.rateLimited) {
-        attempts.push({ tier: '(chain)', outcome: 'aborted', reason: 'rate limited — no further endpoints tried on the same host for this term' });
+        attempts.push({ tier: '(chain)', outcome: 'aborted', reason: 'rate limited - no further endpoints tried on the same host for this term' });
         break;
       }
       continue;
     }
 
-    // An array — including an empty one — means this tier ANSWERED. Stop.
+    // An array - including an empty one - means this tier ANSWERED. Stop.
     attempts.push({ tier: tier.key, outcome: 'ok', items: items.length });
     return { ok: true, tier: tier.key, tierLabel: tier.label, items, attempts };
   }
@@ -581,7 +581,7 @@ async function search(terms, {
   // Subreddit-scoped search runs for the PRIMARY term only. Every term against
   // every subreddit multiplies requests against a rate limit that is the
   // binding constraint here, while the secondary terms are usually near-variants
-  // of the first (a brand name, its domain, its domain label) — so the extra
+  // of the first (a brand name, its domain, its domain label) - so the extra
   // requests buy very little and cost the working tiers a great deal.
   const primary = terms[0];
   if (primary) subreddits.forEach((sub) => targets.push({ term: primary, subreddit: sub }));
@@ -633,7 +633,7 @@ async function search(terms, {
       // explains a thin result far better than a bare item count.
       closedEndpoints: [...s.deadTiers],
     },
-    // One sentence the UI can show, naming which tier answered — the thing a
+    // One sentence the UI can show, naming which tier answered - the thing a
     // practitioner needs in order to trust or distrust the numbers.
     error: anyOk ? null : (perTarget[0] && perTarget[0].error) || 'Reddit returned nothing usable.',
   };
