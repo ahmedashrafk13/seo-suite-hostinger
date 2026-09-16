@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+<%- include('partials/pagehead', {
+  heading: 'Client report',
+  lede: 'Enter a prospect\'s website address and get a document you can send them - what is wrong with their site, what it is costing, and what we would do about it.'
+}) %>
+
+<% if (flash) { %><div class="notice good"><span class="notice-icon">&#10003;</span><div class="notice-body"><%= flash %></div></div><% } %>
+<% if (flashError) { %><div class="notice error"><span class="notice-icon">&#9888;</span><div class="notice-body"><%= flashError %></div></div><% } %>
+
+<% if (activeRuns.length) { %>
+  <div class="notice info">
+    <span class="notice-icon">&#8987;</span>
+    <div class="notice-body">
+      A report is being built for <strong><%= activeRuns[0].domain || activeRuns[0].url %></strong>
+      (<%= Math.round(activeRuns[0].elapsedMs / 1000) %>s so far).
+      Reports run one at a time, because each one crawls a whole site.
+      <a href="/client-report/<%= activeRuns[0].id %>">Watch it</a>.
+    </div>
+  </div>
+<% } %>
+
+  <div class="card">
+    <div class="card-head"><h3>Build a report</h3></div>
+    <div class="card-body">
+      <form method="POST" action="/client-report/run"><%- csrfField %>
+        <div class="field-row">
+          <label class="field" style="flex:2 1 320px">
+            <span>Website address</span>
+            <input type="text" name="url" placeholder="example.com" required autocomplete="off">
+          </label>
+          <label class="field">
+            <span>Country the business sells in</span>
+            <select name="market">
+              <% marketList.forEach(function (m) { %>
+                <option value="<%= m.code %>" <%= m.code === 'ZZ' ? 'selected' : '' %>><%= m.name %></option>
+              <% }) %>
+            </select>
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Company name <span class="muted">- optional</span></span>
+            <input type="text" name="company" placeholder="Read from the website if left blank" autocomplete="off">
+          </label>
+          <label class="field">
+            <span>Prepared for <span class="muted">- optional</span></span>
+            <input type="text" name="prepared_for" placeholder="The contact's name" autocomplete="off">
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Depth</span>
+            <select name="depth">
+              <option value="full" selected>Full report - <%= profiles.full.crawlPages %> pages, <%= profiles.full.estimate %></option>
+              <option value="quick">Quick scan - <%= profiles.quick.crawlPages %> pages, <%= profiles.quick.estimate %></option>
+            </select>
+          </label>
+        </div>
+
+        <div class="btn-row">
+          <button type="submit" class="btn" <%= perms.canWrite ? '' : 'disabled' %>>Build the report</button>
+        </div>
+
+        <p class="hint">
+          Nothing is requested from the prospect and nothing is installed on their site. Everything in the
+          report is measured from the outside, the way a search engine sees it. A full report crawls up to
+          <%= profiles.full.crawlPages %> pages, so it takes <%= profiles.full.estimate %> - start it before the call, not during it.
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <%# The two credentials that decide how complete a report can be. Stated as
+      notices rather than as blockers: a report missing its speed section is
+      still worth sending, and a blocked form on a Friday afternoon is not. %>
+  <% if (!googleConnected) { %>
+    <div class="notice">
+      <span class="notice-icon">&#8505;</span>
+      <div class="notice-body">
+        <strong>No Google account is connected.</strong> Reports will still be built, but without the speed
+        section (PageSpeed Insights authorises your Google account, not the prospect's) and without Google's
+        own search volumes. <a href="/connect">Connect Google</a>.
+      </div>
+    </div>
+  <% } %>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Your letterhead</h3>
+      <span class="sub">Printed on every client report. Set once.</span>
+    </div>
+    <div class="card-body">
+      <% if (!brand.configured) { %>
+        <div class="notice">
+          <span class="notice-icon">&#9888;</span>
+          <div class="notice-body">
+            No company name is set, so reports go out unbranded. That is the one thing a prospect notices.
+          </div>
+        </div>
+      <% } %>
+      <form method="POST" action="/client-report/branding"><%- csrfField %>
+        <div class="field-row">
+          <label class="field">
+            <span>Your company name</span>
+            <input type="text" name="company" value="<%= brand.company || '' %>" placeholder="Your agency">
+          </label>
+          <label class="field">
+            <span>Logo URL</span>
+            <input type="text" name="logo_url" value="<%= brand.logoUrl || '' %>" placeholder="https://yourdomain.com/logo.png">
+          </label>
+          <label class="field" style="flex:0 1 160px">
+            <span>Accent colour</span>
+            <input type="text" name="accent" value="<%= brand.accent || '' %>" placeholder="#1e4d6b">
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Tagline <span class="muted">- under your name on the cover</span></span>
+            <input type="text" name="tagline" value="<%= brand.tagline || '' %>" placeholder="Search marketing for independent retailers">
+          </label>
+          <label class="field">
+            <span>Contact line</span>
+            <input type="text" name="contact" value="<%= brand.contact || '' %>" placeholder="hello@yourdomain.com · 0161 000 0000">
+          </label>
+        </div>
+        <label class="field">
+          <span>Footer line</span>
+          <input type="text" name="footer" value="<%= brand.footer || '' %>" placeholder="Your Agency Ltd · Registered in England 00000000">
+        </label>
+        <div class="btn-row">
+          <button type="submit" class="btn secondary" <%= perms.canWrite ? '' : 'disabled' %>>Save letterhead</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Reports built</h3></div>
+    <div class="card-body">
+      <% if (!reports.length) { %>
+        <div class="empty-state">No client reports yet. Build the first one above.</div>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr>
+                <th>Website</th><th>Company</th><th>Depth</th>
+                <th class="num">Score</th><th>Status</th><th>Built</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% reports.forEach(function (r) { %>
+                <tr>
+                  <td><a href="/client-report/<%= r.id %>"><%= r.domain || r.url %></a></td>
+                  <td><%= r.company || '-' %></td>
+                  <td><%= r.depth === 'quick' ? 'Quick scan' : 'Full' %></td>
+                  <td class="num">
+                    <% if (r.score != null) { %>
+                      <strong><%= r.score %></strong><span class="muted">/100 <%= r.grade || '' %></span>
+                    <% } else { %>-<% } %>
+                  </td>
+                  <td>
+                    <span class="badge <%= statusBadge(r.status) %>"><%= r.status %></span>
+                    <% if (r.status === 'running' && r.stage) { %><span class="muted"> <%= r.stage %></span><% } %>
+                  </td>
+                  <td><%= fmtDateTime(r.started_at) %></td>
+                  <td class="num">
+                    <% if (r.status === 'completed') { %>
+                      <a class="btn secondary sm" href="/client-report/<%= r.id %>/document" target="_blank">Open document</a>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>

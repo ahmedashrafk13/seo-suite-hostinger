@@ -1,0 +1,856 @@
+<%
+/* THE CLIENT DOCUMENT.
+   ==========================================================================
+   This template renders `d` - the frozen payload on the client_reports row -
+   and reads nothing else. No database call, no live figure, no app link: a
+   report opened a year from now shows exactly what was sent.
+
+   IT IS WRITTEN TO BE PRINTED. The sales team's delivery route is
+   Print -> Save as PDF -> attach to an email, so every rule below that looks
+   fussy (page-break control, no fixed viewport units, no dark mode, a print
+   bar that hides itself) exists to make that PDF come out right.
+
+   IT CARRIES NO INTERNAL CHROME. No sidebar, no nav, no run ids, no "generated
+   by SEO Suite" line. A client receiving a document with another company's
+   application furniture on it has been sent a screenshot, not a report.        */
+
+const a = d.agency || {};
+const accent = /^#[0-9a-f]{3,8}$/i.test(String(a.accent || '')) ? a.accent : null;
+const c = d.client || {};
+
+function n(v) { return Math.round(Number(v) || 0).toLocaleString('en-US'); }
+function money(v) { return v == null ? null : `${Number(v).toFixed(2)}`; }
+function sevClass(s) {
+  return s === 'critical' ? 'critical' : (s === 'important' ? 'high' : 'low');
+}
+function gradeClass(score) {
+  if (score == null) return 'unknown';
+  if (score >= 85) return 'good';
+  if (score >= 70) return 'ok';
+  if (score >= 55) return 'medium';
+  return 'critical';
+}
+const dateLong = new Date(d.generatedAt).toLocaleDateString('en-GB', {
+  day: 'numeric', month: 'long', year: 'numeric',
+});
+
+/* Section numbering is computed rather than typed, so a section that is
+   omitted because its data was not collected does not leave a gap in the
+   sequence - "3, 5, 6" on a contents page is the kind of detail that makes a
+   document look automated. */
+let sectionNo = 0;
+const num = () => ++sectionNo;
+%>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title><%= c.company %> - Website and search visibility review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;450;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+  :root {
+    --ink: #14181f;
+    --ink-2: #4a5462;
+    --ink-3: #78828f;
+    --rule: #e3e7ed;
+    --rule-soft: #eef1f5;
+    --paper: #ffffff;
+    --accent: <%= accent || '#1e4d6b' %>;
+    --critical: #b2233a; --critical-soft: #fdf0f2;
+    --high: #b0590a;     --high-soft: #fdf4ea;
+    --medium: #8a6a00;   --medium-soft: #fdf8e6;
+    --low: #33607d;      --low-soft: #eef4f8;
+    --good: #14724c;     --good-soft: #e9f7f0;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0 auto;
+    max-width: 880px;
+    padding: 28px 28px 72px;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14.5px;
+    line-height: 1.62;
+    font-feature-settings: "kern" 1;
+  }
+  h1, h2, h3, .display {
+    font-family: "Space Grotesk", "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+  p { margin: 0 0 12px; }
+  a { color: var(--accent); }
+
+  /* ---------------------------------------------------------- print bar */
+  .bar { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin-bottom: 24px; }
+  .bar button {
+    font: inherit; font-weight: 600; padding: 9px 18px; border-radius: 7px;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+  }
+  .bar button:hover { filter: brightness(1.08); }
+  .bar .tip { color: var(--ink-3); font-size: 12.5px; margin-right: auto; }
+
+  /* ------------------------------------------------------------- cover */
+  .letterhead { display: flex; align-items: center; gap: 16px; padding-bottom: 20px; border-bottom: 2px solid var(--accent); }
+  .letterhead img { max-height: 52px; max-width: 220px; width: auto; }
+  .letterhead .who { font-weight: 650; font-size: 16px; letter-spacing: -0.01em; }
+  .letterhead .tagline { color: var(--ink-3); font-size: 12.5px; }
+
+  .cover { padding: 44px 0 34px; border-bottom: 1px solid var(--rule); }
+  .cover .eyebrow {
+    text-transform: uppercase; letter-spacing: 0.16em; font-size: 11px;
+    font-weight: 600; color: var(--accent);
+  }
+  .cover h1 { font-size: 38px; line-height: 1.12; margin: 12px 0 8px; }
+  .cover .subject { font-size: 17px; color: var(--ink-2); margin: 0 0 22px; }
+  .cover-meta { display: flex; flex-wrap: wrap; gap: 28px; font-size: 13px; color: var(--ink-2); }
+  .cover-meta .k { display: block; text-transform: uppercase; letter-spacing: 0.08em; font-size: 10.5px; color: var(--ink-3); }
+
+  /* ----------------------------------------------------------- sections */
+  section { padding-top: 34px; }
+  h2 {
+    font-size: 21px; margin: 0 0 4px;
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  h2 .no {
+    font-size: 12px; font-weight: 600; color: var(--accent);
+    border: 1px solid var(--accent); border-radius: 50%;
+    width: 24px; height: 24px; min-width: 24px; display: inline-flex;
+    align-items: center; justify-content: center; letter-spacing: 0;
+  }
+  .lede { color: var(--ink-2); margin: 0 0 18px; font-size: 14px; }
+  h3 { font-size: 15.5px; margin: 24px 0 8px; }
+
+  /* ------------------------------------------------------------- score */
+  .score-hero {
+    display: flex; gap: 26px; align-items: center;
+    border: 1px solid var(--rule); border-radius: 12px; padding: 22px 24px; margin: 0 0 20px;
+    background: linear-gradient(180deg, #fbfcfd, #fff);
+  }
+  .dial { text-align: center; min-width: 124px; }
+  .dial .value { font-family: "Space Grotesk", sans-serif; font-size: 52px; font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
+  .dial .outof { color: var(--ink-3); font-size: 12px; }
+  .dial .grade { margin-top: 8px; font-weight: 600; font-size: 13px; }
+  .dial.good .value { color: var(--good); } .dial.ok .value { color: var(--low); }
+  .dial.medium .value { color: var(--high); } .dial.critical .value { color: var(--critical); }
+  .dial.unknown .value { color: var(--ink-3); }
+
+  .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+  .pillar { background: #fff; padding: 14px 16px; }
+  .pillar .name { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+  .pillar .val { font-family: "Space Grotesk", sans-serif; font-size: 26px; font-weight: 650; line-height: 1.2; margin: 2px 0; }
+  .pillar .note { font-size: 12px; color: var(--ink-2); line-height: 1.45; }
+  .pillar.good .val { color: var(--good); } .pillar.ok .val { color: var(--low); }
+  .pillar.medium .val { color: var(--high); } .pillar.critical .val { color: var(--critical); }
+  .pillar.unknown .val { color: var(--ink-3); font-size: 15px; font-weight: 500; padding-top: 6px; }
+  .meter { height: 5px; border-radius: 3px; background: var(--rule-soft); margin: 7px 0 8px; overflow: hidden; }
+  .meter span { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+  .pillar.good .meter span { background: var(--good); } .pillar.medium .meter span { background: var(--high); }
+  .pillar.critical .meter span { background: var(--critical); }
+
+  /* ---------------------------------------------------------- summary */
+  ul.findings { margin: 0 0 16px; padding: 0; list-style: none; }
+  ul.findings li { position: relative; padding-left: 22px; margin-bottom: 9px; }
+  ul.findings li::before {
+    content: ""; position: absolute; left: 4px; top: 9px; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--accent);
+  }
+  .callout {
+    border-left: 3px solid var(--accent); background: #f7fafc;
+    padding: 16px 18px; border-radius: 0 8px 8px 0; margin: 18px 0 0;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+
+  /* ----------------------------------------------------------- issues */
+  .issue { border: 1px solid var(--rule); border-radius: 11px; padding: 18px 20px; margin-bottom: 14px; break-inside: avoid; }
+  .issue-head { display: flex; align-items: flex-start; gap: 13px; margin-bottom: 10px; }
+  .issue-no {
+    font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 15px; color: #fff;
+    background: var(--accent); width: 28px; height: 28px; min-width: 28px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .issue h3 { margin: 2px 0 0; font-size: 16px; flex: 1; }
+  .issue .row { margin: 0 0 9px; }
+  .issue .lbl {
+    display: block; font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--ink-3); margin-bottom: 2px;
+  }
+  .issue .row p { margin: 0; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 11px; border-top: 1px dashed var(--rule); }
+  .examples { margin: 8px 0 0; padding: 10px 12px; background: #fafbfc; border-radius: 7px; font-size: 12px; color: var(--ink-2); }
+  .examples ul { margin: 4px 0 0; padding-left: 16px; }
+  .examples li { margin-bottom: 2px; word-break: break-word; }
+
+  .badge {
+    display: inline-block; font-size: 11px; font-weight: 550; padding: 2.5px 9px;
+    border-radius: 999px; border: 1px solid; white-space: nowrap;
+  }
+  .badge.critical { background: var(--critical-soft); color: var(--critical); border-color: #f2ced5; }
+  .badge.high { background: var(--high-soft); color: var(--high); border-color: #f3ddc4; }
+  .badge.medium { background: var(--medium-soft); color: var(--medium); border-color: #f0e5b8; }
+  .badge.low { background: var(--low-soft); color: var(--low); border-color: #cfe0ec; }
+  .badge.good { background: var(--good-soft); color: var(--good); border-color: #c4e7d6; }
+  .badge.plain { background: #f4f6f8; color: var(--ink-2); border-color: var(--rule); }
+
+  /* ----------------------------------------------------------- tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0 12px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  thead th {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--ink-3); font-weight: 600; border-bottom: 1px solid var(--rule);
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr:nth-child(even) { background: #fcfdfe; }
+  .table-note { font-size: 12px; color: var(--ink-3); margin: -4px 0 16px; }
+
+  /* ------------------------------------------------------------- plan */
+  .plan { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .plan-col { border: 1px solid var(--rule); border-radius: 11px; padding: 16px 18px; break-inside: avoid; }
+  .plan-col h3 { margin: 0 0 4px; font-size: 14.5px; }
+  .plan-col .when { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); font-weight: 600; }
+  .plan-col ol { margin: 10px 0 0; padding-left: 18px; font-size: 13px; }
+  .plan-col li { margin-bottom: 7px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .passed { columns: 2; column-gap: 26px; font-size: 12.5px; color: var(--ink-2); }
+  .passed div { break-inside: avoid; margin-bottom: 4px; padding-left: 18px; position: relative; }
+  .passed div::before { content: "\2713"; position: absolute; left: 0; color: var(--good); font-weight: 700; }
+
+  .method li { margin-bottom: 7px; }
+  .foot {
+    margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--rule);
+    color: var(--ink-3); font-size: 12px; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+  }
+
+  /* -------------------------------------------------------------- print */
+  @page { margin: 14mm 12mm; }
+  @media print {
+    body { max-width: none; padding: 0; font-size: 11.5pt; }
+    .bar { display: none; }
+    a { color: var(--ink); text-decoration: none; }
+    section { break-inside: auto; }
+    h2, h3 { break-after: avoid; }
+    .score-hero, .issue, .plan-col, .pillar { break-inside: avoid; }
+    tr { break-inside: avoid; }
+    .page-break { break-before: page; }
+  }
+  @media (max-width: 720px) {
+    .pillars, .plan, .two-col { grid-template-columns: 1fr; }
+    .score-hero { flex-direction: column; align-items: flex-start; }
+    .passed { columns: 1; }
+    .cover h1 { font-size: 30px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <span class="tip">Print, then choose "Save as PDF" to send this on.</span>
+  <button type="button" onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<%# ------------------------------------------------------------ letterhead %>
+<% if (a.company || a.logoUrl) { %>
+  <div class="letterhead">
+    <% if (a.logoUrl) { %><img src="<%= a.logoUrl %>" alt="<%= a.company || '' %>"><% } %>
+    <div>
+      <% if (a.company) { %><div class="who"><%= a.company %></div><% } %>
+      <% if (a.tagline) { %><div class="tagline"><%= a.tagline %></div><% } %>
+    </div>
+  </div>
+<% } %>
+
+<%# ----------------------------------------------------------------- cover %>
+<div class="cover">
+  <span class="eyebrow">Website and search visibility review</span>
+  <h1><%= c.company %></h1>
+  <p class="subject">An independent assessment of how <%= c.domain %> performs in search, what is holding it
+    back, and what we would change first.</p>
+  <div class="cover-meta">
+    <div><span class="k">Website</span><%= c.domain %></div>
+    <div><span class="k">Date of review</span><%= dateLong %></div>
+    <% if (c.preparedFor) { %><div><span class="k">Prepared for</span><%= c.preparedFor %></div><% } %>
+    <% if (a.company) { %><div><span class="k">Prepared by</span><%= a.company %></div><% } %>
+  </div>
+</div>
+
+<%# ------------------------------------------------------------- contents %>
+<%
+  // The chapter list is derived from what actually rendered, never hard-coded:
+  // a section whose collector failed is absent from the document, so it must be
+  // absent here too. Older stored reports carry no issuesByTopic, so this falls
+  // back to the area grouping rather than printing an empty contents page.
+  var topics = d.issuesByTopic || [];
+  var contents = ['Summary', 'Scorecard', 'What is holding the site back'];
+  if (d.keywords) contents.push('What people are searching for');
+  if (d.speed) contents.push('Speed and experience');
+  topics.forEach(function (t) { contents.push(t.label); });
+  if (!topics.length && d.issuesByArea && d.issuesByArea.length) contents.push('Everything else we found');
+  if (d.passed && d.passed.length) contents.push('What is already right');
+  contents.push('What we would do, in order');
+  contents.push('How this was measured');
+%>
+<section class="page-break">
+  <h2>Contents</h2>
+  <p class="lede">Every section of this review, in the order it appears.</p>
+  <table>
+    <tbody>
+      <% contents.forEach(function (title, i) { %>
+        <tr>
+          <td class="num" style="width:44px;color:var(--ink-3)"><%= String(i + 1).padStart(2, '0') %></td>
+          <td><%= title %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>
+
+<%# ------------------------------------------------------- 1. the summary %>
+<section>
+  <h2><span class="no"><%= num() %></span> Summary</h2>
+  <p class="lede">Everything below was measured directly from the live website on <%= dateLong %>.</p>
+
+  <ul class="findings">
+    <% d.headline.forEach(function (h) { %><li><%= h %></li><% }) %>
+  </ul>
+
+  <div class="callout"><p><%= d.positioning %></p></div>
+</section>
+
+<%# ----------------------------------------------------- 2. the scorecard %>
+<section>
+  <h2><span class="no"><%= num() %></span> Scorecard</h2>
+  <p class="lede">Six measures of how well the website works for search. Each is scored out of 100 from the
+    checks listed later in this report.</p>
+
+  <div class="score-hero">
+    <div class="dial <%= gradeClass(d.overall.score) %>">
+      <div class="value"><%= d.overall.score == null ? '-' : d.overall.score %></div>
+      <div class="outof">out of 100</div>
+      <div class="grade">Grade <%= d.overall.grade || '-' %></div>
+    </div>
+    <div>
+      <p style="margin:0 0 6px"><strong><%= d.overall.label %>.</strong>
+        <% if (d.overall.score != null && d.overall.score >= 70) { %>
+          The site is built on solid ground. The score below 100 is made up of specific, listed issues rather
+          than anything structural, which means the work is incremental rather than a rebuild.
+        <% } else if (d.overall.score != null) { %>
+          The score is pulled down by issues that repeat across many pages. That is the good kind of problem:
+          a handful of changes made once in a template usually moves several of these measures at the same time.
+        <% } else { %>
+          Not enough of the site could be measured to give an overall score. The sections below state what was
+          and was not readable.
+        <% } %>
+      </p>
+      <p style="margin:0; font-size:13px; color:var(--ink-2)">
+        The overall figure is weighted: whether search engines can reach and read the site counts for more than
+        anything else, because nothing else matters until they can. A measure we could not take is left out of
+        the calculation rather than counted as a pass.
+      </p>
+    </div>
+  </div>
+
+  <div class="pillars">
+    <% d.pillars.forEach(function (p) { %>
+      <div class="pillar <%= gradeClass(p.score) %>">
+        <div class="name"><%= p.label %></div>
+        <div class="val"><%= p.score == null ? 'Not measured' : p.score %></div>
+        <% if (p.score != null) { %><div class="meter"><span style="width:<%= Math.max(2, Math.min(100, p.score)) %>%"></span></div><% } %>
+        <div class="note"><%= p.score == null ? p.unknownReason : p.note %></div>
+      </div>
+    <% }) %>
+  </div>
+</section>
+
+<%# --------------------------------------------------- 3. priority issues %>
+<% if (d.priorities.length) { %>
+<section class="page-break">
+  <h2><span class="no"><%= num() %></span> What is holding the site back</h2>
+  <p class="lede">
+    The <%= d.priorities.length %> issues that cost the most, in order. Each is ranked on how directly it affects
+    what the site can rank for and on how much of the site it affects. There
+    <%= d.issueCounts.total === 1 ? 'is 1 issue' : 'are ' + d.issueCounts.total + ' issues' %> in total, and every
+    one of them is listed in full later in this report.
+  </p>
+
+  <% d.priorities.forEach(function (p) { %>
+    <div class="issue">
+      <div class="issue-head">
+        <div class="issue-no"><%= p.rank %></div>
+        <h3><%= p.headline %></h3>
+        <span class="badge <%= sevClass(p.severity) %>"><%= p.severity %></span>
+      </div>
+
+      <div class="row">
+        <span class="lbl">What we found</span>
+        <p><%= p.what %></p>
+      </div>
+
+      <% if (p.why) { %>
+        <div class="row">
+          <span class="lbl">Why it matters</span>
+          <p><%= p.why %></p>
+        </div>
+      <% } %>
+
+      <% if (p.fix) { %>
+        <div class="row">
+          <span class="lbl">What we would do</span>
+          <p><%= p.fix %></p>
+        </div>
+      <% } %>
+
+      <% if (p.examples && p.examples.length) { %>
+        <div class="examples">
+          <strong>Examples from your site</strong>
+          <ul>
+            <% p.examples.slice(0, 4).forEach(function (ex) { %>
+              <li><%= ex.url || '' %><% if (ex.note) { %> <span style="color:var(--ink-3)">- <%= ex.note %></span><% } %></li>
+            <% }) %>
+          </ul>
+        </div>
+      <% } %>
+
+      <div class="tags">
+        <span class="badge plain"><%= p.areaLabel %></span>
+        <span class="badge plain"><%= p.effortLabel %></span>
+        <span class="badge plain">Suggested: <%= p.horizon %></span>
+        <% if (p.count) { %><span class="badge plain"><%= n(p.count) %> <%= p.unit %> affected</span><% } %>
+      </div>
+    </div>
+  <% }) %>
+</section>
+<% } %>
+
+<%# ------------------------------------------------- 4. search visibility %>
+<% if (d.keywords) { %>
+<section class="page-break">
+  <h2><span class="no"><%= num() %></span> What people are searching for</h2>
+  <p class="lede">
+    Google's own figures for what people type in around <%= c.domain %>, for <%= d.keywords.marketLabel %>.
+    These are search volumes reported by Google Ads, not estimates.
+  </p>
+
+  <div class="pillars" style="grid-template-columns: repeat(3, 1fr); margin-bottom:18px">
+    <div class="pillar">
+      <div class="name">Monthly searches</div>
+      <div class="val"><%= n(d.keywords.totalSearches) %></div>
+      <div class="note">Across the <%= n(d.keywords.rowsTotal) %> terms Google associates with this site.</div>
+    </div>
+    <div class="pillar">
+      <div class="name">Terms sampled</div>
+      <div class="val"><%= n(d.keywords.visible + d.keywords.notVisible) %></div>
+      <div class="note">We checked the search results for the highest-volume terms to see who appears.</div>
+    </div>
+    <div class="pillar <%= d.keywords.visibleShare != null && d.keywords.visibleShare < 30 ? 'critical' : '' %>">
+      <div class="name">You appeared for</div>
+      <div class="val"><%= d.keywords.visible %></div>
+      <div class="note">
+        <%= d.keywords.visibleShare == null ? 'No sample was available.'
+          : d.keywords.visibleShare + '% of the terms we sampled.' %>
+      </div>
+    </div>
+  </div>
+
+  <% if (d.keywords.gaps.length) { %>
+    <h3>The biggest gaps</h3>
+    <p style="font-size:13px;color:var(--ink-2)">
+      Searches happening every month where your site did not appear in the results we sampled, largest first.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Search term</th>
+          <th class="num">Monthly searches</th>
+          <th>Competition</th>
+          <th class="num">What advertisers pay</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% d.keywords.gaps.forEach(function (g) { %>
+          <tr>
+            <td><%= g.keyword %></td>
+            <td class="num"><%= g.volume == null ? '-' : n(g.volume) %></td>
+            <td><%= g.competition ? String(g.competition).toLowerCase() : '-' %></td>
+            <td class="num"><%= g.topBidHigh == null ? '-' : money(g.topBidHigh) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <p class="table-note">
+      "What advertisers pay" is the top-of-page bid Google reports for that term. It is the clearest available
+      measure of what a visitor from that search is worth commercially - and it is what you would pay per click
+      for the same visitor through advertising.
+    </p>
+  <% } %>
+
+  <% if (d.keywords.rivals && d.keywords.rivals.length) { %>
+    <h3>Who appears instead</h3>
+    <p style="font-size:13px;color:var(--ink-2)">
+      The sites that came up most often on the searches where yours did not, across the results we sampled.
+    </p>
+    <table>
+      <thead><tr><th>Website</th><th class="num">Appeared on</th></tr></thead>
+      <tbody>
+        <% d.keywords.rivals.forEach(function (r) { %>
+          <tr>
+            <td><%= r.domain %></td>
+            <td class="num"><%= r.appearances %> of the <%= d.keywords.notVisible %> searches you missed</td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+
+  <h3>The demand in full</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Search term</th>
+        <th class="num">Monthly searches</th>
+        <th>Competition</th>
+        <th class="num">Year on year</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% d.keywords.rows.slice(0, 25).forEach(function (r) { %>
+        <tr>
+          <td><%= r.keyword %></td>
+          <td class="num"><%= r.volume == null ? '-' : n(r.volume) %></td>
+          <td><%= r.competition ? String(r.competition).toLowerCase() : '-' %></td>
+          <td class="num"><%= r.changeYoY == null ? '-' : (r.changeYoY > 0 ? '+' : '') + Math.round(r.changeYoY) + '%' %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% if (d.method.serpCaveat) { %>
+    <p class="table-note"><%= d.method.serpCaveat %></p>
+  <% } %>
+</section>
+<% } %>
+
+<%# --------------------------------------------------------- 5. the speed %>
+<% if (d.speed) { %>
+<section>
+  <h2><span class="no"><%= num() %></span> Speed and experience</h2>
+  <p class="lede">
+    How the site performs on a phone, measured with Google PageSpeed Insights - the same tool Google uses to
+    decide whether a site is fast enough.
+  </p>
+
+  <% d.speed.pages.forEach(function (p, i) { %>
+    <% if (i === 0 || p.vitals.length) { %>
+      <h3><%= i === 0 ? 'Home page' : p.url %></h3>
+      <table>
+        <thead><tr><th>Measure</th><th class="num">Score out of 100</th><th>Reading</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Speed on a phone</td>
+            <td class="num"><%= p.performance == null ? '-' : p.performance %></td>
+            <td><%= p.performance == null ? 'Not measured'
+              : (p.performance >= 90 ? 'Fast' : (p.performance >= 50 ? 'Slower than it should be' : 'Slow enough to lose visitors')) %></td>
+          </tr>
+          <tr>
+            <td>Accessibility</td>
+            <td class="num"><%= p.accessibility == null ? '-' : p.accessibility %></td>
+            <td>How usable the site is for visitors with a disability - increasingly a legal question as well as a commercial one.</td>
+          </tr>
+          <tr>
+            <td>Search-engine basics</td>
+            <td class="num"><%= p.seo == null ? '-' : p.seo %></td>
+            <td>Google's own checklist of whether a page is set up to be found.</td>
+          </tr>
+          <tr>
+            <td>Best practice</td>
+            <td class="num"><%= p.bestPractices == null ? '-' : p.bestPractices %></td>
+            <td>Security, correct image sizing and modern browser standards.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <% if (p.vitals.length) { %>
+        <p style="font-size:13px;color:var(--ink-2);margin-top:14px">
+          <strong>What real visitors experienced</strong> over the last 28 days, as recorded by Google from
+          Chrome users on your site.
+        </p>
+        <table>
+          <thead><tr><th>Measure</th><th class="num">Your site</th><th class="num">Target</th><th>What it means</th></tr></thead>
+          <tbody>
+            <% p.vitals.forEach(function (v) { %>
+              <tr>
+                <td><%= v.label %></td>
+                <td class="num">
+                  <span class="badge <%= v.band === 'good' ? 'good' : (v.band === 'average' ? 'medium' : 'critical') %>"><%= v.value %></span>
+                </td>
+                <td class="num"><%= v.target || '-' %></td>
+                <td><%= v.plain %><% if (v.why) { %> <span style="color:var(--ink-3)"><%= v.why %></span><% } %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } else if (i === 0) { %>
+        <table>
+          <thead><tr><th>Measure</th><th class="num">Laboratory result</th></tr></thead>
+          <tbody>
+            <% p.labMetrics.forEach(function (m) { %>
+              <tr><td><%= m.title %></td><td class="num"><%= m.value %></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <p class="table-note">
+          Google does not yet hold enough real-visitor data for this site to report what actual visitors
+          experience, so these are laboratory measurements taken on a simulated mobile connection. They are a
+          fair guide and they are not the same thing.
+        </p>
+      <% } %>
+
+      <% if (p.opportunities && p.opportunities.length) { %>
+        <p style="font-size:13px;color:var(--ink-2);margin-top:14px"><strong>What is slowing it down</strong>,
+          in Google's own words - the list your developer would work from.</p>
+        <ul class="findings">
+          <% p.opportunities.slice(0, 5).forEach(function (o) { %>
+            <li><%= o.title %><% if (o.savingsMs) { %> <span style="color:var(--ink-3)">- around <%= (o.savingsMs / 1000).toFixed(1) %>s to be saved</span><% } %></li>
+          <% }) %>
+        </ul>
+      <% } %>
+    <% } %>
+  <% }) %>
+
+  <% if (d.speed.desktop && d.speed.desktop.length && d.speed.desktop[0].performance != null) { %>
+    <p style="font-size:13px;color:var(--ink-2)">
+      On a desktop computer the home page scores <strong><%= d.speed.desktop[0].performance %> out of 100</strong>.
+      Google judges the mobile version first, which is why the phone figure is the one that matters for rankings.
+    </p>
+  <% } %>
+</section>
+<% } %>
+
+<%# ------------------------------------------------ 6. AI and structured data %>
+<% var aiPillar = d.pillars.filter(function (p) { return p.key === 'ai'; })[0]; %>
+<% if (aiPillar || d.schema) { %>
+<section>
+  <h2><span class="no"><%= num() %></span> AI assistants and rich listings</h2>
+  <p class="lede">
+    A growing share of searches now end in an answer rather than a list of links. Whether ChatGPT, Perplexity
+    or Google's AI answers can name your business depends on whether they can read the site and whether it
+    describes itself in a form they can reuse.
+  </p>
+
+  <% if (aiPillar && aiPillar.score != null) { %>
+    <p>
+      <strong>The site scores <%= aiPillar.score %> out of 100</strong> on whether AI systems can reach, read
+      and quote it. We tested this by requesting pages as each of the major search and AI crawlers in turn, and
+      by reading the instructions the site gives them.
+    </p>
+  <% } else if (aiPillar) { %>
+    <p><%= aiPillar.unknownReason %></p>
+  <% } %>
+
+  <% if (d.schema) { %>
+    <h3>How the site describes itself</h3>
+    <% if (d.schema.presentTypes.length) { %>
+      <p>
+        The home page carries machine-readable descriptions of
+        <strong><%= d.schema.presentTypes.join(', ') %></strong>.
+        <% if (d.schema.errorCount) { %>
+          <%= d.schema.errorCount === 1 ? 'One of them has an error' : d.schema.errorCount + ' of them have errors' %>
+          that stop search engines using it.
+        <% } %>
+        <% if (d.schema.missingTypes.length) { %>
+          Based on what is already visible on the page, it also qualifies for
+          <strong><%= d.schema.missingTypes.join(', ') %></strong>, which it does not currently declare - each
+          of those can produce extra detail in your search listing.
+        <% } %>
+      </p>
+    <% } else { %>
+      <p>
+        The home page carries no machine-readable description of the business at all. This is the hidden text
+        that produces star ratings, opening hours, prices and FAQ answers directly in a search result, and it
+        is a primary source for AI assistants answering questions about a company. Adding it is a one-off
+        change to the site template.
+      </p>
+    <% } %>
+  <% } %>
+
+  <% if (d.siteSignals && !d.siteSignals.contentInHtml) { %>
+    <div class="callout">
+      <p><strong>One thing worth knowing.</strong> The site builds its content in the visitor's browser rather
+      than sending it ready-made. Search engines can usually cope with this; the crawlers behind AI assistants
+      do not run that code at all, so to them large parts of the site may appear empty. This is an
+      architectural decision rather than a bug, and it has a cost that is worth being deliberate about.</p>
+    </div>
+  <% } %>
+</section>
+<% } %>
+
+<%# ------------------------------------------- 7. the findings, by chapter %>
+<%# Grouped into the same chapters the agency's own onboarding report uses, so a %>
+<%# client reading both documents finds the same subject in the same place. The %>
+<%# chapters our review adds and theirs does not - structured data, AI search   %>
+<%# readiness - sit in the same sequence rather than being bolted on at the end. %>
+<% if (d.issuesByTopic && d.issuesByTopic.length) { %>
+  <% d.issuesByTopic.forEach(function (topic) { %>
+    <section class="page-break">
+      <h2><span class="no"><%= num() %></span> <%= topic.label %></h2>
+      <p class="lede">
+        <%= topic.cards.length %> <%= topic.cards.length === 1 ? 'finding' : 'findings' %> in this area<% if (topic.criticalCount) { %>,
+        <%= topic.criticalCount %> of <%= topic.criticalCount === 1 ? 'which needs' : 'which need' %> attention first<% } %>.
+      </p>
+      <% topic.cards.forEach(function (card) { %>
+        <div class="issue">
+          <h3><%= card.headline %>
+            <span class="badge <%= sevClass(card.severity) %>"><%= card.severity %></span></h3>
+          <p><%= card.what %></p>
+          <% if (card.why) { %><p style="color:var(--ink-2)"><%= card.why %></p><% } %>
+          <% if (card.fix) { %><p><strong>What we would do:</strong> <%= card.fix %></p><% } %>
+          <p style="color:var(--ink-3);font-size:12.5px">
+            <%= card.count ? n(card.count) + ' ' + card.unit + ' affected' : 'Site-wide' %>
+            &middot; <%= card.effortLabel %> &middot; <%= card.horizon %>
+          </p>
+          <% if (card.examples && card.examples.length) { %>
+            <div class="examples">
+              Examples
+              <ul>
+                <% card.examples.forEach(function (ex) { %>
+                  <li><%= ex.url || ex.note %><% if (ex.url && ex.note) { %> - <%= ex.note %><% } %></li>
+                <% }) %>
+              </ul>
+            </div>
+          <% } %>
+        </div>
+      <% }) %>
+    </section>
+  <% }) %>
+<% } else if (d.issuesByArea && d.issuesByArea.length) { %>
+  <%# Older stored reports, rendered the way they were built. %>
+  <section class="page-break">
+    <h2><span class="no"><%= num() %></span> Everything else we found</h2>
+    <% d.issuesByArea.forEach(function (area) { %>
+      <h3><%= area.label %></h3>
+      <table>
+        <thead><tr><th>Issue</th><th class="num">Affected</th><th>Severity</th><th>Effort</th></tr></thead>
+        <tbody>
+          <% area.cards.forEach(function (card) { %>
+            <tr>
+              <td>
+                <strong><%= card.headline %></strong>
+                <div style="color:var(--ink-2);font-size:12.5px"><%= card.what %></div>
+              </td>
+              <td class="num"><%= card.count ? n(card.count) + ' ' + card.unit : '-' %></td>
+              <td><span class="badge <%= sevClass(card.severity) %>"><%= card.severity %></span></td>
+              <td><%= card.effortLabel %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% }) %>
+  </section>
+<% } %>
+
+<%# --------------------------------------------------- 8. what is going well %>
+<% if (d.passed && d.passed.length) { %>
+<section>
+  <h2><span class="no"><%= num() %></span> What is already right</h2>
+  <p class="lede">
+    <%= d.passed.length %> of the checks we ran came back clean. They are listed because a review that reports
+    only problems is not a review - and because these are the things not to break.
+  </p>
+  <div class="passed">
+    <% d.passed.forEach(function (p) { %><div><%= p.name %></div><% }) %>
+  </div>
+</section>
+<% } %>
+
+<%# -------------------------------------------------------------- 9. plan %>
+<section class="page-break">
+  <h2><span class="no"><%= num() %></span> What we would do, in order</h2>
+  <p class="lede">
+    Sequenced by what moves the needle soonest for the least work. Nothing here requires a rebuild of the site.
+  </p>
+  <div class="plan">
+    <div class="plan-col">
+      <span class="when">First 30 days</span>
+      <h3>Fix what is costing you now</h3>
+      <% if (d.plan.thirty.length) { %>
+        <ol><% d.plan.thirty.forEach(function (x) { %><li><%= x.headline %></li><% }) %></ol>
+      <% } else { %><p style="font-size:13px;color:var(--ink-2);margin:8px 0 0">Nothing urgent enough to sit here.</p><% } %>
+    </div>
+    <div class="plan-col">
+      <span class="when">Days 30-60</span>
+      <h3>Strengthen the foundations</h3>
+      <% if (d.plan.sixty.length) { %>
+        <ol><% d.plan.sixty.forEach(function (x) { %><li><%= x.headline %></li><% }) %></ol>
+      <% } else { %><p style="font-size:13px;color:var(--ink-2);margin:8px 0 0">Nothing in this band.</p><% } %>
+    </div>
+    <div class="plan-col">
+      <span class="when">Days 60-90</span>
+      <h3>Build the position</h3>
+      <% if (d.plan.ninety.length) { %>
+        <ol><% d.plan.ninety.forEach(function (x) { %><li><%= x.headline %></li><% }) %></ol>
+      <% } else { %><p style="font-size:13px;color:var(--ink-2);margin:8px 0 0">Nothing in this band.</p><% } %>
+    </div>
+  </div>
+  <% if (d.keywords && d.keywords.gapSearches > 0) { %>
+    <div class="callout">
+      <p>Alongside the fixes, the content work follows the measured demand shown earlier:
+      <strong><%= n(d.keywords.gapSearches) %> searches a month</strong> across the terms we sampled where the
+      site did not appear at all. Those are the pages worth writing first, because the demand for them is
+      already measured rather than assumed.</p>
+    </div>
+  <% } %>
+</section>
+
+<%# ------------------------------------------------------------ 10. method %>
+<section>
+  <h2><span class="no"><%= num() %></span> How this was measured</h2>
+  <p class="lede">
+    So that every figure in this document can be checked, and so it is clear what was not measured rather than
+    left to be assumed.
+  </p>
+
+  <div class="two-col">
+    <div>
+      <h3>What we measured</h3>
+      <ul class="findings method">
+        <% d.method.measured.forEach(function (m) { %><li><%= m %></li><% }) %>
+      </ul>
+    </div>
+    <div>
+      <h3>What this review does not cover</h3>
+      <ul class="findings method">
+        <% d.method.notMeasured.forEach(function (m) { %><li><%= m %></li><% }) %>
+      </ul>
+    </div>
+  </div>
+
+  <p style="font-size:12.5px;color:var(--ink-3);margin-top:14px">
+    The crawl read <%= n(d.method.crawlScope.pagesCrawled) %>
+    <%= d.method.crawlScope.pagesCrawled === 1 ? 'page' : 'pages' %> and checked
+    <%= n(d.method.crawlScope.linksChecked) %> links against
+    <%= d.method.crawlScope.checksRun %> separate tests.
+    <% if (d.method.crawlScope.cappedOut) { %>
+      It stopped at <%= n(d.method.crawlScope.cap) %> pages, which is the limit we set for a review of this
+      length - the site may have more.
+    <% } %>
+    No figure in this document is estimated, projected or modelled; where something could not be measured, it
+    is named above rather than filled in.
+  </p>
+</section>
+
+<div class="foot">
+  <div>
+    <% if (a.company) { %><strong><%= a.company %></strong><% } %>
+    <% if (a.contact) { %> &middot; <%= a.contact %><% } %>
+    <% if (a.footer) { %><div><%= a.footer %></div><% } %>
+  </div>
+  <div><%= c.company %> &middot; <%= c.domain %> &middot; <%= dateLong %></div>
+</div>
+
+</body>
+</html>

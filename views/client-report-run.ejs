@@ -1,0 +1,195 @@
+<%
+/* THE INTERNAL VIEW of a client report.
+   Everything the team needs and the client must never see: which collectors
+   ran, which failed and why, links into the raw evidence, and the controls.
+   The document itself is a separate template with none of this on it. */
+const d = report.result;
+const internal = d && d.internal ? d.internal : null;
+const SOURCE_LABEL = {
+  crawl: 'Site crawl', readiness: 'Crawlability and AI access', schema: 'Structured data',
+  speed: 'PageSpeed Insights', keywords: 'Google search volumes',
+  visibility: 'Search result sample', linking: 'Internal links',
+};
+%>
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<div class="app">
+<%- include('partials/sidebar') %>
+<%- include('partials/topbar') %>
+
+  <div class="btn-row" style="margin-bottom:12px">
+    <a class="btn secondary sm" href="/client-report">&larr; All client reports</a>
+    <div class="spacer"></div>
+    <% if (report.status === 'completed') { %>
+      <a class="btn" href="/client-report/<%= report.id %>/document" target="_blank">Open the client document</a>
+      <a class="btn secondary sm" href="/client-report/<%= report.id %>/json" target="_blank">JSON</a>
+    <% } %>
+    <form method="POST" action="/client-report/<%= report.id %>/delete" style="display:inline"
+          onsubmit="return confirm('Delete this client report? This cannot be undone.')"><%- csrfField %>
+      <button type="submit" class="btn danger-ghost sm">Delete</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h1 style="font-size:var(--fs-xl)"><%= report.company || report.domain %></h1>
+      <span class="sub"><%= report.url %> &middot; <%= report.depth === 'quick' ? 'Quick scan' : 'Full report' %>
+        &middot; started <%= fmtDateTime(report.started_at) %></span>
+    </div>
+    <div class="card-body">
+      <p style="margin:0 0 8px">
+        <span class="badge <%= statusBadge(report.status) %>"><%= report.status %></span>
+        <% if (report.score != null) { %>
+          <span class="badge good"><%= report.score %>/100 &middot; grade <%= report.grade %></span>
+        <% } %>
+        <% if (report.ms) { %><span class="muted"> built in <%= Math.round(report.ms / 1000) %>s</span><% } %>
+      </p>
+
+      <% if (report.status === 'error') { %>
+        <div class="notice error"><span class="notice-icon">&#9888;</span>
+          <div class="notice-body"><%= report.error || 'The report failed.' %></div></div>
+      <% } %>
+
+      <% if (orphaned) { %>
+        <div class="notice error"><span class="notice-icon">&#9888;</span>
+          <div class="notice-body">
+            This report was interrupted - the application restarted while it was being built. Start it again.
+          </div></div>
+      <% } else if (report.status === 'running') { %>
+        <div class="notice info" id="progress-area">
+          <span class="notice-icon">&#8987;</span>
+          <div class="notice-body">
+            <div><strong id="stage-line"><%= report.stage || 'Working' %></strong></div>
+            <div class="hint">
+              This page updates by itself. A full report crawls the whole site, so ten to twenty minutes is
+              normal - you can close this tab and come back to it.
+            </div>
+          </div>
+        </div>
+        <script>
+          (function poll() {
+            fetch('/client-report/<%= report.id %>/status')
+              .then(function (r) { return r.json(); })
+              .then(function (d) {
+                if (d.status && d.status !== 'running') { window.location.reload(); return; }
+                var el = document.getElementById('stage-line');
+                if (el && d.stage) el.textContent = d.stage;
+                var log = document.getElementById('stage-log');
+                if (log && d.progress) {
+                  log.innerHTML = '';
+                  d.progress.slice(-12).forEach(function (p) {
+                    var li = document.createElement('li');
+                    li.textContent = p.at + '  ' + p.label + (p.ok === false ? '  (failed: ' + (p.note || '') + ')' : '');
+                    if (p.ok === false) li.className = 'bad';
+                    log.appendChild(li);
+                  });
+                }
+                setTimeout(poll, 4000);
+              })
+              .catch(function () { setTimeout(poll, 6000); });
+          })();
+        </script>
+      <% } %>
+
+      <% if (report.progress && report.progress.length) { %>
+        <details <%= report.status === 'running' ? 'open' : '' %>>
+          <summary>Build log</summary>
+          <ul id="stage-log" class="tight-list">
+            <% report.progress.slice(-20).forEach(function (p) { %>
+              <li class="<%= p.ok === false ? 'bad' : '' %>">
+                <span class="muted"><%= p.at %></span> <%= p.label %><%
+                  if (p.ok === false) { %> <span class="muted">(failed: <%= p.note %>)</span><% }
+                %>
+              </li>
+            <% }) %>
+          </ul>
+        </details>
+      <% } %>
+    </div>
+  </div>
+
+<% if (d) { %>
+  <div class="card">
+    <div class="card-head">
+      <h3>What went into it</h3>
+      <span class="sub">Only the team sees this. The client document says what was measured, not which call failed.</span>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Source</th><th>Result</th><th class="num">Took</th><th>Evidence</th></tr></thead>
+          <tbody>
+            <% Object.entries((internal && internal.attempts) || {}).forEach(function (entry) {
+                 const key = entry[0]; const a = entry[1];
+                 const runs = (internal && internal.sourceRuns) || {};
+                 let link = null;
+                 if (key === 'crawl' && runs.auditRunId) link = '/audit/' + runs.auditRunId;
+                 if (key === 'readiness' && runs.readinessRunId) link = '/ai-seo/site-readiness/' + runs.readinessRunId;
+                 if (key === 'schema' && runs.schemaRunId) link = '/ai-seo/schema/' + runs.schemaRunId;
+                 if (key === 'linking' && runs.linkingRunId) link = '/linking/' + runs.linkingRunId;
+            %>
+              <tr>
+                <td><%= SOURCE_LABEL[key] || key %></td>
+                <td>
+                  <span class="badge <%= a.ok ? 'good' : 'medium' %>"><%= a.ok ? 'used' : 'not used' %></span>
+                  <% if (!a.ok && a.error) { %><span class="muted"> <%= a.error %></span><% } %>
+                </td>
+                <td class="num"><%= a.ms ? Math.round(a.ms / 1000) + 's' : '-' %></td>
+                <td><% if (link) { %><a href="<%= link %>">Open the raw run</a><% } else { %><span class="muted">-</span><% } %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Scorecard</h3></div>
+    <div class="card-body">
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Pillar</th><th class="num">Score</th><th class="num">Weight</th><th>Reading</th></tr></thead>
+          <tbody>
+            <% d.pillars.forEach(function (p) { %>
+              <tr>
+                <td><%= p.label %></td>
+                <td class="num"><%= p.score == null ? 'not measured' : p.score %></td>
+                <td class="num"><%= p.weight %></td>
+                <td><%= p.score == null ? p.unknownReason : p.label + ' - ' + p.note %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint">
+        A pillar that could not be measured is excluded from the overall score on both sides of the ratio,
+        rather than being scored as if it had passed.
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Priorities in the document</h3>
+      <span class="sub"><%= d.issueCounts.total %> issues found &middot; <%= d.issueCounts.critical %> critical
+        &middot; <%= d.issueCounts.quickWins %> quick wins</span>
+    </div>
+    <div class="card-body">
+      <ol class="tight-list">
+        <% d.priorities.forEach(function (p) { %>
+          <li>
+            <strong><%= p.headline %></strong>
+            <span class="muted"><%= p.areaLabel %> &middot; <%= p.severity %> &middot; <%= p.effortLabel %>
+              &middot; priority <%= p.priority %><%= p.mapped ? '' : ' &middot; UNMAPPED - written in the tool\'s own words' %></span>
+          </li>
+        <% }) %>
+      </ol>
+    </div>
+  </div>
+<% } %>
+
+<%- include('partials/sidebar-end') %>
+<%- include('partials/foot') %>
